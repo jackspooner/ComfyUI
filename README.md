@@ -437,3 +437,36 @@ This approach allows you to easily switch between the stable fortnightly release
 ### Which GPU should I buy for this?
 
 [See this page for some recommendations](https://github.com/comfyanonymous/ComfyUI/wiki/Which-GPU-should-I-buy-for-ComfyUI)
+
+## Worktree development
+
+Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_worktree.py` before editing. The configured Python must be >=3.10 with PyTorch, einops and safetensors installed from the ComfyUI deployment's requirements. The check reuses that explicit runtime without copying dependencies, installing packages, loading models or connecting to a service. It is safe to rerun and leaves tracked files unchanged. GPU validation requires a compatible GPU/runtime and separately provisioned model files; unit tests use isolated fixtures.
+
+## Local fork: pinned-memory and prefetch recovery
+
+This fork is based on [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+and its [upstream README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
+Upstream supplies the node editor, local image/audio/video inference, model
+loading and offloading, API and extension system documented above. Original
+attribution and licensing remain unchanged.
+
+The local repair makes a failed host-memory registration discard its temporary
+allocation before evicting other registrations. Retrying allocates from the
+buffer's current offset, avoiding stale pointers and invalid truncation. Partial
+prefetch batches and their VBAR faults remain reachable to existing cleanup after
+an exception. Successful sampling math and model interfaces are unchanged.
+
+Activate core changes by restarting an idle instance; an already-running process
+retains the old implementation and any stale pin state. This repair addresses
+registration retry and exception cleanup, not every possible RAM/VRAM exhaustion.
+It does not reduce the target resolution or the memory required by H3 refinement.
+Third-party latent upscalers must separately use ComfyUI-managed model loading.
+
+CPU regression checks (pytest and the prepared ComfyUI runtime required):
+
+```bash
+OMP_NUM_THREADS=1 "$COMFYUI_PYTHON" -m pytest -q tests-unit/comfy_test/test_pinned_memory_recovery.py tests-unit/comfy_test/test_prefetch_recovery.py
+```
+
+The tests inject registration/eviction and prefetch failures without GPU work.
+Live CUDA inference and capacity limits require separate acceptance testing.
