@@ -11,10 +11,10 @@ optional decimation are separate downstream operations.
 
 Use the normal ComfyUI Python environment and native Trellis2 models. The encoder
 uses ComfyUI sparse convolutions, model patching, dtype selection and GPU memory
-management. Repeated blocks use the allocation compiler after sparse neighbor
-maps are built; topology-changing downsampling and variable-size sparse-convolution
-gather workspaces stay outside that repeated scope. Dense normalization and MLP
-operations retain allocation recording.
+management. Like the existing native sparse decoders, its varying topology and
+VRAM-dependent gather workspaces use the normal VAE path with prefetch hooks,
+without opening a separate allocation-recording scope. Service compiler and
+dynamic-VRAM settings remain unchanged.
 Its CPU mesh-to-dual-grid component requires a C++20 compiler, matching
 PyTorch development headers (included with PyTorch), setuptools, ninja and Eigen
 3 headers. No full O-Voxel, CuMesh, FlexGEMM or separate inference worker is needed.

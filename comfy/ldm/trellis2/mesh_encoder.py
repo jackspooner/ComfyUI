@@ -98,18 +98,6 @@ class SparseResBlockS2C3d(nn.Module):
         return h.replace(h.feats + skip.feats.reshape(len(skip.feats), self.out_channels, -1).mean(-1))
 
 
-class SparseEncoderConvNeXtBlock3d(SparseConvNeXtBlock3d):
-    def _forward(self, x):
-        # Sparse convolution chooses gather chunk sizes from current free VRAM.
-        # Keep that variable workspace out of repeated dense allocation plans.
-        with comfy.model_prefetch.pause_malloc_graph(sync=True):
-            h = self.conv(x)
-        h = h.replace(self.norm(h.feats))
-        h = h.replace(self.mlp(h.feats))
-        h.feats.add_(x.feats.to(h.feats))
-        return h
-
-
 class ShapeEncoder(nn.Module):
     def __init__(self):
         super().__init__()
@@ -118,31 +106,21 @@ class ShapeEncoder(nn.Module):
         self.to_latent = SparseLinear(channels[-1], 64)
         self.blocks = nn.ModuleList()
         for i, count in enumerate([0, 4, 8, 16, 4]):
-            stage = nn.ModuleList(SparseEncoderConvNeXtBlock3d(channels[i]) for _ in range(count))
+            stage = nn.ModuleList(SparseConvNeXtBlock3d(channels[i]) for _ in range(count))
             if i < 4:
                 stage.append(SparseResBlockS2C3d(channels[i], channels[i + 1]))
             self.blocks.append(stage)
 
     def encode_shape_slat(self, features, coords, resolution, transformer_options):
         h = self.input_layer(SparseTensor(feats=features, coords=coords))
-        for stage_index, stage in enumerate(self.blocks):
-            has_downsample = isinstance(stage[-1], SparseResBlockS2C3d)
-            repeated = list(stage[:-1] if has_downsample else stage)
-            if repeated:
-                prefetch = comfy.model_prefetch.make_prefetch_queue(repeated, features.device, transformer_options)
-                # Build persistent sparse neighbor maps outside the allocation
-                # graph. They outlive a block; topology changes between scales.
-                comfy.model_prefetch.prefetch_queue_pop(prefetch, features.device, repeated[0], features.dtype)
-                h = repeated[0](h)
-                with comfy.model_prefetch.malloc_graph_scope(features.device):
-                    for block in repeated[1:]:
-                        comfy.model_prefetch.prefetch_queue_pop(prefetch, features.device, block, features.dtype,
-                                                               malloc_scope=f"shape_encoder_{stage_index}")
-                        h = block(h)
-                    comfy.model_prefetch.prefetch_queue_pop(prefetch, features.device, None,
-                                                           malloc_scope=f"shape_encoder_{stage_index}")
-            if has_downsample:
-                h = stage[-1](h)
+        blocks = [block for stage in self.blocks for block in stage]
+        prefetch = comfy.model_prefetch.make_prefetch_queue(blocks, features.device, transformer_options)
+        # Follow the native sparse VAE execution path. Its coordinate caches and
+        # VRAM-dependent gathers do not form a repeatable transformer-block plan.
+        for block in blocks:
+            comfy.model_prefetch.prefetch_queue_pop(prefetch, features.device, block, features.dtype)
+            h = block(h)
+        comfy.model_prefetch.prefetch_queue_pop(prefetch, features.device, None)
         h = self.to_latent(h.replace(F.layer_norm(h.feats, h.feats.shape[-1:])))
         mean = h.feats[:, :32].float()
         mean = comfy.latent_formats.Trellis2ShapeSLAT().process_in(mean)
