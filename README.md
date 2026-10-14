@@ -44,6 +44,17 @@ ComfyUI is the AI creation engine for visual professionals who demand control ov
 - The most sophisticated workflows can be exposed through a simple UI thanks to App Mode.
 - It integrates seamlessly into production pipelines with our API endpoints.
 
+## Local stable-release maintenance
+
+This fork retains the upstream node engine, inference APIs and model support
+attributed above, plus local pinned-memory and partial-prefetch recovery fixes.
+The Linux installation uses its existing `.venv`, shared models outside Git and
+`comfyui.service`. [Stable-release operations](docs/stable-release-maintenance.md)
+describe verification, protected GPU dependencies and rollback. Develop changes
+in a linked worktree with `COMFYUI_PYTHON=/path/to/prepared/python python3
+scripts/setup_worktree.py`; it checks Python >=3.10, PyTorch, einops and safetensors
+without installing packages or starting workloads. Use that interpreter for tests.
+
 ## Get Started
 
 ### Local
