@@ -481,3 +481,15 @@ OMP_NUM_THREADS=1 "$COMFYUI_PYTHON" -m pytest -q tests-unit/comfy_test/test_pinn
 
 The tests inject registration/eviction and prefetch failures without GPU work.
 Live CUDA inference and capacity limits require separate acceptance testing.
+
+## Local fork: existing-mesh Trellis2 texturing
+
+`Trellis2 VAE Encode Mesh` encodes an existing mesh (including a TripoSplat-derived
+mesh) for native Trellis2 image-conditioned PBR texturing. It preserves faces while
+centering/scaling the mesh, and provides exact surface subdivisions for texture
+decoding. Use the returned mesh for UV unwrapping, baking and GLB export. The
+optional CPU converter build requires Eigen 3, a C++20 compiler and the prepared
+ComfyUI PyTorch runtime; weights are provisioned separately. See
+[setup, workflow, contracts and limitations](docs/trellis2-mesh-texturing.md).
+This extends the node engine, model loading and media workflows described in the
+[upstream README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).

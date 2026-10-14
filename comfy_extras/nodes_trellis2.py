@@ -4,6 +4,8 @@ from comfy.ldm.trellis2.vae import SparseTensor
 from comfy.ldm.trellis2.model import build_proj_transform_matrix, compute_stage_proj_feats
 
 from comfy_extras.nodes_mesh_postprocess import pack_variable_mesh_batch
+from comfy_extras.nodes_save_3d import get_mesh_batch_item
+from comfy.ldm.trellis2.mesh_encoder import mesh_to_dual_grid, shape_subdivisions
 import comfy.latent_formats
 import comfy.model_management
 import comfy.utils
@@ -112,6 +114,54 @@ def split_batched_sparse_latent(samples, coords, coord_counts):
         count = coords_i.shape[0]
         items.append((samples[i, :count], coords_i))
     return items
+
+class VaeEncodeMeshTrellis2(IO.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="VaeEncodeMeshTrellis2",
+            display_name="Trellis2 VAE Encode Mesh",
+            category="model/latent/trellis",
+            description="Encode an existing mesh for Trellis2 texturing. Normalizes to a unit cube; preserves faces. Use its normalized mesh and subdivisions with texture decoding and baking.",
+            inputs=[IO.Mesh.Input("mesh"), IO.Vae.Input("vae"),
+                    IO.Combo.Input("resolution", options=["512", "1024"], default="512")],
+            outputs=[IO.Latent.Output("shape_latent"), IO.Mesh.Output("normalized_mesh"),
+                     ShapeSubdivides.Output("shape_subdivides")],
+        )
+
+    @classmethod
+    def execute(cls, mesh, vae, resolution):
+        resolution = int(resolution)
+        if not isinstance(vae.first_stage_model, comfy.ldm.trellis2.mesh_encoder.ShapeEncoder):
+            raise ValueError("Select the Trellis2 shape encoder checkpoint, not the shape decoder VAE.")
+        device, output_device = vae.device, comfy.model_management.intermediate_device()
+        verts, faces, latents, subs = [], [], [], []
+        for i in range(len(mesh.vertices)):
+            v, f, _, _, _ = get_mesh_batch_item(mesh, i)
+            normalized, features, coords = mesh_to_dual_grid(v, f, resolution)
+            verts.append(normalized)
+            faces.append(f.cpu())
+            subs.append(shape_subdivisions(coords))
+            memory = _sparse_vae_decode_memory(len(coords), vae.vae_dtype)
+            comfy.model_management.load_models_gpu([vae.patcher], memory_required=memory, force_full_load=vae.disable_offload)
+            with comfy.model_management.cuda_device_context(device):
+                latent = vae.first_stage_model.encode_shape_slat(features.to(device=device, dtype=vae.vae_dtype), coords.to(device), resolution, vae.patcher.model_options.get("transformer_options", {}))
+            latents.append({k: value.to(output_device) if isinstance(value, torch.Tensor) else value for k, value in latent.items()})
+        counts = [item["samples"].shape[2] for item in latents]
+        samples = torch.zeros((len(latents), 32, max(counts), 1), device=output_device)
+        coord_list = []
+        for i, item in enumerate(latents):
+            samples[i, :, :counts[i]] = item["samples"][0]
+            c = item["coords"].clone()
+            c[:, 0] = i
+            coord_list.append(c)
+        latent = {"samples": samples, "coords": torch.cat(coord_list),
+                  "coord_counts": torch.tensor(counts, device=output_device),
+                  "coord_resolution": resolution // 16, "model_frame": "z_up", "type": "trellis2"}
+        combined_subs = [SparseTensor.from_tensor_list([s[j].feats.to(output_device) for s in subs],
+                                                     [s[j].coords.to(output_device) for s in subs]) for j in range(4)]
+        return IO.NodeOutput(latent, pack_variable_mesh_batch(verts, faces), combined_subs)
+
 
 class VaeDecodeShapeTrellis(IO.ComfyNode):
     @classmethod
@@ -882,6 +932,7 @@ class Trellis2Extension(ComfyExtension):
             Trellis2ShapeStage,
             EmptyTrellis2LatentStructure,
             Trellis2TextureStage,
+            VaeEncodeMeshTrellis2,
             VaeDecodeTextureTrellis,
             VaeDecodeShapeTrellis,
             VaeDecodeStructureTrellis2,

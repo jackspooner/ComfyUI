@@ -394,3 +394,12 @@
 Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_worktree.py` before editing. The configured Python must be >=3.10 with PyTorch, einops and safetensors installed from the ComfyUI deployment's requirements. The check reuses that explicit runtime without copying dependencies, installing packages, loading models or connecting to a service. It is safe to rerun and leaves tracked files unchanged. GPU validation requires a compatible GPU/runtime and separately provisioned model files; unit tests use isolated fixtures.
 
 Prepare the exact worktree GitNexus index separately after setup with embeddings disabled. Operating guidance belongs to the existing shared ComfyUI model-runtimes skill; do not register temporary worktrees as shared skill sources.
+
+### Optional Trellis2 mesh encoder
+
+For mesh-encoder work, use the same setup command with `--trellis-mesh` and
+`EIGEN_INCLUDE_DIR` pointing at Eigen 3 headers. It builds only a checkout-local
+CPU extension; no downloads or package installs occur. See
+`docs/trellis2-mesh-texturing.md` for compiler/PyTorch prerequisites and tests.
+The shared authoritative `comfyui` skill owns this workflow operating guidance;
+extend it alongside this capability rather than creating a per-model skill.

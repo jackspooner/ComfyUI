@@ -16,6 +16,7 @@ import comfy.ldm.lightricks.vae.audio_vae
 import comfy.ldm.cosmos.vae
 import comfy.ldm.wan.vae
 import comfy.ldm.trellis2.vae
+import comfy.ldm.trellis2.mesh_encoder
 import comfy.ldm.wan.vae2_2
 import comfy.ldm.hunyuan3d.vae
 import comfy.ldm.seedvr.vae
@@ -599,6 +600,9 @@ class VAE:
                 self.memory_used_decode = lambda shape, dtype: (2500 * math.prod(shape[2:])) * model_management.dtype_size(dtype)
                 self.memory_used_encode = lambda shape, dtype: (2500 * math.prod(shape[2:])) * model_management.dtype_size(dtype)
                 self.first_stage_model = comfy.ldm.trellis2.vae.TextureVae()
+            elif all(k in sd for k in ("input_layer.weight", "to_latent.weight", "blocks.4.3.conv.weight", "blocks.0.0.conv1.weight")) and sd["input_layer.weight"].shape[0] == 64 and sd["to_latent.weight"].shape[0] == 64:
+                self.working_dtypes = [torch.float16, torch.bfloat16, torch.float32]
+                self.first_stage_model = comfy.ldm.trellis2.mesh_encoder.ShapeEncoder()
             elif "decoder.up_blocks.2.upsamplers.0.upscale_conv.weight" in sd: # seedvr2
                 self.first_stage_model = comfy.ldm.seedvr.vae.VideoAutoencoderKLWrapper()
                 self.latent_channels = comfy.ldm.seedvr.vae.SEEDVR2_LATENT_CHANNELS
