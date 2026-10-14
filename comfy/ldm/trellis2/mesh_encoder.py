@@ -98,6 +98,18 @@ class SparseResBlockS2C3d(nn.Module):
         return h.replace(h.feats + skip.feats.reshape(len(skip.feats), self.out_channels, -1).mean(-1))
 
 
+class SparseEncoderConvNeXtBlock3d(SparseConvNeXtBlock3d):
+    def _forward(self, x):
+        # Sparse convolution chooses gather chunk sizes from current free VRAM.
+        # Keep that variable workspace out of repeated dense allocation plans.
+        with comfy.model_prefetch.pause_malloc_graph(sync=True):
+            h = self.conv(x)
+        h = h.replace(self.norm(h.feats))
+        h = h.replace(self.mlp(h.feats))
+        h.feats.add_(x.feats.to(h.feats))
+        return h
+
+
 class ShapeEncoder(nn.Module):
     def __init__(self):
         super().__init__()
@@ -106,7 +118,7 @@ class ShapeEncoder(nn.Module):
         self.to_latent = SparseLinear(channels[-1], 64)
         self.blocks = nn.ModuleList()
         for i, count in enumerate([0, 4, 8, 16, 4]):
-            stage = nn.ModuleList(SparseConvNeXtBlock3d(channels[i]) for _ in range(count))
+            stage = nn.ModuleList(SparseEncoderConvNeXtBlock3d(channels[i]) for _ in range(count))
             if i < 4:
                 stage.append(SparseResBlockS2C3d(channels[i], channels[i + 1]))
             self.blocks.append(stage)
