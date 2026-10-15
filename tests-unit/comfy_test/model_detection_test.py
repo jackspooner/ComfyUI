@@ -351,3 +351,24 @@ class TestModelDetection:
             "combination, which makes detection ambiguous: "
             + "; ".join(", ".join(names) for names in duplicates.values())
         )
+
+
+def test_flux3_distilled_detection_uses_unpacked_output_width():
+    state = {
+        'content_mode_blocks.image.0.attn_out.weight': torch.empty(3072, 1536, device='meta'),
+        'single_stream_modulations.txt.lin.weight': torch.empty(9216, 1536, device='meta'),
+        'single_blocks.0.qkv.weight': torch.empty(9216, 1536, device='meta'),
+        'txt_mode_blocks.0.qkv.weight': torch.empty(9216, 1536, device='meta'),
+        'ref_time_in.in_layer.weight': torch.empty(3072, 128, device='meta'),
+    }
+    config = detect_unet_config(state, '')
+    assert config['image_model'] == 'flux3'
+    assert config['hidden_size'] == 3072
+    assert config['num_heads'] == 24
+    assert config['flow_map'] is True
+    assert config['fused_qkv'] is True
+    assert isinstance(model_config_from_unet_config(config), comfy.supported_models.Flux3)
+    del state['ref_time_in.in_layer.weight']
+    assert detect_unet_config(state, '')['flow_map'] is False
+    del state['content_mode_blocks.image.0.attn_out.weight']
+    assert detect_unet_config(state, '') is None
