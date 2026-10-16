@@ -67,6 +67,8 @@ The shared Llama/Qwen attention path honors per-module attention preferences in
 prefill and cached decoding. Explicit preferences use masked dispatch for fixed
 caches; unconfigured fixed caches retain the existing flash decode path. See
 [native audio integration status and verification](docs/native-audio-grounding.md).
+The same guide covers the offline, pinned VoiceGenerator BF16 converter. It
+preserves weights and tokenizer assets; native speech generation remains pending.
 
 ## Local stable-release maintenance
 

@@ -79,12 +79,14 @@ def expected_shapes():
 
 
 def inspect_shards(source, expected=None):
-    index = read_json(source / 'model.safetensors.index.json')
-    weight_map = index['weight_map']
-    if expected is not None and set(weight_map) != set(expected):
+    index_path = source / 'model.safetensors.index.json'
+    index = read_json(index_path) if index_path.exists() else None
+    weight_map = index['weight_map'] if index is not None else None
+    if expected is not None and weight_map is not None and set(weight_map) != set(expected):
         raise ValueError(f"Unexpected tensor inventory: missing {sorted(set(expected) - set(weight_map))}, extra {sorted(set(weight_map) - set(expected))}")
     records = {}
-    for filename in sorted(set(weight_map.values())):
+    filenames = sorted(set(weight_map.values())) if weight_map is not None else ['model.safetensors']
+    for filename in filenames:
         path = source / filename
         if path.resolve().parent != source.resolve():
             raise ValueError(f"Shard must be directly inside the source directory: {filename}")
@@ -105,16 +107,20 @@ def inspect_shards(source, expected=None):
         for key in keys:
             if key in records:
                 raise ValueError(f"Duplicate tensor across shards: {key}")
-            if weight_map.get(key) != filename:
+            if weight_map is not None and weight_map.get(key) != filename:
                 raise ValueError(f"Tensor not assigned to this shard: {key}")
             entry = header[key]
+            if expected is not None and key not in expected:
+                raise ValueError(f"Unexpected tensor: {key}")
             if expected is not None and (entry['shape'] != expected[key] or entry['dtype'] != 'BF16'):
                 raise ValueError(f"Unexpected shape/dtype for {key}: {entry['shape']} {entry['dtype']}")
             records[key] = (path, size + 8, entry)
-    if set(records) != set(weight_map):
+    if weight_map is not None and set(records) != set(weight_map):
         raise ValueError(f"Missing tensors: {sorted(set(weight_map) - set(records))}")
+    if expected is not None and set(records) != set(expected):
+        raise ValueError(f"Missing tensors: {sorted(set(expected) - set(records))}")
     total = sum(entry['data_offsets'][1] - entry['data_offsets'][0] for _, _, entry in records.values())
-    if total != index['metadata']['total_size']:
+    if index is not None and total != index['metadata']['total_size']:
         raise ValueError('Payload size does not match the shard index')
     return records
 
@@ -131,11 +137,21 @@ def copy_payload(source, destination, count):
     return digest.hexdigest()
 
 
-def stream_checkpoint(records, tokenizer_json, destination, metadata):
+def file_identity(path):
+    stat = path.stat()
+    return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
+
+
+def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_stats=None):
     destination = Path(destination)
     manifest_path = destination.with_suffix('.manifest.json')
     if destination.exists() or manifest_path.exists():
         raise FileExistsError(f"Destination or manifest already exists: {destination}")
+    if source_stats is None:
+        source_stats = {path: file_identity(path) for path, _, _ in records.values()}
+    for path, identity in source_stats.items():
+        if file_identity(path) != identity:
+            raise ValueError(f'Source changed before conversion: {path}')
     destination.parent.mkdir(parents=True, exist_ok=True)
     header = {'__metadata__': metadata}
     offset = 0
@@ -185,6 +201,9 @@ def stream_checkpoint(records, tokenizer_json, destination, metadata):
                     remaining -= len(chunk)
                 if digest.hexdigest() != hashes[key]:
                     raise ValueError(f'Converted payload differs: {key}')
+        for path, identity in source_stats.items():
+            if file_identity(path) != identity:
+                raise ValueError(f'Source changed during conversion: {path}')
         manifest = dict(metadata=metadata, source_tensors=len(records), source_bytes=offset,
                         tokenizer_sha256=hashlib.sha256(tokenizer_json).hexdigest(),
                         tensors={key: dict(destination=mapped_name(key), sha256=hashes[key],

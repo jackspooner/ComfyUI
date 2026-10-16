@@ -1,0 +1,71 @@
+{
+  "model_id": "OpenMOSS-Team/MOSS-VoiceGenerator",
+  "revision": "97521ec2b6f3ec5026ac1f5751f8fc302d82c2d4",
+  "license": "Apache-2.0",
+  "files": {
+    "README.md": {
+      "bytes": 15002,
+      "sha256": "0c85edecd01000e82796ba31a1c3da336fccdf0f26a91ab960f9d4ac9a2f9156"
+    },
+    "__init__.py": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "added_tokens.json": {
+      "bytes": 704,
+      "sha256": "9dfb40d3a3f8654c8af17771d767a494e973b9a33d5c3aeffa1b21f77db8e6d3"
+    },
+    "chat_template.jinja": {
+      "bytes": 352,
+      "sha256": "894e3ace884e212ae34e1f46063686e7ebcc8b2fa0153af4579dfa5685f63184"
+    },
+    "config.json": {
+      "bytes": 2203,
+      "sha256": "5b6ccfbf309a5844c130d09c9b5fa8b9eef55db27f1b7072695483b6f5524685"
+    },
+    "configuration_moss_tts.py": {
+      "bytes": 5584,
+      "sha256": "257842f2fa90124307408f36d55b74e135ee32b7afacbe30280964f7feb329d1"
+    },
+    "inference_utils.py": {
+      "bytes": 5092,
+      "sha256": "12cdf3260114e44c8cba816782f743779ab621e0ba4047e59a3f3579cfcb0e26"
+    },
+    "merges.txt": {
+      "bytes": 1671853,
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+    },
+    "model.safetensors": {
+      "bytes": 4228278872,
+      "sha256": "dbe345257ff9f6cc84195bed830a268b39d5e0b728ff3ba90e715150a49b16d4"
+    },
+    "modeling_moss_tts.py": {
+      "bytes": 25329,
+      "sha256": "666d7320f93ce6b1c1f6ed4dba6fd4b9520a082a90fa7a17211efd83247d28a0"
+    },
+    "processing_moss_tts.py": {
+      "bytes": 37220,
+      "sha256": "16dda5233f9f752518d07a6b780d6555945b48547fba0b4e7faf6eb2c4ed0038"
+    },
+    "processor_config.json": {
+      "bytes": 145,
+      "sha256": "6821d4805f10fb8b5cc743c021215097e03f1a25f7c220dfc4fb0d62b5dc97e0"
+    },
+    "special_tokens_map.json": {
+      "bytes": 631,
+      "sha256": "55cbd0665670e196ce105db3f0d787e5eb35bce235fcb2bd50acbdd60c1e39c6"
+    },
+    "tokenizer.json": {
+      "bytes": 11422691,
+      "sha256": "cb3c8fa82993d515469c2800cc455bff4aaa3c4fed9da1f2b0c0668c304f335a"
+    },
+    "tokenizer_config.json": {
+      "bytes": 5501,
+      "sha256": "87b1f37a4a73e4c4b61637a1446763e8bdea274347f0418cd5c68ead488c8ea4"
+    },
+    "vocab.json": {
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  }
+}
