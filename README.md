@@ -46,6 +46,11 @@ ComfyUI is the AI creation engine for visual professionals who demand control ov
 
 ## Local stable-release maintenance
 
+The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).
+It adds Flux3 image models, H3 LightVAE loading and a default-workflow API;
+weights and end-to-end acceptance for these new model variants are separate
+requirements. Existing H3 inference is the local release acceptance workflow.
+
 This fork retains the upstream node engine, inference APIs and model support
 attributed above, plus local pinned-memory and partial-prefetch recovery fixes.
 The Linux installation uses its existing `.venv`, shared models outside Git and

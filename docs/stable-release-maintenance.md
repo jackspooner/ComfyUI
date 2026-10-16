@@ -2,9 +2,9 @@
 
 Deploy published non-draft, non-prerelease tags from the actual configured GitHub
 remote, retaining the fork's local memory-recovery patch. Do not deploy a later
-branch tip or downgrade a checkout containing the stable tag. The 14 October 2026
-candidate is [v0.40.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.40.0),
-release commit `3541246a9c997f4b8c32f9f88f3c985d02021c79`.
+branch tip or downgrade a checkout containing the stable tag. The 16 October 2026
+candidate is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0),
+release commit `98cc0bf84b7cb1383654c5b402e7612d875d6d22`.
 
 Before changing source or packages, save Git revision/diffs, custom-node revisions,
 package inventory/constraints, service configuration, workflows and baseline
@@ -51,3 +51,12 @@ If repair cannot succeed, stop safely, restore source/configuration and the comp
 previous environment, restart and verify the old installation. Keep a durable
 incomplete-update record for the next scheduled retry. Never report rollback as a
 successful upgrade. Backups and logs may contain secrets and remain private.
+
+The v0.41.0 release keeps frontend 1.55.17, embedded docs 0.5.14, Kitchen
+0.2.37 and allocator 0.5.6; it requires workflow templates 0.11.84. Preserve
+the operator-selected floating frontend flag and record the actually served
+version separately. Upstream adds Flux3 image models, H3 LightVAE variants,
+reference/geometry nodes and `GET /default_workflow`; discover node schemas
+and local weights before using them. Existing-model acceptance does not certify
+these new variants or full-size/audio quality. The authoritative general
+`comfyui` skill links the v0.41 operating notes.
