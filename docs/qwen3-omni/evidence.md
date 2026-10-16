@@ -4,8 +4,9 @@
 
 Evidence date: 16 October 2026. Local source baseline:
 `0d2d2221bcd9b4895cfb0930864a1a72e2888374`. Remote `main` URLs below are mutable;
-pin full revisions during M0. No model payload was downloaded or executed for
-this specification.
+pin full revisions during M0. The initial specification involved no payload
+download or execution. Subsequent [execution evidence](status.md) records the
+pinned download, actual layout and unresolved acceptance gates.
 
 ## Source observations
 

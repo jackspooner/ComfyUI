@@ -1,0 +1,432 @@
+{
+  "source_revision": "0ed3aa2b00eeedbb0d38b6d4738f506af759213b",
+  "reference_kind": "ModelOpt 0.42.0 format equation only",
+  "full_model_parity": false,
+  "accelerated_execution_accepted": false,
+  "versions": {
+    "torch": "2.14.1+cu130",
+    "transformers": "5.20.0",
+    "comfy-kitchen": "0.2.37",
+    "safetensors": "0.8.0"
+  },
+  "source_integrity": {
+    "declared_payload_bytes": 25850817744,
+    "actual_payload_bytes": 25850816336,
+    "size_matches": false
+  },
+  "inventory": {
+    "tensor_count": 65880,
+    "component_dtypes": {
+      "code2wav.code_embedding:BF16": 1,
+      "code2wav.decoder:BF16": 118,
+      "code2wav.pre_transformer:BF16": 89,
+      "code2wav.upsample:BF16": 22,
+      "talker.code_predictor:BF16": 86,
+      "talker.codec_head:BF16": 1,
+      "talker.hidden_projection:BF16": 4,
+      "talker.model:BF16": 7942,
+      "talker.text_projection:BF16": 4,
+      "thinker.audio_tower:BF16": 525,
+      "thinker.audio_tower:F8_E4M3": 195,
+      "thinker.audio_tower:U8": 195,
+      "thinker.lm_head:BF16": 1,
+      "thinker.model:BF16": 18866,
+      "thinker.model:F8_E4M3": 18624,
+      "thinker.model:U8": 18624,
+      "thinker.visual:BF16": 351,
+      "thinker.visual:F8_E4M3": 116,
+      "thinker.visual:U8": 116
+    },
+    "payload_bytes_by_stage": {
+      "thinker": 18769590222,
+      "talker": 6649192960,
+      "code2wav": 432033154
+    },
+    "quantized_projections": 18935
+  },
+  "shards": [
+    {
+      "name": "model-00001-of-00007.safetensors",
+      "bytes": 4295306332,
+      "sha256": "2c4496127047f13ce428cd36e69166dd0f49e9f1a5e61b74b900cc63ac06acd7"
+    },
+    {
+      "name": "model-00002-of-00007.safetensors",
+      "bytes": 4296398884,
+      "sha256": "a1c55bcc98c571afd731d9e0c167bac755075681d714bb1c1579f8564cbaaccf"
+    },
+    {
+      "name": "model-00003-of-00007.safetensors",
+      "bytes": 4296404020,
+      "sha256": "8dff8d0297e38d6292aedf540e1f042527825ac7614f5ed31d98554d30d2f273"
+    },
+    {
+      "name": "model-00004-of-00007.safetensors",
+      "bytes": 4296403644,
+      "sha256": "df22ba52a8ad246efcbdf52218d8f9d404592d896c05a5655be89ea17e38e85a"
+    },
+    {
+      "name": "model-00005-of-00007.safetensors",
+      "bytes": 4295495904,
+      "sha256": "47d0b047c8b489a16f8e72ba78f71450a0a6c4a22534c6d2e4001db89d91fe18"
+    },
+    {
+      "name": "model-00006-of-00007.safetensors",
+      "bytes": 4295396744,
+      "sha256": "3afb1ac2ddef98a5467903625a5fe805de1e19b2cee15c3b9bd4394f8eebd4e2"
+    },
+    {
+      "name": "model-00007-of-00007.safetensors",
+      "bytes": 83971720,
+      "sha256": "651bfe612523149bcb7937a892f59340725809125c8510e579af59af5b050b7e"
+    }
+  ],
+  "projections": {
+    "thinker.model.layers.0.self_attn.q_proj": {
+      "logical_shape": [
+        4096,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.audio_tower.conv_out": {
+      "logical_shape": [
+        1280,
+        7680
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.audio_tower.layers.0.self_attn.k_proj": {
+      "logical_shape": [
+        1280,
+        1280
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.visual.blocks.0.attn.qkv": {
+      "logical_shape": [
+        3456,
+        1152
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.visual.merger.mlp.0": {
+      "logical_shape": [
+        4608,
+        4608
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.0.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.0.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.0.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.63.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.63.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.63.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.127.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.127.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.0.mlp.experts.127.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.0.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.0.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.0.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.63.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.63.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.63.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.127.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.127.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.23.mlp.experts.127.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.0.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.0.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.0.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.63.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.63.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.63.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.127.gate_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.127.up_proj": {
+      "logical_shape": [
+        768,
+        2048
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    },
+    "thinker.model.layers.47.mlp.experts.127.down_proj": {
+      "logical_shape": [
+        2048,
+        768
+      ],
+      "packed_roundtrip": true,
+      "scale_roundtrip": true,
+      "fp32_decode_max_abs_error": 0.0
+    }
+  },
+  "expert_paths": {
+    "0:0": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    },
+    "0:63": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    },
+    "0:127": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    },
+    "23:0": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    },
+    "23:63": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    },
+    "23:127": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    },
+    "47:0": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    },
+    "47:63": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    },
+    "47:127": {
+      "tokens": 16,
+      "seed": 17,
+      "fp32_output_max_abs_error": 0.0,
+      "execution": "CPU decoded-weight diagnostic, not accelerated inference"
+    }
+  },
+  "gate_up_unequal_global_scales": [],
+  "peak_host_rss_bytes": 1379835904
+}

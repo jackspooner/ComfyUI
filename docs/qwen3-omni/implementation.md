@@ -2,8 +2,10 @@
 
 [Project index](README.md)
 
-All milestones below are pending implementation. This document set completes
-planning only; no inference, model download or deployment was performed for it.
+M0 preparation and M1 storage investigation have started. The pinned model has
+downloaded and an offline diagnostic is implemented. M1 has not passed: source
+metadata and reference-loading issues remain, and accelerated execution has not
+been evaluated. See [execution evidence](status.md). M2–M6 remain pending.
 
 | Milestone | Work | Exit evidence |
 | --- | --- | --- |

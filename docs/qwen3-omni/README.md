@@ -1,7 +1,8 @@
 # Qwen3-Omni native CLIP integration
 
-Status: project specification, 16 October 2026. No Qwen3-Omni converter, native
-loader or validated workflow is delivered by this document set.
+Status: checkpoint investigation in progress, 16 October 2026. The offline storage
+diagnostic is implemented. No Qwen3-Omni converter, native loader or validated
+workflow is delivered. See [current results and unresolved gates](status.md).
 
 Build a native ComfyUI integration that loads a converted version of
 [`shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4`](https://huggingface.co/shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4)
@@ -33,6 +34,7 @@ GPU acceptance requires provisioned checkpoints, a compatible GPU/kernel runtime
 licensed test media and enough RAM/disk for source, output and working space.
 No measured latency, final package size or peak VRAM guarantee exists yet.
 
-These are planning documents, not runnable installation instructions. Names such
+The diagnostic command in the status document is runnable; installation remains
+planned. Names such
 as `qwen3_omni` below are proposed interfaces until implementation lands. Runtime
 activation and actual inference must be recorded separately from source delivery.

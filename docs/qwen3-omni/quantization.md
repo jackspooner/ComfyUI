@@ -9,6 +9,11 @@ scales, and BF16 audio/vision encoders. Configuration declares FP8 KV-cache
 quantization. These are publisher claims/configuration, not a verified reference
 execution. See [sources and open questions](evidence.md).
 
+Payload inspection now contradicts the BF16-encoder claim: 195 audio and 116
+vision projections are packed NVFP4. The source index also has a stale byte total.
+See [the pinned findings and diagnostic command](status.md). Do not use the model
+card's precision table as the converter's tensor inventory.
+
 Local ComfyUI supports NVFP4 `weight`, `weight_scale`, `weight_scale_2` and
 quantization descriptors, including expert banks. Its fast path can quantize
 activations using the NVFP4 layout. This is not proof of the source's advertised
@@ -56,8 +61,9 @@ Inputs: an explicit local source directory, pinned revision/provenance and an
 explicit destination. Outputs: a ComfyUI-readable checkpoint and manifest with
 source revision, converter commit, source/output checksums, tensor inventory,
 excluded speech-output modules, key/layout transformations and precision policy.
-Keep all assets required for offline tokenization/preprocessing embedded or in a
-documented package; a lone weights file is insufficient if it needs sidecars.
+Embed all tokenizer, configuration and processor assets required for inference in
+the single safetensors artifact. The provenance manifest may be a sidecar;
+inference must not need the source Hugging Face directory.
 
 Stream or bound memory rather than loading the whole model at once. Retain packed
 values and scales when an exact mapping is possible. Mark each quantized layer
