@@ -3,6 +3,41 @@
 # ComfyUI
 **The most powerful and modular AI engine for content creation.**
 
+## Local MiniMax H3 workflows and acceleration
+
+This installation uses [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+and its [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md):
+the node graph UI/API, local image/audio/video inference, model loading and
+memory management described below are upstream functionality.
+
+The saved **MiniMax H3 - 360 Orbit** workflow uses Pablo Dawson's orbit LoRA
+with the same image at both endpoints, 768×768, 73 frames and 28 steps. Open it
+from the Workflows sidebar and press Run; the default input is the latest toy-house
+image from this installation. It saves silent MP4 video under `output/360_orbit`.
+See the [recipe, model requirements and recovery guide](docs/minimax-h3-360-orbit.md)
+and the repository-owned [agent skill](skills/minimax-h3-360-orbit/SKILL.md).
+The graph passed prompt validation and a complete house render on 7 October 2026
+(73 frames at 24 fps, 768×768, no audio track; about 73 seconds on this host).
+The author's training examples are human-centric, so object orbit quality is not
+established by the model card.
+
+The local Linux RTX 5090 installation additionally includes
+[ComfyUI-Sol-H3](https://github.com/xmarre/ComfyUI-Sol-H3) v0.1.9, pinned at
+`09a3320205512cd87f6110397fca1e25c19f5536`. Its Exact Runtime and experimental
+Sana/CuTe sparse attention are available as MODEL patch nodes. In an existing
+native H3 graph, connect the model after other patches through **Sol-H3 Exact
+Runtime**, or **Sol-H3 SOL Attention (Experimental)**, before the sampler.
+The latter includes Exact Runtime and defaults to one dense evaluation and two
+dense leading layers. Sparse attention approximates the dense result.
+
+GPU kernel and native model-patcher checks passed on 7 October 2026; full-sized
+render quality and end-to-end speed have not been measured here. Existing router
+`sol` selections still use the separate `SolAttnPatch` Triton extension. NVIDIA's
+standalone Sol Engine is not installed by this node pack. See the
+[local setup and recovery notes](../services/infrastructure/Workspace2LinuxDeployment/docs/minimax-h3-sol.md)
+for dependencies, verification, limitations and rollback. Upstream credit and
+licensing remain with the projects linked above.
+
 
 [![Website][website-shield]][website-url]
 [![Dynamic JSON Badge][discord-shield]][discord-url]
