@@ -1,0 +1,60 @@
+{
+  "1": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "moss_audio_demo.wav"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "moss_audio_8b_thinking_bf16.safetensors",
+      "type": "moss_audio",
+      "device": "default"
+    }
+  },
+  "3": {
+    "class_type": "TextGenerate",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "audio": [
+        "1",
+        0
+      ],
+      "prompt": "Describe the foreground and background sounds and the order of events. Distinguish speech, music and environmental sounds. State uncertainty where needed.",
+      "max_length": 2048,
+      "sampling_mode": "on",
+      "sampling_mode.temperature": 1.0,
+      "sampling_mode.top_k": 50,
+      "sampling_mode.top_p": 1.0,
+      "sampling_mode.min_p": 0.0,
+      "sampling_mode.repetition_penalty": 1.0,
+      "sampling_mode.seed": 42,
+      "sampling_mode.presence_penalty": 0.0,
+      "thinking": true,
+      "use_default_template": true,
+      "mtp": "auto"
+    }
+  },
+  "4": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "3",
+        0
+      ]
+    }
+  },
+  "5": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "3",
+        1
+      ]
+    }
+  }
+}

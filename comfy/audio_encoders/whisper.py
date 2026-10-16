@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import comfy.audio
 from typing import Optional
-from comfy.ldm.modules.attention import optimized_attention_masked
+from comfy.ldm.modules.attention import optimized_attention_masked, ComfyAttention, AttentionTensorContainer
 import comfy.ops
 
 class WhisperFeatureExtractor(nn.Module):
@@ -54,6 +54,7 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         assert d_model % n_heads == 0
 
+        self.comfy_attention = ComfyAttention()
         self.d_model = d_model
         self.n_heads = n_heads
         self.d_k = d_model // n_heads
@@ -76,7 +77,8 @@ class MultiHeadAttention(nn.Module):
         k = self.k_proj(key)
         v = self.v_proj(value)
 
-        attn_output = optimized_attention_masked(q, k, v, self.n_heads, mask)
+        q, k, v = AttentionTensorContainer(q), AttentionTensorContainer(k), AttentionTensorContainer(v)
+        attn_output = optimized_attention_masked(q, k, v, self.n_heads, mask, preferred_attention=self.comfy_attention)
         attn_output = self.out_proj(attn_output)
 
         return attn_output

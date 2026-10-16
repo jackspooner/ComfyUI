@@ -44,6 +44,17 @@ ComfyUI is the AI creation engine for visual professionals who demand control ov
 - The most sophisticated workflows can be exposed through a simple UI thanks to App Mode.
 - It integrates seamlessly into production pipelines with our API endpoints.
 
+## Native MOSS-Audio in this fork
+
+[Upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
+[README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md) describe the
+node graph engine, local multimodal inference, APIs and memory management retained
+here. This fork adds native MOSS-Audio 8B audio understanding through **Load CLIP →
+Generate Text**, using a locally converted BF16 checkpoint and the existing AUDIO
+socket. See [preparation, usage and verification status](docs/moss-audio.md).
+CPU reference and full BF16 RTX 5090 comparisons pass, including two-minute audio.
+See the linked document for caption-quality limits and service acceptance status.
+
 ## Local stable-release maintenance
 
 The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).

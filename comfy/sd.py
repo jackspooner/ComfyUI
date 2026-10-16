@@ -81,6 +81,7 @@ import comfy.text_encoders.ace15
 import comfy.text_encoders.longcat_image
 import comfy.text_encoders.qwen35
 import comfy.text_encoders.qwen3vl
+import comfy.text_encoders.moss_audio
 import comfy.text_encoders.minimax
 import comfy.text_encoders.minimax_music
 import comfy.text_encoders.yue2
@@ -1613,6 +1614,7 @@ class CLIPType(Enum):
     MINIMAX = 35
     YUE2 = 36
     FLUX3 = 37
+    MOSS_AUDIO = 38
 
 
 
@@ -1671,6 +1673,7 @@ class TEModel(Enum):
     GEMMA_4_12B = 36
     QWEN3VL_32B = 37
     MING_IMAGE = 38
+    MOSS_AUDIO = 39
 
 
 def detect_te_model(sd):
@@ -1742,6 +1745,11 @@ def detect_te_model(sd):
     if "visual.deepstack_merger_list.0.norm.weight" in sd and "model.layers.49.self_attn.q_proj.weight" in sd:
         # MiniMax H3 conditioning encoder: Qwen3-VL-32B, truncated to 50 layers
         return TEModel.QWEN3VL_32B
+    moss_signature = {"audio_encoder.conv1.weight": 480, "audio_encoder.stem_proj.weight": 1280,
+                      "audio_adapter.gate_proj.weight": 8192, "deepstack_audio_merger_list.2.down_proj.weight": 4096,
+                      "model.layers.0.self_attn.q_norm.weight": 128, "model.norm.weight": 4096}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in moss_signature.items()):
+        return TEModel.MOSS_AUDIO
     if "model.layers.0.post_attention_layernorm.weight" in sd:
         weight = sd['model.layers.0.post_attention_layernorm.weight']
         if 'model.layers.0.self_attn.q_norm.weight' in sd:
@@ -1944,6 +1952,10 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.clip = comfy.text_encoders.gpt_oss.lens_te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.gpt_oss.LensTokenizer
             tokenizer_data["tokenizer_json"] = clip_data[0].get("tokenizer_json", None)
+        elif te_model == TEModel.MOSS_AUDIO:
+            clip_target.clip = comfy.text_encoders.moss_audio.te(**llama_detect(clip_data))
+            clip_target.tokenizer = comfy.text_encoders.moss_audio.MossAudioTokenizer
+            tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
         elif te_model == TEModel.QWEN3_4B:
             if clip_type == CLIPType.FLUX or clip_type == CLIPType.FLUX2:
                 clip_target.clip = comfy.text_encoders.flux.klein_te(**llama_detect(clip_data), model_type="qwen3_4b")
