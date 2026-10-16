@@ -134,7 +134,7 @@
         "Node name for S&R": "TextGenerate"
       },
       "widgets_values": [
-        "Describe the foreground and background sounds and the order of events. Distinguish speech, music and environmental sounds. State uncertainty where needed.",
+        "Write a detailed audio caption in 3\u20135 sentences. Describe foreground and background sounds and their order, distinguishing speech, music and environmental sounds. Include only audible evidence and state uncertainty about ambiguous sounds. Do not give exact timestamps.",
         2048,
         "on",
         1.0,

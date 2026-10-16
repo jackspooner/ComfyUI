@@ -42,8 +42,9 @@ for its generated-text and thinking outputs. Text-only generation also works.
 
 The example uses 2,048 output tokens, thinking enabled, the standard template,
 temperature 1, top-k 50, top-p 1, min-p 0, repetition penalty 1 and seed 42.
-Try: “Describe the foreground and background sounds and the order of events.
-Distinguish speech, music and environmental sounds. State uncertainty where needed.”
+The example asks for a 3–5 sentence caption covering foreground/background sounds
+and event order, with uncertainty and no exact timestamps. Precise timestamps in
+sampled reasoning can be invented, even beyond the supplied clip duration.
 The system-prompt input replaces the standard system turn. Disabling thinking
 primes an empty Qwen thinking block; this is a prompt control, not a change to
 weights. With the default template disabled, include exactly one
@@ -93,8 +94,19 @@ The test audio derives from the librosa examples: LibriSpeech/Garth Comira
 (CC BY 4.0), trumpet/Mihai Sorohan (CC BY 3.0), robin/InspectorJ (CC BY 3.0).
 Original attribution files accompany local validation fixtures.
 
-GPU lifecycle checks and live-service acceptance are still pending. Other
-accelerator backends remain unverified.
+Cancellation, repeated generation, offload/reload, text-only generation, context
+capacity errors and transition to Qwen3-VL-4B and back passed on the RTX 5090.
+Greedy outputs were unchanged after reload and the model transition. Instrumented
+runs confirmed one audio-encoder call per generation.
+
+The installed service exposes `moss_audio` and completed the example through its
+normal queue on 16 October 2026. The two-minute example returned speech, birds
+and music; the sampled reasoning also demonstrated unreliable exact timestamps.
+The editable workflow is `MOSS-Audio 8B Thinking.json` in the user workflow library,
+with `moss_audio_demo.wav` in the instance input directory. Portable examples are
+[editor JSON](workflows/moss_audio.json) and [API JSON](workflows/moss_audio_api.json);
+select your own audio when using these elsewhere. Other accelerator backends
+remain unverified.
 
 ## Measured performance
 

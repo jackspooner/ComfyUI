@@ -53,7 +53,8 @@ here. This fork adds native MOSS-Audio 8B audio understanding through **Load CLI
 Generate Text**, using a locally converted BF16 checkpoint and the existing AUDIO
 socket. See [preparation, usage and verification status](docs/moss-audio.md).
 CPU reference and full BF16 RTX 5090 comparisons pass, including two-minute audio.
-See the linked document for caption-quality limits and service acceptance status.
+The local service and saved example workflow are verified. See the linked document
+for measured loading performance and caption-quality limits.
 
 ## Local stable-release maintenance
 

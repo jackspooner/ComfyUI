@@ -24,7 +24,7 @@
         "1",
         0
       ],
-      "prompt": "Describe the foreground and background sounds and the order of events. Distinguish speech, music and environmental sounds. State uncertainty where needed.",
+      "prompt": "Write a detailed audio caption in 3\u20135 sentences. Describe foreground and background sounds and their order, distinguishing speech, music and environmental sounds. Include only audible evidence and state uncertainty about ambiguous sounds. Do not give exact timestamps.",
       "max_length": 2048,
       "sampling_mode": "on",
       "sampling_mode.temperature": 1.0,
