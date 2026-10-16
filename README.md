@@ -3,6 +3,21 @@
 # ComfyUI
 **The most powerful and modular AI engine for content creation.**
 
+## Fork: Krea 2 inference
+
+This fork builds on [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+and its [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
+Upstream provides the node graph, model loading, sampling and local image,
+audio and video generation documented below; upstream credits and licenses remain.
+
+Krea 2 uses the shared attention dispatcher's grouped-query support without
+expanding K/V heads in the model, and projects only target tokens at the output.
+The paired Krea2 Edit source-patch update prepares static text fusion once per
+conditioning during sampling preparation. Update both repositories together;
+existing workflow sockets and checkpoint layouts are unchanged. Hooks and dynamic
+patches retain per-step fusion. See [Krea 2 editing efficiency](docs/krea2-edit-efficiency.md)
+for setup, tests and limitations. These changes do not alter other model families.
+
 
 [![Website][website-shield]][website-url]
 [![Dynamic JSON Badge][discord-shield]][discord-url]
