@@ -69,8 +69,10 @@ caches; unconfigured fixed caches retain the existing flash decode path. See
 [native audio integration status and verification](docs/native-audio-grounding.md).
 The same guide covers the offline, pinned VoiceGenerator BF16 converter. It
 preserves weights and tokenizer assets; native speech generation remains pending.
-An offline FP32 MOSS v1 codec converter and native codec math have focused CPU
-reference coverage. The discrete codec loader and live speech workflows are pending.
+The FP32 MOSS v1 codec has an offline converter and native **Load Audio Codec →
+Encode Audio Codes → Decode Audio Codes** nodes, with integer payloads and
+ComfyUI model/offload ownership. CPU reference and lifecycle checks pass;
+accelerator, speech quality and live-service adoption remain pending.
 
 ## Local stable-release maintenance
 

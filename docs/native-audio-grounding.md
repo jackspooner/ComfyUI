@@ -81,8 +81,9 @@ The full [Apache license](../comfy/ldm/audio/moss_audio_tokenizer.LICENSE) accom
 the adapted module. It implements the original 24 kHz, 1920-sample hop, causal transformer encoder
 and decoder with residual LFQ. It uses native operations, exact GELU, shared
 interleaved rotary kernels, per-module attention preferences/containers and block
-prefetch. All streaming tensors belong to one decode call. Loading, eviction and
-output-device policy still require the pending discrete codec owner.
+prefetch. All streaming tensors belong to one decode call. The discrete codec
+owner uses ComfyUI's model patcher, device selection, memory reservation and
+offloading; output codes and PCM are copied to CPU.
 
 Prepare its separate FP32 checkpoint with the same local runtime:
 
@@ -120,15 +121,61 @@ PYTHONPATH=/absolute/worker/transformers5 MOSS_CODEC_REFERENCE=/absolute/MOSS-Au
 The real checkpoint also passed stagewise CPU comparisons for a one-frame
 16-book decode and a 1,937-sample encode; encode code IDs matched exactly. These
 synthetic cases do not establish audible quality, accelerator support, long-form
-streaming, cancellation/offload acceptance or runtime adoption. No new codec
-loader/node is registered by this prerequisite.
+streaming, accelerator cancellation/offload acceptance or runtime adoption.
+
+### Discrete codec nodes
+
+Place the converted codec in a configured `vae` model directory (or configure
+an additional `vae` search path). **Load Audio Codec** validates the selected
+path, pinned conversion metadata and complete FP32 tensor inventory. It returns
+`AUDIO_CODEC`, separate from a continuous VAE. Wrong revisions, missing tensors,
+wrong shapes and reduced-precision weights fail before model allocation. Restore
+or reconvert the pinned artifact; do not rename an unrelated checkpoint.
+
+Connect **Load Audio → Encode Audio Codes → Decode Audio Codes → Save Audio**,
+with the codec connected to both encode and decode. Encoding mixes channels to
+mono and resamples to 24 kHz using the shared audio implementation, without
+loudness normalization. Select 1–32 ordered codebooks (32 by default). Decoding
+uses the reference 100-frame chunks, returns raw FP32 PCM, and emits a ComfyUI
+list of AUDIO values, one per segment/batch item. Downstream nodes run once per
+item, preserving unequal lengths without padding. No volume normalization or
+clipping is applied. Empty valid segments produce empty audio; saving an empty
+clip may be unsupported by the selected audio writer.
+
+`comfy.audio_codec.AudioCodes` version 1 carries an immutable codec identity
+(family, revision, sample rate, hop and ordered codebook sizes) and a tuple of
+`AudioCodeSegment` values. Each segment contains an integer `[B,Q,T]` tensor,
+Python valid frame lengths, and optional source sample lengths at the codec
+rate. Codebooks are a prefix in codec order. Decoding validates identity and
+valid IDs, ignores storage beyond each valid length, and never casts floats to
+IDs. MOSS protocol padding 1024 is invalid inside valid frames. Source lengths
+are provenance, not a request to synthesize a partial frame: 1,937 input samples
+produce two stored frames, one valid frame, and 1,920 decoded samples. Speech
+protocol trimming and reference loudness processing belong to their adapters.
+
+The owner processes one stream at a time and reserves attention/block/output
+workspace plus the 169,984,000-byte streaming ring when needed. These conservative
+estimates are not a measured low-VRAM guarantee. Full-sequence encoding grows
+quadratically in attention workspace. An OOM is reported without silently
+changing chunk policy or codebook count; shorten input or free memory and retry.
+Cancellation uses normal ComfyUI interruption, with no cross-call codec caches.
+The loader registers a patcher reconstruction factory for the existing lifecycle.
+
+Run `python -m pytest tests-unit/comfy_test/audio_codec_test.py -q` for payload,
+node schema, containment, lifecycle boundary and cancellation fixtures. The real
+1.77-billion-parameter checkpoint also passed a CPU load/encode/decode and exact
+decode after unload/reload; observed peak process RSS was about 12.75 GiB. An
+isolated CPU queue also completed the five-node load/encode/decode/save graph,
+producing a mono 24 kHz FLAC with the expected 1,920 samples. This is a synthetic
+fixture, not a speech-quality result or live-service deployment. GPU, dynamic
+offload, constrained-memory and audible quality acceptance remain open.
 
 ## Remaining integrations
 
 These are shared prerequisites for the requested native MOSS speech family,
 SoundEffect v2, LocateAnything, Qwen3-ASR, Qwen3 ForcedAligner and Fish S2-Pro
-integrations. Their new loaders, remaining codecs, generation/alignment nodes,
+integrations. Their speech loaders, remaining codecs, generation/alignment nodes,
 quality comparisons and live workflows are **not implemented or accepted by this
 change**. Existing worker/runtime paths remain unchanged. Integer speech codes
-will use an explicit discrete codec contract; SoundEffect's continuous diffusion
+use the discrete codec contract above; SoundEffect's continuous diffusion
 path and forced alignment's timestamp classifier remain separate designs.
