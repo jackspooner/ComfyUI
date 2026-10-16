@@ -1,0 +1,39 @@
+{
+  "model_id": "OpenMOSS-Team/MOSS-Audio-Tokenizer",
+  "revision": "3cd226ba2947efa357ef453bcad111b6eafba782",
+  "license": "Apache-2.0",
+  "files": {
+    "README.md": {
+      "bytes": 10778,
+      "sha256": "795c97ec27b38994d4bee033dc3f6f0ad56763510deec3e04a5c1de385139223"
+    },
+    "__init__.py": {
+      "bytes": 52,
+      "sha256": "ed0b4910a5e53b1dfc3234cfcf96e2c6890d339f9134a3dfed8481d01b3768fd"
+    },
+    "config.json": {
+      "bytes": 6601,
+      "sha256": "0f669e288d39c9c0ffae4e39babe5167b57e89d3132f0785655d1096a8da8e45"
+    },
+    "configuration_moss_audio_tokenizer.py": {
+      "bytes": 12933,
+      "sha256": "349b7ff7e1b3f160f9c80df9a0311672b326b8b73e90459122fb39e6878962bf"
+    },
+    "model-00001-of-00002.safetensors": {
+      "bytes": 4998259168,
+      "sha256": "037f441ed30a0ab59f6049de83b824a1b3bd6feb7dbd46c3fbca41fc2f649f28"
+    },
+    "model-00002-of-00002.safetensors": {
+      "bytes": 2100202560,
+      "sha256": "a187d73d2cda1c2d0676586d9d03c09c0a5813450266af32029c871493fc9582"
+    },
+    "model.safetensors.index.json": {
+      "bytes": 148113,
+      "sha256": "e107e83fee64adc3ccdb993975290cecb00fcf7d72cdaa388011abad16bcc82d"
+    },
+    "modeling_moss_audio_tokenizer.py": {
+      "bytes": 70906,
+      "sha256": "65cae7744845f1b8ac65957e918cea508efe331a38e87b882b7530b6c8d7caa5"
+    }
+  }
+}

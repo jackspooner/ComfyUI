@@ -162,7 +162,8 @@ def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_
         length = entry['data_offsets'][1] - entry['data_offsets'][0]
         header[name] = dict(dtype=entry['dtype'], shape=entry['shape'], data_offsets=[offset, offset + length])
         offset += length
-    header['tokenizer_json'] = dict(dtype='U8', shape=[len(tokenizer_json)], data_offsets=[offset, offset + len(tokenizer_json)])
+    if tokenizer_json is not None:
+        header['tokenizer_json'] = dict(dtype='U8', shape=[len(tokenizer_json)], data_offsets=[offset, offset + len(tokenizer_json)])
     encoded = json.dumps(header, separators=(',', ':')).encode()
     encoded += b' ' * (-len(encoded) % 8)
     temp_path = None
@@ -178,13 +179,14 @@ def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_
                 with path.open('rb') as source:
                     source.seek(base + start)
                     hashes[key] = copy_payload(source, output, end - start)
-            output.write(tokenizer_json)
+            if tokenizer_json is not None:
+                output.write(tokenizer_json)
             output.flush()
             os.fsync(output.fileno())
         with safe_open(temp_path, framework='pt', device='cpu') as tensors:
             if set(tensors.keys()) != set(header) - {'__metadata__'}:
                 raise ValueError('Converted tensor inventory mismatch')
-            if tensors.get_tensor('tokenizer_json').numpy().tobytes() != tokenizer_json:
+            if tokenizer_json is not None and tensors.get_tensor('tokenizer_json').numpy().tobytes() != tokenizer_json:
                 raise ValueError('Embedded tokenizer was changed')
         # Re-read every completed output payload, independently of the copy operation.
         with temp_path.open('rb') as output:
@@ -205,9 +207,10 @@ def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_
             if file_identity(path) != identity:
                 raise ValueError(f'Source changed during conversion: {path}')
         manifest = dict(metadata=metadata, source_tensors=len(records), source_bytes=offset,
-                        tokenizer_sha256=hashlib.sha256(tokenizer_json).hexdigest(),
                         tensors={key: dict(destination=mapped_name(key), sha256=hashes[key],
                                            source_file=records[key][0].name, shape=records[key][2]['shape'], dtype=records[key][2]['dtype']) for key in sorted(records)})
+        if tokenizer_json is not None:
+            manifest['tokenizer_sha256'] = hashlib.sha256(tokenizer_json).hexdigest()
         with tempfile.NamedTemporaryFile(mode='w', dir=destination.parent, prefix='.' + manifest_path.name + '.', delete=False) as stream:
             manifest_temp = Path(stream.name)
             json.dump(manifest, stream, indent=2)

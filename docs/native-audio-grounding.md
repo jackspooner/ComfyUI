@@ -73,11 +73,60 @@ named output and manifest before retrying; a published output requires a fresh
 destination. This artifact is a conversion baseline, not a registered native
 speech loader, an INT8 model or an accepted speech workflow.
 
+## MOSS v1 codec baseline
+
+The native math in `comfy/ldm/audio/moss_audio_tokenizer.py` is adapted from the
+Apache-2.0 [OpenMOSS audio tokenizer](https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer/tree/3cd226ba2947efa357ef453bcad111b6eafba782).
+It implements the original 24 kHz, 1920-sample hop, causal transformer encoder
+and decoder with residual LFQ. It uses native operations, exact GELU, shared
+interleaved rotary kernels, per-module attention preferences/containers and block
+prefetch. All streaming tensors belong to one decode call. Loading, eviction and
+output-device policy still require the pending discrete codec owner.
+
+Prepare its separate FP32 checkpoint with the same local runtime:
+
+```sh
+python -m scripts.convert_moss_codec --source /absolute/MOSS-Audio-Tokenizer --destination /absolute/moss_audio_tokenizer_v1_fp32.safetensors
+```
+
+The complete pinned bundle must match `scripts/moss_codec_v1.json`. Conversion
+accounts for 1,600 original tensors. It folds 66 weight-normalization magnitude/
+direction pairs with the reference FP32 `torch._weight_norm` operation, retaining
+biases and emitting 1,534 inference tensors. Metadata records both source keys,
+their shapes/checksums and the transform; the output manifest hashes every
+resulting tensor. It embeds the source config and provenance, with no text
+tokenizer tensor. Allow approximately 7.10 GB extra disk space, plus a small
+temporary folded-weight file. It performs no model inference or download.
+The same overwrite, interruption and source-change checks apply as above.
+
+The reference's eight-second chunk decode is preserved, including its ring-cache
+behavior: it inserts an entire chunk before evaluating attention. After the
+first chunk, this is **not equivalent** to full causal attention with a ten-second
+window. Short inputs use the reference full-attention path. Encoder padding also
+preserves the reference's floor-divided valid frame count: a partially padded
+last frame exists in storage but is outside the reported valid length. These
+behaviors must not be silently corrected during native parity work.
+
+Focused fixtures compare rotary math, full/ring attention, transformer blocks,
+patch layouts, FP32 LFQ and the complete folded state-dict inventory. Use the
+pinned source with the existing isolated Transformers 5 environment; do not
+replace the serving interpreter's Transformers installation:
+
+```sh
+PYTHONPATH=/absolute/worker/transformers5 MOSS_CODEC_REFERENCE=/absolute/MOSS-Audio-Tokenizer HF_HUB_OFFLINE=1 /absolute/prepared/python -m pytest tests-unit/comfy_test/moss_codec_reference_test.py -q
+```
+
+The real checkpoint also passed stagewise CPU comparisons for a one-frame
+16-book decode and a 1,937-sample encode; encode code IDs matched exactly. These
+synthetic cases do not establish audible quality, accelerator support, long-form
+streaming, cancellation/offload acceptance or runtime adoption. No new codec
+loader/node is registered by this prerequisite.
+
 ## Remaining integrations
 
 These are shared prerequisites for the requested native MOSS speech family,
 SoundEffect v2, LocateAnything, Qwen3-ASR, Qwen3 ForcedAligner and Fish S2-Pro
-integrations. Their new loaders, codecs, generation/alignment nodes,
+integrations. Their new loaders, remaining codecs, generation/alignment nodes,
 quality comparisons and live workflows are **not implemented or accepted by this
 change**. Existing worker/runtime paths remain unchanged. Integer speech codes
 will use an explicit discrete codec contract; SoundEffect's continuous diffusion

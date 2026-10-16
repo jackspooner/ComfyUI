@@ -12,6 +12,7 @@ from transformers import Qwen2TokenizerFast
 
 from scripts import convert_moss_audio as writer
 from scripts import convert_moss_speech as converter
+from scripts import convert_moss_codec as codec_converter
 
 
 def test_single_checkpoint_preserves_independent_heads_and_tokenizer(tmp_path):
@@ -114,6 +115,23 @@ def test_refuse_existing_output_before_reading_source(tmp_path):
     with pytest.raises(FileExistsError):
         converter.convert(tmp_path / 'absent', output)
     assert output.read_bytes() == b'preserve'
+
+
+def test_codec_folding_matches_weight_normalized_convolution(tmp_path):
+    convolution = torch.nn.utils.parametrizations.weight_norm(torch.nn.Conv1d(3, 5, 1))
+    weights = {'conv.' + key: value for key, value in convolution.state_dict().items()}
+    save_file(weights, tmp_path / 'model.safetensors')
+    records = writer.inspect_shards(tmp_path)
+    folded, transforms = codec_converter.fold_convolutions(records)
+    torch.testing.assert_close(folded['conv.weight'], convolution.weight, rtol=0, atol=0)
+    assert {item['key'] for item in transforms['conv.weight']['sources']} == {
+        'conv.parametrizations.weight.original0', 'conv.parametrizations.weight.original1'}
+    for source in transforms['conv.weight']['sources']:
+        assert source['sha256'] == hashlib.sha256(weights[source['key']].numpy().tobytes()).hexdigest()
+    output = tmp_path / 'codec.safetensors'
+    manifest = writer.stream_checkpoint(records, None, output, {'architecture': 'fixture_codec'})
+    assert 'tokenizer_sha256' not in manifest
+    assert load_file(output).keys() == weights.keys()
 
 
 @pytest.mark.skipif(not os.environ.get('MOSS_VOICEGENERATOR_SOURCE'), reason='Requires pinned original VoiceGenerator bundle')
