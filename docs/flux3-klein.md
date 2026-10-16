@@ -6,8 +6,8 @@ ComfyUI v0.41 upgrade.
 
 Obtain the [official ComfyUI files](https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy)
 through Download Manager 2. `_sd_` identifies distilled; unmarked files are base.
-Use `flux3_image_klein_sd_bf16.safetensors`, `_sd_int8_convrot.safetensors`, or
-`_sd_nvfp4.safetensors` in diffusion_models, a Qwen3-VL 4B encoder in text_encoders,
+Use `flux3_image_klein_sd_bf16.safetensors` or `_sd_int8_convrot.safetensors`
+in diffusion_models, a Qwen3-VL 4B encoder in text_encoders,
 and `flux2-vae.safetensors` in vae. Weights have the FLUX Kommunity license;
 consult the model repository for its terms.
 

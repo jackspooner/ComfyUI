@@ -65,9 +65,8 @@ Load the official ComfyUI `flux3_image_klein_sd_*` diffusion checkpoint with
 `UNETLoader`, `qwen3vl_4b_bf16.safetensors` with `CLIPLoader` type `flux3`, and
 `flux2-vae.safetensors` with `VAELoader`. The distilled recipe uses 16 Euler/simple
 steps and `BasicGuider` (no CFG), with `EmptyFlux2LatentImage` and optional chained
-`ReferenceLatent` conditioning. Use dimensions divisible by 16. BF16, INT8 ConvRot
-and NVFP4 use the existing quantized loaders; NVFP4 needs compatible Blackwell
-hardware. Models are separately provisioned, never downloaded during inference.
+`ReferenceLatent` conditioning. Use dimensions divisible by 16. The local route selects BF16 or INT8 ConvRot
+checkpoints. Models are separately provisioned, never downloaded during inference.
 See [FLUX 3 operation](docs/flux3-klein.md) for inputs, prompting and verification.
 
 ## Get Started
