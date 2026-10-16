@@ -7,7 +7,7 @@ from tqdm import tqdm
 import comfy.utils
 import comfy_kitchen
 
-from comfy.ldm.modules.attention import optimized_attention_for_device
+from comfy.ldm.modules.attention import AttentionTensorContainer, ComfyAttention, optimized_attention_for_device
 import comfy.model_management
 import comfy.model_prefetch
 import comfy.ops
@@ -620,6 +620,7 @@ def apply_rope(xq, xk, freqs_cis):
 class Attention(nn.Module):
     def __init__(self, config: Llama2Config, device=None, dtype=None, ops: Any = None):
         super().__init__()
+        self.comfy_attention = ComfyAttention()
         self.num_heads = config.num_attention_heads
         self.num_kv_heads = config.num_key_value_heads
         self.hidden_size = config.hidden_size
@@ -685,20 +686,26 @@ class Attention(nn.Module):
                 position = fixed_cache.position.view(batch_size, 1, 1, 1).expand_as(xk)
                 fixed_cache.key.scatter_(1, position, xk)
                 fixed_cache.value.scatter_(1, position, xv)
-                output = comfy_kitchen.flash_attention_decode(xq, fixed_cache.key, fixed_cache.value, fixed_cache.seqlen)
-                return self.o_proj(output.view(batch_size, seq_length, self.inner_size)), fixed_cache
-
-            if attention_mask is None or attention_mask.ndim < 4:
-                fixed_cache.key[:, :seq_length].copy_(xk)
-                fixed_cache.value[:, :seq_length].copy_(xv)
+                if self.comfy_attention.function is None:
+                    output = comfy_kitchen.flash_attention_decode(xq, fixed_cache.key, fixed_cache.value, fixed_cache.seqlen)
+                    return self.o_proj(output.view(batch_size, seq_length, self.inner_size)), fixed_cache
+                xk, xv = fixed_cache.key, fixed_cache.value
+                # The fixed cache compacts padded prompts independently for each batch item.
+                attention_mask = torch.arange(xk.shape[1], device=xq.device)[None, None, None, :] < fixed_cache.seqlen[:, None, None, None]
+                invalid = ~attention_mask.transpose(1, 3)
+                xk, xv = xk.masked_fill(invalid, 0), xv.masked_fill(invalid, 0)
             else:
-                valid = attention_mask[:, 0, -1, -seq_length:] == 0
-                indices = torch.arange(seq_length, device=xk.device).expand(batch_size, -1)
-                indices = indices.masked_fill(~valid, seq_length).sort(dim=1).values.clamp_max_(seq_length - 1)
-                indices = indices.view(batch_size, seq_length, 1, 1).expand_as(xk)
-                fixed_cache.key[:, :seq_length].copy_(xk.gather(1, indices))
-                fixed_cache.value[:, :seq_length].copy_(xv.gather(1, indices))
-                fixed_cache.seqlen.copy_(valid.sum(dim=1))
+                if attention_mask is None or attention_mask.ndim < 4:
+                    fixed_cache.key[:, :seq_length].copy_(xk)
+                    fixed_cache.value[:, :seq_length].copy_(xv)
+                else:
+                    valid = attention_mask[:, 0, -1, -seq_length:] == 0
+                    indices = torch.arange(seq_length, device=xk.device).expand(batch_size, -1)
+                    indices = indices.masked_fill(~valid, seq_length).sort(dim=1).values.clamp_max_(seq_length - 1)
+                    indices = indices.view(batch_size, seq_length, 1, 1).expand_as(xk)
+                    fixed_cache.key[:, :seq_length].copy_(xk.gather(1, indices))
+                    fixed_cache.value[:, :seq_length].copy_(xv.gather(1, indices))
+                    fixed_cache.seqlen.copy_(valid.sum(dim=1))
 
             xq = xq.transpose(1, 2)
             xk = xk.transpose(1, 2)
@@ -729,7 +736,8 @@ class Attention(nn.Module):
                 attention_mask = attention_mask[..., -sliding_window:] if attention_mask is not None else None
 
         gqa_kwargs = {"enable_gqa": True} if self.num_heads != self.num_kv_heads else {}
-        output = optimized_attention(xq, xk, xv, self.num_heads, mask=attention_mask, skip_reshape=True, **gqa_kwargs)
+        xq, xk, xv = AttentionTensorContainer(xq), AttentionTensorContainer(xk), AttentionTensorContainer(xv)
+        output = optimized_attention(xq, xk, xv, self.num_heads, mask=attention_mask, skip_reshape=True, preferred_attention=self.comfy_attention, **gqa_kwargs)
         return self.o_proj(output), present_key_value
 
 class MLP(nn.Module):

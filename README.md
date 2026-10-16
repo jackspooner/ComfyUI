@@ -63,6 +63,11 @@ memory still limit execution. See [token budgets and caption prompting](docs/mos
 Reasoning is separated at `</think>` even when the model omits the opening tag,
 preventing reasoning or duplicate text from leaking into `generated_text`.
 
+The shared Llama/Qwen attention path honors per-module attention preferences in
+prefill and cached decoding. Explicit preferences use masked dispatch for fixed
+caches; unconfigured fixed caches retain the existing flash decode path. See
+[native audio integration status and verification](docs/native-audio-grounding.md).
+
 ## Local stable-release maintenance
 
 The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).
