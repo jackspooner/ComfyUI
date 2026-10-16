@@ -77,7 +77,8 @@ speech loader, an INT8 model or an accepted speech workflow.
 
 The native math in `comfy/ldm/audio/moss_audio_tokenizer.py` is adapted from the
 Apache-2.0 [OpenMOSS audio tokenizer](https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer/tree/3cd226ba2947efa357ef453bcad111b6eafba782).
-It implements the original 24 kHz, 1920-sample hop, causal transformer encoder
+The full [Apache license](../comfy/ldm/audio/moss_audio_tokenizer.LICENSE) accompanies
+the adapted module. It implements the original 24 kHz, 1920-sample hop, causal transformer encoder
 and decoder with residual LFQ. It uses native operations, exact GELU, shared
 interleaved rotary kernels, per-module attention preferences/containers and block
 prefetch. All streaming tensors belong to one decode call. Loading, eviction and
