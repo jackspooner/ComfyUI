@@ -999,7 +999,7 @@ def detect_unet_config(state_dict, key_prefix, metadata=None):
         dit_config["fused_mlp"] = gate_up is not None
         return dit_config
 
-    if '{}txt_norm.weight'.format(key_prefix) in state_dict_keys:  # Qwen Image
+    if all(key_prefix + key in state_dict_keys for key in ('txt_norm.weight', 'img_in.weight')):  # Qwen Image
         dit_config = {}
         dit_config["image_model"] = "qwen_image"
         dit_config["in_channels"] = state_dict['{}img_in.weight'.format(key_prefix)].shape[1]
@@ -1197,6 +1197,14 @@ def detect_unet_config(state_dict, key_prefix, metadata=None):
         "model.layers.0.self_attn.qkv_proj.weight", "time_embedder.mlp.0.weight",
     )):
         return {"audio_model": "yue2"}
+
+    auk_signature = {"audio_embed.linear.weight": 1536, "txt_proj.weight": 1536,
+                     "transformer_blocks.9.attn.to_qkv_c.weight": 4608,
+                     "single_transformer_blocks.19.attn.to_qkv.weight": 4608,
+                     "proj_out.weight": 64}
+    if all(key_prefix + key in state_dict and state_dict[key_prefix + key].ndim > 0
+           and state_dict[key_prefix + key].shape[0] == size for key, size in auk_signature.items()):
+        return {"audio_model": "auk_flash"}
 
     if '{}input_blocks.0.0.weight'.format(key_prefix) not in state_dict_keys:
         return None
