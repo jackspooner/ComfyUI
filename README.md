@@ -56,6 +56,11 @@ CPU reference and full BF16 RTX 5090 comparisons pass, including two-minute audi
 The local service and saved example workflow are verified. See the linked document
 for measured loading performance and caption-quality limits.
 
+**Generate Text** accepts up to 1,048,576 requested output tokens. Set `max_length`
+to `0` to use the model's remaining context after text and media expansion;
+thinking and the final answer share that budget. Model context and available
+memory still limit execution. See [token budgets and caption prompting](docs/moss-audio.md#token-budgets-and-caption-prompting).
+
 ## Local stable-release maintenance
 
 The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).

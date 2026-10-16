@@ -59,6 +59,34 @@ DeepStack additions. Audio encoding occurs once per generation. Generation cache
 and audio features last only for that execution; model residency belongs to
 ComfyUI. Input plus requested output must fit the 40,960-token context.
 
+## Token budgets and caption prompting
+
+Generate Text's `max_length` accepts `0` through `1048576`; its default stays 512.
+Positive values retain their existing meaning: maximum **new** tokens, shared by
+reasoning and the final answer. `0` resolves to the model's configured context
+minus the expanded input length, including audio features and timestamp tokens.
+For MOSS this is `40960 - input_tokens`. It stops early at EOS. An input that fills
+the context must be shortened; increasing the UI maximum does not enlarge the
+checkpoint's context. The same automatic convention applies to native Qwen,
+Gemma and Llama generation, including Qwen3.5's MTP path.
+
+Automatic mode reserves cache capacity for the remaining context. It is not a
+free-VRAM estimator or an OOM retry mechanism; memory allocation/offloading stays
+with ComfyUI. A large context can require substantial memory even if EOS arrives
+early. Use an explicit smaller budget if memory is insufficient. For example:
+`TextGenerate` inputs `max_length: 0`, `thinking: true`,
+`sampling_mode: "off"`, `use_default_template: true` retain deterministic greedy
+generation with an automatically sized context budget.
+
+For captions, use a specific request such as: “Describe the audible foreground
+and background sounds in 3–5 sentences. Summarize speech at a high level,
+distinguish it from music and sound effects, and describe the order of events.
+State uncertainty. Do not provide exact timestamps, a transcript, or a one-word
+answer.” The generic “Describe this audio” request can produce a transcript,
+one-word answer or numeric/hash-like output after otherwise fluent reasoning.
+Increasing the output budget does not fix a model that already ended its answer.
+Disabling thinking changes the prompt but does not establish caption accuracy.
+
 ## Verification status
 
 CPU tests pass for 16/44.1/48 kHz mono/stereo, silence, short clips, partial chunks,

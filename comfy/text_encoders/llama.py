@@ -1125,6 +1125,14 @@ def apply_penalty(logits, repetition_penalty, presence_penalty):
 
 
 class BaseGenerate:
+    def resolve_max_length(self, max_length, input_length):
+        if max_length != 0:
+            return max_length
+        remaining = self.model.config.max_position_embeddings - input_length
+        if remaining <= 0:
+            raise ValueError(f"The input uses {input_length} tokens; the model's {self.model.config.max_position_embeddings}-token context has no room for generation. Shorten the prompt or media.")
+        return remaining
+
     def logits(self, x):
         input = x[:, -1:]
         if hasattr(self.model, "lm_head"):
@@ -1156,6 +1164,7 @@ class BaseGenerate:
         if embeds.ndim == 2:
             embeds = embeds.unsqueeze(0)
 
+        max_length = self.resolve_max_length(max_length, embeds.shape[1])
         max_cache_len = embeds.shape[1] + max_length
         past_key_values = self.init_kv_cache(embeds.shape[0], max_cache_len, device, execution_dtype)
 

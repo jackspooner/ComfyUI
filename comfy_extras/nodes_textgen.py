@@ -35,7 +35,7 @@ class TextGenerate(io.ComfyNode):
                 io.Image.Input("image", optional=True),
                 io.Image.Input("video", optional=True, tooltip="Video frames as image batch. Assumed to be 24 FPS; subsampled to 1 FPS internally."),
                 io.Audio.Input("audio", optional=True),
-                io.Int.Input("max_length", default=512, min=1, max=32768),
+                io.Int.Input("max_length", default=512, min=0, max=1048576, tooltip="Maximum new tokens, including thinking. 0 uses the model's remaining context after the prompt and media. Generation stops at the model's end token; larger budgets require more memory."),
                 io.DynamicCombo.Input("sampling_mode", options=sampling_options, display_name="Sampling Mode"),
                 io.Boolean.Input("thinking", optional=True, default=False, tooltip="Operate in thinking mode if the model supports it."),
                 io.Boolean.Input("use_default_template", optional=True, default=True, tooltip="Use the built in system prompt/template if the model has one.", advanced=True),

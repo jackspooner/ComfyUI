@@ -772,6 +772,7 @@ class Qwen35(BaseLlama, BaseGenerate, torch.nn.Module):
         embeds = embeds.to(dt)
         if embeds.ndim == 2:
             embeds = embeds.unsqueeze(0)
+        max_length = self.resolve_max_length(max_length, embeds.shape[1])
         # greedy drafts 3 deep (5 after the probe); sampled stays at 2
         depth = fixed_depth if fixed_depth is not None else (3 if sampling is None else 2)
         cap = embeds.shape[1] + max_length + 7
