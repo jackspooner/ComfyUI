@@ -44,6 +44,14 @@ ComfyUI is the AI creation engine for visual professionals who demand control ov
 - The most sophisticated workflows can be exposed through a simple UI thanks to App Mode.
 - It integrates seamlessly into production pipelines with our API endpoints.
 
+## Planned Qwen3-Omni integration
+
+The [Qwen3-Omni project documents](docs/qwen3-omni/README.md) define a planned
+native CLIP integration using the community NVFP4 Instruct checkpoint: text,
+audio and image inputs, including combined inputs, with text output through
+Generate Text. The converter, model integration and GPU acceptance are not yet
+implemented or verified. Start with the documented quantization feasibility gate.
+
 ## Native MOSS-Audio in this fork
 
 [Upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
