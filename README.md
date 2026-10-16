@@ -60,6 +60,8 @@ for measured loading performance and caption-quality limits.
 to `0` to use the model's remaining context after text and media expansion;
 thinking and the final answer share that budget. Model context and available
 memory still limit execution. See [token budgets and caption prompting](docs/moss-audio.md#token-budgets-and-caption-prompting).
+Reasoning is separated at `</think>` even when the model omits the opening tag,
+preventing reasoning or duplicate text from leaking into `generated_text`.
 
 ## Local stable-release maintenance
 

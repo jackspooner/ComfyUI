@@ -87,6 +87,14 @@ one-word answer or numeric/hash-like output after otherwise fluent reasoning.
 Increasing the output budget does not fix a model that already ended its answer.
 Disabling thinking changes the prompt but does not establish caption accuracy.
 
+Some responses contain `</think>` without a generated opening tag, including
+when the template has already supplied one or MOSS ignores the no-thinking hint.
+Generate Text separates at that closing marker and returns the preceding text
+through `thinking`. It does not duplicate that text in `generated_text`. If the
+model never finishes an opened reasoning block, the final output remains empty;
+increase a genuinely exhausted budget or revise the prompt rather than treating
+unfinished reasoning as the final answer.
+
 ## Verification status
 
 CPU tests pass for 16/44.1/48 kHz mono/stereo, silence, short clips, partial chunks,

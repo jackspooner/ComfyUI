@@ -81,9 +81,9 @@ class TextGenerate(io.ComfyNode):
 
         generated_text = clip.decode(generated_ids)
 
-        # Reasoning opens in the generated text or at the end of a raw prompt, and has no close when max_length cut it short.
-        reasoning, _, text = generated_text.partition("</think>")
-        if not reasoning.lstrip().startswith("<think>") and not prompt.rstrip().endswith("<think>"):
+        # The opening tag may be in the chat template; truncated reasoning may have no closing tag.
+        reasoning, separator, text = generated_text.partition("</think>")
+        if not separator and not reasoning.lstrip().startswith("<think>") and not prompt.rstrip().endswith("<think>"):
             reasoning, text = "", generated_text
 
         return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip())

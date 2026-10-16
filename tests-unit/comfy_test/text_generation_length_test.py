@@ -76,3 +76,19 @@ def test_node_accepts_auto_and_larger_explicit_budgets():
     length = next(i for i in TextGenerate.define_schema().inputs if i.id == 'max_length')
     assert length.min == 0
     assert length.max == 1048576
+
+
+@pytest.mark.parametrize('decoded,prompt,expected', [
+    ('<think>reason</think>answer', 'question', ('answer', 'reason')),
+    ('reason</think>answer', 'question', ('answer', 'reason')),
+    ('caption\n</think>\ncaption', 'question', ('caption', 'caption')),
+    ('<think>unfinished', 'question', ('', 'unfinished')),
+    ('unfinished', 'question<think>', ('', 'unfinished')),
+    ('ordinary answer', 'question', ('ordinary answer', '')),
+])
+def test_reasoning_split_with_template_or_generated_opening(decoded, prompt, expected):
+    clip = SimpleNamespace(tokenize=lambda *args, **kwargs: [],
+                           generate=lambda *args, **kwargs: [],
+                           decode=lambda ids: decoded)
+    output = TextGenerate.execute(clip, prompt, 512, {'sampling_mode': 'off'}, thinking=False)
+    assert output.result == expected
