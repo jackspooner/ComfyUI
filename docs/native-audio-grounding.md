@@ -70,8 +70,70 @@ Conversion streams tensor bytes through CPU file buffers and neither loads a
 model nor uses the GPU. On hash/config failure, restore the exact pinned files
 through the managed download workflow. On interrupted conversion, inspect the
 named output and manifest before retrying; a published output requires a fresh
-destination. This artifact is a conversion baseline, not a registered native
-speech loader, an INT8 model or an accepted speech workflow.
+destination. This artifact is the BF16 storage baseline for the native VoiceGenerator loader
+below. INT8/ConvRot artifacts and other MOSS generator variants are not yet supported.
+
+## Native VoiceGenerator
+
+Place the converted generator in a configured `text_encoders` directory and the
+converted FP32 codec in `vae`. Select **Load CLIP**, type **moss_tts**, and
+`moss_voicegenerator_bf16.safetensors`. Connect its CLIP output to
+**MOSS VoiceGenerator**; connect the resulting AUDIO_CODES and **Load Audio
+Codec** to **Decode Audio Codes**, then **Save Audio**. The generation node reads
+`text`, `instruction` (voice description), `language`, `seed`, `max_length`,
+`audio_temperature`, `audio_top_p`, `audio_top_k` and `audio_repetition_penalty`.
+It returns codes only; it does not load the codec, clone reference voices, return
+text conditioning or use the diffusion sampler. The shared CLIP boundary owns
+model loading and memory reservation, including the requested KV capacity.
+
+A concrete API prompt fragment, after choosing the model names above:
+
+```json
+{"class_type":"MossVoiceGenerator","inputs":{"clip":["1",0],"text":"Hello world.","instruction":"A warm, natural adult voice.","language":"en","seed":7,"max_length":256,"audio_temperature":1.5,"audio_top_p":0.6,"audio_top_k":50,"audio_repetition_penalty":1.1}}
+```
+
+Text, whitespace, brackets and voice instructions are serialized as in the pinned
+worker's dictionary-message path. An empty language uses its literal `None`
+field. Text sampling retains reference defaults (temperature 1.5, top-p 1,
+top-k 50). Audio temperature 0 selects greedy audio tokens; positive values sample
+with a private seeded generator. Repetition penalties retain the reference's
+flattened audio-head history. Seed reproducibility is within a fixed runtime and
+backend; identical seeds across devices need not produce identical speech.
+
+`max_length` counts outer generation steps, including delay and flush overhead,
+not words or audio frames. Zero uses the remaining 40,960-position context after
+the longest prompt. Large budgets reserve more KV memory even when generation
+stops early. Small budgets may produce no complete frame: incomplete delayed
+frames are omitted, not padded into fabricated codec IDs. The decoder returns
+one AUDIO per complete segment; a request with no segments has no audio to save.
+Increase the budget if speech is cut short. Codes use the first 16 ordered books
+of MOSS v1; decoding produces raw mono 24 kHz PCM without loudness normalization.
+
+The model uses the shared native Qwen3 operations, attention and prefetch paths,
+learned audio-pad embeddings and independent output heads. It never executes
+checkpoint Python or Transformers model code in production. KV and delay state
+are call-local, with interruption checked at each generation step. A wrong model,
+missing embedded tokenizer or incompatible weights fails at the loader or
+CLIP boundary; use the pinned converter and correct model selection to recover.
+Follow the queue prompt ID after a timeout rather than submitting duplicate work.
+
+CPU checks cover tokenization against the pinned processor, independent greedy/
+stochastic sampling, warm-up/flush/stopping/continuation, padded cached logits,
+complete-frame extraction and CLIP/node ownership. The full original checkpoint
+can also be checked against the reference without replacing the serving runtime:
+
+```sh
+MOSS_VOICEGENERATOR_SOURCE=/absolute/MOSS-VoiceGenerator MOSS_VOICEGENERATOR_WEIGHTS=/absolute/MOSS-VoiceGenerator/model.safetensors PYTHONPATH=/absolute/worker/transformers5 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 /absolute/prepared/python -m pytest tests-unit/comfy_test/moss_delay_reference_test.py -q -s
+python -m pytest tests-unit/comfy_test/moss_speech_adapter_test.py -q
+```
+
+The full-checkpoint test hashes the original weights, requires about 10 GB of RAM
+and compares FP32 prefill plus three cached steps across all 17 heads. Omitting
+`MOSS_VOICEGENERATOR_WEIGHTS` skips that test. An isolated CPU queue run produced
+four seconds of 24 kHz mono FLAC through the complete native graph in 14.81 seconds;
+this is one local run, not a performance guarantee. Listening/quality comparisons,
+GPU and low-memory lifecycle acceptance, long speech, quantization and serving
+adoption remain pending. Existing worker workflows remain available.
 
 ## MOSS v1 codec baseline
 

@@ -67,8 +67,9 @@ The shared Llama/Qwen attention path honors per-module attention preferences in
 prefill and cached decoding. Explicit preferences use masked dispatch for fixed
 caches; unconfigured fixed caches retain the existing flash decode path. See
 [native audio integration status and verification](docs/native-audio-grounding.md).
-The same guide covers the offline, pinned VoiceGenerator BF16 converter. It
-preserves weights and tokenizer assets; native speech generation remains pending.
+The same guide covers pinned VoiceGenerator BF16 conversion and native speech:
+**Load CLIP (moss_tts) → MOSS VoiceGenerator → Decode Audio Codes → Save Audio**.
+Text and voice descriptions produce discrete codes for the separately loaded codec.
 The FP32 MOSS v1 codec has an offline converter and native **Load Audio Codec →
 Encode Audio Codes → Decode Audio Codes** nodes, with integer payloads and
 ComfyUI model/offload ownership. CPU reference and lifecycle checks pass;

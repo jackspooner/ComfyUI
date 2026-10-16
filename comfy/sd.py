@@ -82,6 +82,7 @@ import comfy.text_encoders.longcat_image
 import comfy.text_encoders.qwen35
 import comfy.text_encoders.qwen3vl
 import comfy.text_encoders.moss_audio
+import comfy.text_encoders.moss_speech
 import comfy.text_encoders.minimax
 import comfy.text_encoders.minimax_music
 import comfy.text_encoders.yue2
@@ -485,6 +486,20 @@ class CLIP:
 
         with model_management.cuda_device_context(device), comfy.ops.use_quantized_matmul(self.cond_stage_model, device):
             return self.cond_stage_model.generate(tokens, do_sample=do_sample, max_length=max_length, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty, seed=seed, presence_penalty=presence_penalty, mtp=mtp)
+
+    def generate_audio_codes(self, tokens, max_length=1000, seed=0, **sampling):
+        generate = getattr(self.cond_stage_model, 'generate_audio_codes', None)
+        if generate is None:
+            raise ValueError('This CLIP does not support audio-code generation; load a native speech checkpoint')
+        self.cond_stage_model.reset_clip_options()
+        device = self.patcher.load_device
+        memory = self.cond_stage_model.audio_generation_memory(tokens, max_length)
+        with model_management.cuda_device_context(device):
+            with comfy.model_prefetch.pause_malloc_graph():
+                model_management.load_models_gpu([self.patcher], memory_required=memory)
+            self.cond_stage_model.set_clip_options({'layer': None, 'execution_device': device})
+            with comfy.ops.use_quantized_matmul(self.cond_stage_model, device):
+                return generate(tokens, max_length=max_length, seed=seed, **sampling)
 
     def decode(self, token_ids, skip_special_tokens=True):
         return self.tokenizer.decode(token_ids, skip_special_tokens=skip_special_tokens)
@@ -1615,6 +1630,7 @@ class CLIPType(Enum):
     YUE2 = 36
     FLUX3 = 37
     MOSS_AUDIO = 38
+    MOSS_TTS = 39
 
 
 
@@ -1674,6 +1690,7 @@ class TEModel(Enum):
     QWEN3VL_32B = 37
     MING_IMAGE = 38
     MOSS_AUDIO = 39
+    MOSS_VOICEGENERATOR = 40
 
 
 def detect_te_model(sd):
@@ -1750,6 +1767,13 @@ def detect_te_model(sd):
                       "model.layers.0.self_attn.q_norm.weight": 128, "model.norm.weight": 4096}
     if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in moss_signature.items()):
         return TEModel.MOSS_AUDIO
+    if 'emb_ext.0.weight' in sd and 'lm_heads.0.weight' in sd:
+        signature = {'model.norm.weight': 2048, 'model.layers.27.self_attn.q_norm.weight': 128,
+                     'model.embed_tokens.weight': 155648, 'lm_heads.0.weight': 155648,
+                     'emb_ext.0.weight': 1025, 'emb_ext.15.weight': 1025, 'lm_heads.16.weight': 1025}
+        if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in signature.items()):
+            return TEModel.MOSS_VOICEGENERATOR
+        raise ValueError('Unsupported MOSS speech checkpoint; this loader currently supports converted VoiceGenerator')
     if "model.layers.0.post_attention_layernorm.weight" in sd:
         weight = sd['model.layers.0.post_attention_layernorm.weight']
         if 'model.layers.0.self_attn.q_norm.weight' in sd:
@@ -1956,6 +1980,10 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.clip = comfy.text_encoders.moss_audio.te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.moss_audio.MossAudioTokenizer
             tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
+        elif te_model == TEModel.MOSS_VOICEGENERATOR:
+            clip_target.clip = comfy.text_encoders.moss_speech.te(**llama_detect(clip_data))
+            clip_target.tokenizer = comfy.text_encoders.moss_speech.MossSpeechTokenizer
+            tokenizer_data['tokenizer_json'] = clip_data[0].pop('tokenizer_json', None)
         elif te_model == TEModel.QWEN3_4B:
             if clip_type == CLIPType.FLUX or clip_type == CLIPType.FLUX2:
                 clip_target.clip = comfy.text_encoders.flux.klein_te(**llama_detect(clip_data), model_type="qwen3_4b")
