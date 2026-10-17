@@ -13,14 +13,16 @@ from comfy.ldm.modules.attention import AttentionTensorContainer, ComfyAttention
 
 
 def run_layers(layers, x):
+    # Residuals and backbone features cross block lifetimes; the forward owns
+    # one allocation scope while this queue handles weight prefetch.
     queue = comfy.model_prefetch.make_prefetch_queue(list(layers), x.device, {'prefetch_dynamic_vbars': True})
     for layer in layers:
         comfy.model_management.throw_exception_if_processing_interrupted()
         def core():
             nonlocal x
             x = layer(x)
-        comfy.model_prefetch.prefetch_queue_pop(queue, x.device, layer, x.dtype, core=core, malloc_scope='block')
-    comfy.model_prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope='block')
+        comfy.model_prefetch.prefetch_queue_pop(queue, x.device, layer, x.dtype, core=core)
+    comfy.model_prefetch.prefetch_queue_pop(queue, x.device, None)
     return x
 
 

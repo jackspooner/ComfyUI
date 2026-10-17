@@ -49,6 +49,8 @@ IDs and verify payloads before loading; never queue duplicates as a retry strate
 Validation uses an allocation-free schema so deferred ComfyUI linear parameters
 remain subject to complete shape checks. OCR requests full-precision attention
 through the selected dispatcher, including under `--use-ck-attention`.
+The allocation compiler records one forward scope because retained backbone
+features cross block lifetimes; the block queues still prefetch weights.
 
 ## Workflow and outputs
 
