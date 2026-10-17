@@ -169,7 +169,8 @@ def test_ordinary_templated_text_outputs_history_for_the_next_node():
     assert json.loads(second.result[2])['messages'][:2] == [
         {'role': 'user', 'content': 'My code is BLUE'}, {'role': 'assistant', 'content': 'First answer'}]
     raw = TextGenerate.execute(single, 'raw prompt', 64, {'sampling_mode': 'off'}, use_default_template=False)
-    assert raw.result[2:] == ('', '')
+    assert raw.result[2:4] == ('', '')
+    assert raw.result[4] == 'First answer'
 
 
 @pytest.mark.parametrize('extra', [{'image': object()}, {'audio': object()}, {'video': object()}, {'use_default_template': False}])

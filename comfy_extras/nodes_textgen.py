@@ -52,6 +52,7 @@ class TextGenerate(io.ComfyNode):
                 io.String.Output(display_name="thinking"),
                 io.String.Output(display_name="history"),
                 io.String.Output(display_name="context_info"),
+                io.String.Output(display_name="raw_text"),
             ],
         )
 
@@ -111,7 +112,7 @@ class TextGenerate(io.ComfyNode):
             updated_history = write_history([*messages, {"role": "assistant", "content": text.strip()}])
         if context_info is not None:
             context_info["generated_tokens"] = len(generated_ids)
-        return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip(), updated_history, json.dumps(context_info) if context_info is not None else "")
+        return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip(), updated_history, json.dumps(context_info) if context_info is not None else "", generated_text)
 
 
 LTX2_T2V_SYSTEM_PROMPT = """You are a Creative Assistant. Given a user's raw input prompt describing a scene or concept, expand it into a detailed video generation prompt with specific visuals and integrated audio to guide a text-to-video model.

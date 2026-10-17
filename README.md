@@ -3,6 +3,14 @@
 # ComfyUI
 **The most powerful and modular AI engine for content creation.**
 
+## Native GLM-OCR in this fork
+
+This fork adds the official Z.ai GLM-OCR recognizer through **Load CLIP → Generate
+Text**, using ComfyUI's native model loading, attention, prefetch and memory owners.
+It processes one original-pixel image/crop with padding and no enlargement, and
+adds a raw decoded-text output. See [setup, conversion and limits](docs/glm-ocr.md).
+Source integration requires activation before it changes a running service.
+
 ## Native text conversations in this fork
 
 This fork also adds optional text conversation history and exact context budgets
