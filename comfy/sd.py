@@ -334,6 +334,18 @@ class CLIP:
             kwargs["tokenizer_options"] = tokenizer_options
         return self.tokenizer.tokenize_with_weights(text, return_word_ids, **kwargs)
 
+    def tokenize_chat(self, messages, thinking=False):
+        tokenize = getattr(self.tokenizer, "tokenize_chat", None)
+        if tokenize is None:
+            raise ValueError("This tokenizer does not support structured text conversations.")
+        return tokenize(messages, thinking=thinking)
+
+    def get_chat_context_length(self):
+        context = getattr(self.cond_stage_model, "get_chat_context_length", None)
+        if context is None:
+            raise ValueError("This model does not expose a text conversation context limit.")
+        return context()
+
     def add_hooks_to_dict(self, pooled_dict: dict[str]):
         if self.apply_hooks_to_conds:
             pooled_dict["hooks"] = self.apply_hooks_to_conds

@@ -3,6 +3,16 @@
 # ComfyUI
 **The most powerful and modular AI engine for content creation.**
 
+## Native text conversations in this fork
+
+This fork also adds optional text conversation history and exact context budgets
+to the existing **Load CLIP → Generate Text** path for native Qwen3.5/Qwen3.8 and
+MOSS. History is explicit JSON input/output; saving it belongs to the caller.
+Existing single-prompt and media paths remain available. See
+[native text conversations](docs/text-conversations.md) for prerequisites,
+contracts, examples, limits and verification. This source capability requires
+deployment before it appears in a running ComfyUI process.
+
 ## Fork: Krea 2 inference
 
 This fork builds on [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI)

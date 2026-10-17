@@ -13,6 +13,7 @@ import comfy_kitchen
 from comfy.quant_ops import QuantizedTensor
 from comfy.ldm.modules.attention import optimized_attention_for_device
 from comfy import sd1_clip
+from comfy.text_generation import format_qwen_chat
 import comfy.text_encoders.qwen_vl
 
 from .llama import BaseLlama, BaseGenerate, FixedKV, FixedKVBias, Llama2_, MLP, RMSNorm, apply_penalty, apply_rope, penalty_active, precompute_freqs_cis, rope_matrix
@@ -1019,6 +1020,9 @@ class Qwen35Tokenizer(sd1_clip.SDTokenizer):
 
 
 class Qwen35ImageTokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_chat(self, messages, thinking=False):
+        return self.tokenize_with_weights(format_qwen_chat(messages, thinking))
+
     def __init__(self, embedding_directory=None, tokenizer_data={}, model_type="qwen35_2b"):
         embedding_size = QWEN35_MODELS.get(model_type, {}).get("hidden_size", 2048)
         tokenizer = lambda *a, **kw: Qwen35Tokenizer(*a, **kw, embedding_size=embedding_size, embedding_key=model_type)
@@ -1089,6 +1093,9 @@ class Qwen35ClipModel(sd1_clip.SDClipModel):
 
 
 class Qwen35TEModel(sd1_clip.SD1ClipModel):
+    def get_chat_context_length(self):
+        return getattr(self, self.clip).transformer.model.config.max_position_embeddings
+
     def __init__(self, device="cpu", dtype=None, model_options={}, model_type="qwen35_2b", mtp=False):
         clip_model = lambda **kw: Qwen35ClipModel(**kw, model_type=model_type, mtp=mtp)
         super().__init__(device=device, dtype=dtype, name=model_type, clip_model=clip_model, model_options=model_options)
