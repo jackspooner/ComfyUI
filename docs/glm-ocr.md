@@ -80,7 +80,7 @@ response. Never reset queues, delete GPU holds or automatically replay work.
 ## RouterText, MediaTools and WF5
 
 RouterText's operator configuration selects `backend:"native_text"`,
-`modelFamily:"glm_ocr"`, `acceptsImages:true` and the exact converted filename.
+`nativeFamily:"glm_ocr"`, `acceptsImages:true` and the exact converted filename.
 It checks the deployed raw_text output before uploads, uses native GLM markers,
 queues one image, defaults to 512 greedy tokens, saves normalized/raw text separately
 and returns raw decoded text. Only text output is advertised; no JSON repair,
