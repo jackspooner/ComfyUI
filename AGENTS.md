@@ -395,6 +395,15 @@ Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_workt
 
 Prepare the exact worktree GitNexus index separately after setup with embeddings disabled. Operating guidance belongs to the existing shared ComfyUI model-runtimes skill; do not register temporary worktrees as shared skill sources.
 
+### Optional native PaddleOCR
+
+For native PP-OCRv6 work, add `--paddleocr` to the setup command. It checks
+preinstalled OpenCV Python, NumPy and torchvision without installing packages or
+loading models. Run `python -m pytest tests-unit/comfy_test/paddleocr_test.py -q`
+with the prepared interpreter. `docs/paddleocr.md` documents the offline reference
+harness, pinned models, node contracts and acceptance limits. Update the existing
+authoritative `comfyui` and `comfyui-model-runtimes` skills for capability changes.
+
 ### Optional Trellis2 mesh encoder
 
 For mesh-encoder work, use the same setup command with `--trellis-mesh` and

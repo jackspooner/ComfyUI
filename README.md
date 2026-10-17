@@ -3,6 +3,19 @@
 # ComfyUI
 **The most powerful and modular AI engine for content creation.**
 
+## Native PaddleOCR in this fork
+
+This fork adds **Load PaddleOCR Models → PaddleOCR** for local PP-OCRv6 medium
+text detection and CTC recognition. Native ComfyUI model management owns both
+FP32 models. Outputs include text, region geometry, model scores and preprocessing
+transforms; independent batch images remain separate. Default preprocessing avoids
+enlargement, with an explicit upstream-resize comparison mode. See
+[model setup, node contracts and measured limits](docs/paddleocr.md).
+Worktree preparation for this optional capability uses the normal setup command
+with `--paddleocr` to check its preinstalled OpenCV/torchvision prerequisites.
+Source integration requires activation before new nodes appear in a running
+service. Recognition errors remain visible; no production advert route is added.
+
 ## Native GLM-OCR in this fork
 
 This fork adds the official Z.ai GLM-OCR recognizer through **Load CLIP → Generate
