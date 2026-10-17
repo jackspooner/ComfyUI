@@ -46,6 +46,9 @@ tensor shapes/inventory. The official medium recognizer uses configuration type
 weights. No converter is needed. Wrong files fail clearly without downloads or
 automatic substitution. After uncertain acquisition, recover existing download
 IDs and verify payloads before loading; never queue duplicates as a retry strategy.
+Validation uses an allocation-free schema so deferred ComfyUI linear parameters
+remain subject to complete shape checks. OCR requests full-precision attention
+through the selected dispatcher, including under `--use-ck-attention`.
 
 ## Workflow and outputs
 

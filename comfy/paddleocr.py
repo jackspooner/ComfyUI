@@ -56,11 +56,15 @@ def read_assets(checkpoint, kind):
 def load_model(checkpoint, kind):
     config, processor = read_assets(checkpoint, kind)
     cls = Detector if kind == 'detector' else Recognizer
-    model = cls(config, comfy.ops.manual_cast, device='cpu', dtype=torch.float32).eval()
     sd = comfy.utils.load_torch_file(str(checkpoint), safe_load=True)
-    expected = {k: v.shape for k, v in model.state_dict().items() if not k.endswith('.num_batches_tracked')}
+    # Cast-aware linear ops can defer parameters until loading. Validate against
+    # an allocation-free schema rather than that incomplete initial state dict.
+    schema = cls(config, torch.nn, device='meta', dtype=torch.float32)
+    expected = {k: v.shape for k, v in schema.state_dict().items() if not k.endswith('.num_batches_tracked')}
+    del schema
     if set(sd) != set(expected) or any(sd[k].shape != shape or sd[k].dtype != torch.float32 for k, shape in expected.items()):
         raise ValueError(f'PaddleOCR {kind} checkpoint must have the complete supported FP32 tensor inventory and shapes.')
+    model = cls(config, comfy.ops.manual_cast, device='cpu', dtype=torch.float32).eval()
     patcher = comfy.model_patcher.CoreModelPatcher(model, load_device=mm.get_torch_device(), offload_device=mm.unet_offload_device(), fast_disk=comfy.storage.state_dict_fast_disk(sd))
     model.load_state_dict(sd, strict=False, assign=patcher.is_dynamic())
     digest = hashlib.sha256()

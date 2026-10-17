@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 
 import numpy as np
@@ -7,6 +8,7 @@ import torch
 
 from comfy.cli_args import args
 args.cpu = True
+import comfy.memory_management
 from comfy.ldm.paddleocr import Detector, Recognizer
 from comfy.ops import manual_cast
 from comfy.paddleocr import (decode_ctc, detection_regions, mini_box, plain_text, prepare_detector, load_model,
@@ -157,12 +159,13 @@ def test_workspace_is_admitted_before_execution(monkeypatch):
     assert events == [workspace_bytes('recognizer', result.shape), 'forward']
 
 
+@pytest.mark.parametrize('lazy', [False, True])
 @pytest.mark.parametrize('mutation', ['missing', 'extra', 'shape', 'dtype'])
-def test_weight_inventory_is_strict(tmp_path, monkeypatch, mutation):
+def test_weight_inventory_is_strict(tmp_path, monkeypatch, mutation, lazy):
     import comfy.paddleocr as ocr
     from safetensors.torch import save_file
     cfg = config('recognizer')
-    model = Recognizer(cfg, manual_cast, device='cpu', dtype=torch.float32)
+    model = Recognizer(cfg, torch.nn, device='cpu', dtype=torch.float32)
     sd = {k: v for k, v in model.state_dict().items() if not k.endswith('.num_batches_tracked')}
     key = next(iter(sd))
     if mutation == 'missing':
@@ -175,9 +178,37 @@ def test_weight_inventory_is_strict(tmp_path, monkeypatch, mutation):
         sd[key] = sd[key].half()
     checkpoint = tmp_path / 'model.safetensors'
     save_file(sd, checkpoint)
+    monkeypatch.setattr(ocr.comfy.utils, 'load_torch_file', lambda *a, **kw: sd.copy())
+    monkeypatch.setattr(comfy.memory_management, 'aimdo_enabled', lazy)
     monkeypatch.setattr(ocr, 'read_assets', lambda *a: [cfg, {}])
     with pytest.raises(ValueError, match='inventory'):
         load_model(checkpoint, 'recognizer')
+
+
+def test_lazy_weight_loading_accepts_complete_checkpoint(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from safetensors.torch import save_file
+    import comfy.paddleocr as ocr
+    cfg = config('recognizer')
+    reference = Recognizer(cfg, torch.nn, device='cpu', dtype=torch.float32)
+    sd = {k: v for k, v in reference.state_dict().items() if not k.endswith('.num_batches_tracked')}
+    checkpoint = tmp_path / 'model.safetensors'
+    save_file(sd, checkpoint)
+    monkeypatch.setattr(ocr.comfy.utils, 'load_torch_file', lambda *a, **kw: sd.copy())
+    monkeypatch.setattr(comfy.memory_management, 'aimdo_enabled', True)
+    monkeypatch.setattr(ocr, 'read_assets', lambda *a: [cfg, {}])
+    monkeypatch.setitem(ocr.SOURCES, 'recognizer', {'weights_sha256': hashlib.sha256(checkpoint.read_bytes()).hexdigest()})
+    monkeypatch.setattr(ocr.comfy.model_patcher, 'CoreModelPatcher', lambda model, **kw: SimpleNamespace(model=model, is_dynamic=lambda: False))
+    patcher, _, _ = load_model(checkpoint, 'recognizer')
+    for key, value in sd.items():
+        torch.testing.assert_close(patcher.model.state_dict()[key], value)
+
+
+def test_fp32_recognizer_with_kitchen_attention(monkeypatch):
+    import comfy.ldm.paddleocr as native
+    from comfy.ldm.modules.attention import attention_comfy_kitchen_int8
+    monkeypatch.setattr(native, 'optimized_attention', attention_comfy_kitchen_int8)
+    test_native_math_matches_reference('recognizer')
 
 
 def test_cancellation_before_model_execution(monkeypatch):

@@ -14,7 +14,9 @@ enlargement, with an explicit upstream-resize comparison mode. See
 Worktree preparation for this optional capability uses the normal setup command
 with `--paddleocr` to check its preinstalled OpenCV/torchvision prerequisites.
 Source integration requires activation before new nodes appear in a running
-service. Recognition errors remain visible; no production advert route is added.
+service. Checkpoint validation supports lazy weight allocation; OCR requests FP32
+attention through the selected dispatcher. Recognition errors remain visible;
+no production advert route is added.
 
 ## Native GLM-OCR in this fork
 

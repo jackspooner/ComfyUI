@@ -222,7 +222,7 @@ class RecognitionAttention(nn.Module):
     def forward(self, x):
         q, k, v = self.qkv(x).reshape(x.shape[0], x.shape[1], 3, self.heads, -1).unbind(2)
         q, k, v = [AttentionTensorContainer(t.transpose(1, 2)) for t in (q, k, v)]
-        return self.projection(optimized_attention(q, k, v, self.heads, skip_reshape=True, preferred_attention=self.comfy_attention))
+        return self.projection(optimized_attention(q, k, v, self.heads, skip_reshape=True, preferred_attention=self.comfy_attention, low_precision_attention=False))
 
 
 class RecognitionMLP(nn.Module):
