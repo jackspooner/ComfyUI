@@ -493,7 +493,13 @@ class CLIP:
 
         estimate = getattr(self.cond_stage_model, "generation_memory_estimation_function", None)
         if estimate is not None:
-            self.load_model(tokens, memory_required=estimate(tokens, max_length, device=self.patcher.load_device))
+            required = estimate(tokens, max_length, device=self.patcher.load_device)
+            self.load_model(tokens, memory_required=required)
+            device = self.patcher.load_device
+            reserved = 0 if model_management.is_device_cpu(device) else model_management.extra_reserved_memory()
+            available = model_management.get_free_memory(device)
+            if available < required + reserved:
+                raise RuntimeError(f"Text generation needs {required + reserved} free bytes including reserve; observed {available}. Shorten the input or output budget, or release idle models.")
         else:
             self.load_model(tokens)
         device = self.patcher.load_device

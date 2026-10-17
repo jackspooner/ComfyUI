@@ -70,7 +70,9 @@ request/workflow IDs with every result. Full-frame reduction must follow croppin
 
 Generation admission includes expanded image tokens, all decoder KV layers and the
 requested new-token budget, plus conservative vision/prefill/workspace allowance
-(including unfused attention scores). Weight admission remains patcher-owned.
+(including unfused attention scores). Weight admission remains patcher-owned. After owner reclamation/loading, the
+generation boundary checks actual reusable free memory plus the owner reserve
+before entering generation; insufficient capacity fails before KV allocation.
 Zero max_length requests all remaining context and may require substantial memory;
 no free-VRAM-based shrinking occurs. Insufficient capacity fails normally. Caches
 are execution-scoped; block and decode interruption follows normal ComfyUI controls.
@@ -101,3 +103,33 @@ ranges and budget-aware admission. They do not establish GPU quality, release,
 transitions or maximum-size capacity. Record live acceptance separately, including
 real cropped/blank images, cold/warm outputs, physical VRAM, targeted cancellation
 and GLM → another native model → GLM / Runtime ASR transitions.
+
+## Bounded acceptance on 17 October 2026
+
+The pinned original checkpoint passed its published SHA-256, complete 526-tensor
+inventory/range checks, and conversion to 510 native tensors plus embedded tokenizer.
+The manifest records the omitted 16 MTP tensors. Reduced CPU vision/decoder tests
+match the installed official implementation in FP32; padded processing and template
+IDs match. Full BF16 badge generation produced identical native/reference token IDs;
+full-frame generation diverged in uncertain fine print, with first-token logits
+mean absolute difference about 0.071. Exact BF16 sequence parity is not promised.
+
+The deployed RTX 5090 completed a clear-text fixture exactly on one cold and three
+warm queued runs (about 1.27 s cold, 0.14–0.16 s warm). Pending, running vision and
+observed-token decode cancellation passed, as did GLM → complete native Qwen → GLM
+and GLM → Runtime ASR → GLM. Native holds were released; idle external ASR residency
+remained explicitly accounted for. Coarse physical-memory samples during warm GLM
+were about 4.2 GiB including process/context/allocator memory; the cold transition
+sample included another model's cached weights and is not a GLM peak estimate.
+This is bounded lifecycle evidence, not maximum-context/pressure/crash acceptance.
+
+Literal accuracy failed. On source frame hash
+`7918c129d073c892639d47eaf145ccacd1d58b8dfa0610638f1844b23a3d541f`,
+the original-pixel Almay badge crop `[334,134,418,211]` produced invented
+`SUSTAINABLE` text in both native and official reference. Full-frame recognition
+also invented seal text. Blank input produced formatting marks rather than empty
+text. Additional white padding did not repair the badge. No expected wording was
+supplied and no pixels were enlarged. The production RouterText OCR route remains
+unconfigured; MediaTools/WF5 OCR inference is withheld until literal acceptance
+passes. The approximately 100-crop human-reviewed evaluation, isolated capacity/
+crash tests, detailed allocator peaks and wider device coverage remain unverified.

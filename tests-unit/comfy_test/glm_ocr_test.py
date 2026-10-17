@@ -118,6 +118,11 @@ def test_budget_reaches_admission_before_generation(monkeypatch):
     monkeypatch.setattr('comfy.ops.use_quantized_matmul', lambda *a: contextlib.nullcontext())
     assert clip.generate({}, max_length=42, do_sample=False) == [1]
     assert events == [4200, 'generate']
+    events.clear()
+    monkeypatch.setattr(comfy.model_management, 'get_free_memory', lambda device: 100)
+    with pytest.raises(RuntimeError, match='needs 4200 free bytes'):
+        clip.generate({}, max_length=42, do_sample=False)
+    assert events == [4200]  # Admission fails before any generation/cache allocation.
     del stage.generation_memory_estimation_function
     events.clear()
     clip.generate({}, max_length=42, do_sample=False)

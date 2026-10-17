@@ -9,7 +9,8 @@ This fork adds the official Z.ai GLM-OCR recognizer through **Load CLIP → Gene
 Text**, using ComfyUI's native model loading, attention, prefetch and memory owners.
 It processes one original-pixel image/crop with padding and no enlargement, and
 adds a raw decoded-text output. See [setup, conversion and limits](docs/glm-ocr.md).
-Source integration requires activation before it changes a running service.
+Bounded GPU lifecycle checks passed, but the Almay badge failed literal accuracy;
+the production OCR route remains unconfigured. See the linked acceptance limits.
 
 ## Native text conversations in this fork
 
