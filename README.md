@@ -16,7 +16,8 @@ with `--paddleocr` to check its preinstalled OpenCV/torchvision prerequisites.
 Source integration requires activation before new nodes appear in a running
 service. Checkpoint validation supports lazy weight allocation; OCR requests FP32
 attention through the selected dispatcher. Recognition errors remain visible;
-no production advert route is added.
+no production advert route is added. RTX 5090 advert tests read all five supplied
+text lines correctly with official preprocessing; the tiny circular badge fails.
 
 ## Native GLM-OCR in this fork
 

@@ -160,8 +160,44 @@ redetection. Do not interpret these mixed-task totals as a model ranking.
 Focused tests cover small randomized architectures, exported processor
 parity, no enlargement, CTC blanks/repeats, detection geometry/thresholds, path
 containment, independent images, strict weights, cancellation and admission order.
-110 targeted/regression tests pass; one optional MOSS reference module is skipped
+118 targeted/regression tests pass; one optional MOSS reference module is skipped
 because its separate reference source is not configured. An isolated CPU ComfyUI
 queue successfully executes cold/warm clear controls and a blank-result badge.
 GPU lifecycle evidence must be reported separately. No RouterText,
 MediaTools, WF5 or advert-automation production route is added by this change.
+
+
+### RTX 5090 advert acceptance (17 October 2026)
+
+Twenty normal queue submissions succeeded with the pinned FP32 models, dynamic
+VRAM, allocation compilation and the deployment's Comfy Kitchen attention flag.
+Two activation defects were found and repaired: lazy linear parameters had been
+mistaken for missing checkpoint keys, and block allocation scopes were too short
+for retained convolutional features. FP32 attention is explicitly requested.
+
+On the original Almay frame, official preprocessing reads the main package copy
+and English footer, with errors in multilingual fine print. The five supplied
+single-line crops reproduce the CPU results: official has zero errors over 75
+normalized characters; no-enlargement has one substitution, fourteen deletions
+and no insertions (20% CER). This is one advert, not a general OCR benchmark.
+The 84×77 original-pixel badge still returns no text without enlargement and
+`100` then `8` with official preprocessing. It does not verify `100%` or
+`BIODEGRADABLE FIBERS`; the incorrect `8` has recognition score about 0.774.
+
+Queue execution time was 1.320 seconds for the cold clear control and 0.068
+seconds warm; the full advert took 0.407 seconds without enlargement and 0.522
+seconds with official preprocessing. Process GPU-memory samples at 100 ms
+intervals reached 2,066 MiB during these OCR runs; this includes runtime overhead
+and can miss short peaks. Timings exclude upload and queue waiting. Every
+comparable GPU transcription matched its CPU counterpart. This establishes text
+agreement, not GPU-native versus official probability-map parity. Other GPUs,
+low-memory pressure and non-CUDA backends remain unverified. Preserve the saved
+prompt histories, source/crop hashes, geometry and raw erroneous outputs when
+using these observations; advert routing remains withheld.
+
+Targeted cancellation interrupted the OCR node in a repeated-image batch, and
+the following clear control succeeded. Explicit idle offload/reload and OCR →
+native Qwen → OCR → RuntimeHost ASR → OCR transitions also succeeded through the
+normal queue and coordinated GPU ownership. Rotated controls still misread text;
+no orientation model was added. A clear/blank two-image batch preserves image
+boundaries and leaves the blank result empty.
