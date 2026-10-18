@@ -1,6 +1,11 @@
 <div align="center">
 
 # ComfyUI
+
+## Native Audio Flamingo 3 in this fork
+
+This fork adds native audio understanding and transcription with NVIDIA Audio Flamingo 3 through Load CLIP and Generate Text. It reuses ComfyUI model/attention/memory management and repackages a local HF snapshot without downloading during execution. See [setup, licensing, inputs and acceptance limits](docs/audio-flamingo.md). CPU reference checks pass; GPU activation remains pending.
+
 **The most powerful and modular AI engine for content creation.**
 
 ## Native PaddleOCR in this fork
