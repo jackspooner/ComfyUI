@@ -2593,7 +2593,23 @@ class CogVideoX_Inpaint(CogVideoX_T2V):
         return out
 
 
+
+class AuK(supported_models_base.BASE):
+    unet_config = {"audio_model": "auk_flash"}
+    unet_extra_config = {}
+    latent_format = latent_formats.AuK
+    sampling_settings = {"shift": 1.0, "multiplier": 1.0}
+    supported_inference_dtypes = [torch.bfloat16, torch.float32]
+
+    def __init__(self, unet_config):
+        super().__init__(unet_config)
+        self.unet_config.pop("audio_model")
+
+    def get_model(self, state_dict, prefix="", device=None):
+        return model_base.AuK(self, device=device)
+
 models = [
+    AuK,
     LotusD,
     Stable_Zero123,
     SD15_instructpix2pix,

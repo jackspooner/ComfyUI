@@ -81,6 +81,8 @@ import comfy.text_encoders.ace15
 import comfy.text_encoders.longcat_image
 import comfy.text_encoders.qwen35
 import comfy.text_encoders.qwen3vl
+import comfy.text_encoders.auk
+import comfy.ldm.auk.vae
 import comfy.text_encoders.moss_audio
 import comfy.text_encoders.glm_ocr
 import comfy.text_encoders.qwen3_omni
@@ -1027,6 +1029,20 @@ class VAE:
                 self.working_dtypes = [torch.float32]
                 self.disable_offload = True
                 self.extra_1d_channel = 16
+            elif all(key in sd for key in ("global_mean", "global_log_std", "audio_encoder.generator.0.layer.weight", "resblocks.17.convs1.2.weight")):
+                self.first_stage_model = comfy.ldm.auk.vae.AuKVAE()
+                self.crop_input = False
+                self.latent_channels = 64
+                self.output_channels = 1
+                self.upscale_ratio = 480
+                self.downscale_ratio = 480
+                self.latent_dim = 1
+                self.audio_sample_rate = 24000
+                self.process_output = lambda audio: audio
+                self.process_input = lambda audio: audio.mean(dim=1, keepdim=True)
+                self.working_dtypes = [torch.float32]
+                self.memory_used_encode = lambda shape, dtype: shape[2] * 2000 * model_management.dtype_size(dtype)
+                self.memory_used_decode = lambda shape, dtype: shape[2] * 480 * 2000 * model_management.dtype_size(dtype)
             elif "decoder.layers.3.transformers.0.pre_norm.alpha" in sd:  # Stable Audio 3 VAE
                 if "decoder.layers.3.transformers.11.self_attn.to_out.weight" in sd:
                     config = {"channels": 256, "transformer_depths": 12, "sinusoidal_blocks": 8,
@@ -1639,7 +1655,8 @@ class CLIPType(Enum):
     YUE2 = 36
     FLUX3 = 37
     MOSS_AUDIO = 38
-    QWEN3_OMNI = 39
+    AUK = 39
+    QWEN3_OMNI = 40
 
 
 
@@ -1700,7 +1717,8 @@ class TEModel(Enum):
     MING_IMAGE = 38
     MOSS_AUDIO = 39
     GLM_OCR = 40
-    QWEN3_OMNI = 41
+    AUK = 41
+    QWEN3_OMNI = 42
 
 
 def detect_te_model(sd):
@@ -1750,6 +1768,10 @@ def detect_te_model(sd):
     # Must precede the Qwen2.5-7B k_proj.bias=512 check (GPT-OSS also has 8*64=512).
     if "layers.0.self_attn.sinks" in sd and "layers.0.mlp.experts.gate_up_proj.weight" in sd:
         return TEModel.GPT_OSS_20B
+    auk_signature = {"audio_tower.conv1.weight": 1280, "audio_tower.proj.weight": 2048,
+                     "layer_weights": 36, "layer_scale": 1, "model.norm.weight": 2048}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in auk_signature.items()):
+        return TEModel.AUK
     if 'model.layers.0.self_attn.k_proj.bias' in sd:
         weight = sd['model.layers.0.self_attn.k_proj.bias']
         if weight.shape[0] == 256:
@@ -1992,6 +2014,11 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.clip = comfy.text_encoders.gpt_oss.lens_te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.gpt_oss.LensTokenizer
             tokenizer_data["tokenizer_json"] = clip_data[0].get("tokenizer_json", None)
+        elif te_model == TEModel.AUK:
+            clip_target.clip = comfy.text_encoders.auk.te(**llama_detect(clip_data))
+            clip_target.tokenizer = comfy.text_encoders.auk.AuKTokenizer
+            for key in ("tokenizer_json", "auk_config_json"):
+                tokenizer_data[key] = clip_data[0].pop(key)
         elif te_model == TEModel.MOSS_AUDIO:
             clip_target.clip = comfy.text_encoders.moss_audio.te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.moss_audio.MossAudioTokenizer
