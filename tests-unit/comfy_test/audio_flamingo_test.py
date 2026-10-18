@@ -65,9 +65,10 @@ def test_full_checkpoint_detection_guards():
                  'multi_modal_projector.linear_1.weight':3584,'model.embed_tokens.weight':151672,
                  'model.layers.27.self_attn.q_proj.weight':3584,'model.lm_head.weight':151672}
     state = {k:torch.empty(v,1,device='meta') for k,v in signature.items()}
+    state['model.layers.0.self_attn.k_proj.bias'] = torch.empty(512, device='meta')
     assert detect_te_model(state) == TEModel.AUDIO_FLAMINGO
     assert TEModel.AUDIO_FLAMINGO != TEModel.AUK
-    for key in state:
+    for key in signature:
         assert detect_te_model({k:v for k,v in state.items() if k != key}) != TEModel.AUDIO_FLAMINGO
 
 

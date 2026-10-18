@@ -1774,6 +1774,11 @@ def detect_te_model(sd):
                      "layer_weights": 36, "layer_scale": 1, "model.norm.weight": 2048}
     if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in auk_signature.items()):
         return TEModel.AUK
+    flamingo_signature = {"audio_tower.conv1.weight": 1280, "audio_tower.embed_positions.weight": 1500,
+                          "multi_modal_projector.linear_1.weight": 3584, "model.embed_tokens.weight": 151672,
+                          "model.layers.27.self_attn.q_proj.weight": 3584, "model.lm_head.weight": 151672}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in flamingo_signature.items()):
+        return TEModel.AUDIO_FLAMINGO
     if 'model.layers.0.self_attn.k_proj.bias' in sd:
         weight = sd['model.layers.0.self_attn.k_proj.bias']
         if weight.shape[0] == 256:
@@ -1796,11 +1801,6 @@ def detect_te_model(sd):
     if "visual.deepstack_merger_list.0.norm.weight" in sd and "model.layers.49.self_attn.q_proj.weight" in sd:
         # MiniMax H3 conditioning encoder: Qwen3-VL-32B, truncated to 50 layers
         return TEModel.QWEN3VL_32B
-    flamingo_signature = {"audio_tower.conv1.weight": 1280, "audio_tower.embed_positions.weight": 1500,
-                          "multi_modal_projector.linear_1.weight": 3584, "model.embed_tokens.weight": 151672,
-                          "model.layers.27.self_attn.q_proj.weight": 3584, "model.lm_head.weight": 151672}
-    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in flamingo_signature.items()):
-        return TEModel.AUDIO_FLAMINGO
     moss_signature = {"audio_encoder.conv1.weight": 480, "audio_encoder.stem_proj.weight": 1280,
                       "audio_adapter.gate_proj.weight": 8192, "deepstack_audio_merger_list.2.down_proj.weight": 4096,
                       "model.layers.0.self_attn.q_norm.weight": 128, "model.norm.weight": 4096}
