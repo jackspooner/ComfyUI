@@ -1206,6 +1206,15 @@ def detect_unet_config(state_dict, key_prefix, metadata=None):
            and state_dict[key_prefix + key].shape[0] == size for key, size in auk_signature.items()):
         return {"audio_model": "auk_flash"}
 
+    ying_signature = {"text_embed_p.text_embed.weight": 374,
+                      "input_embed_with_midi.midi_proj.weight": 128,
+                      "input_embed_with_midi.proj.weight": 1024,
+                      "transformer_blocks.21.attn_norm.linear.weight": 6144,
+                      "time_embed.time_mlp.0.weight": 1024, "proj_out.weight": 64}
+    if all(key_prefix + key in state_dict and state_dict[key_prefix + key].ndim > 0
+           and state_dict[key_prefix + key].shape[0] == size for key, size in ying_signature.items()):
+        return {"audio_model": "yingmusic"}
+
     if '{}input_blocks.0.0.weight'.format(key_prefix) not in state_dict_keys:
         return None
 

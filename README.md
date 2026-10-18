@@ -1,7 +1,22 @@
 <div align="center">
 
 # ComfyUI
+
+## Native Audio Flamingo 3 in this fork
+
+This fork adds native audio understanding and transcription with NVIDIA Audio Flamingo 3 through Load CLIP and Generate Text. It reuses ComfyUI model/attention/memory management and repackages a local HF snapshot without downloading during execution. See [setup, licensing, inputs and acceptance limits](docs/audio-flamingo.md). CPU reference checks and short-clip RTX 5090 inference, cancellation/reload and RouterAudio acceptance pass; broader resource and quality limits remain unverified.
+
 **The most powerful and modular AI engine for content creation.**
+
+## Native YingMusic Singer Plus in this fork
+
+This fork adds the Singer Plus transformer and melody encoder to ComfyUI's native
+loaders, attention and memory management. **Load Diffusion Model + Load Audio
+Encoder + Load VAE → YingMusic Generate / Edit Singing** accepts voice and melody
+audio references and Chinese/English lyrics. Weight conversion is local and explicit;
+there is no singing inference worker. Optional phonemizer/espeak and Chinese ONNX
+assets are used only for lyric preprocessing. See [setup, conversion and limitations](docs/yingmusic.md).
+RTX 5090 generation, cancellation/reload and RouterAudio reference editing passed, including optional separation and accompaniment mixing. See the bounded acceptance evidence in the model documentation.
 
 ## Native PaddleOCR in this fork
 

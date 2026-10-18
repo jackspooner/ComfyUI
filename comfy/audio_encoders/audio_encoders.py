@@ -1,6 +1,7 @@
 from .wav2vec2 import Wav2Vec2Model
 from .whisper import WhisperLargeV3
 from .sheetsage2 import SheetSage2
+from .yingmusic import MelodyEncoder, spectrogram
 from .sheetsage2_abc import events_to_abc
 import comfy.model_management
 import comfy.ops
@@ -20,6 +21,8 @@ class AudioEncoderModel():
         self.model_sample_rate = config.pop("model_sample_rate", 16000)
         if model_type == "sheetsage2":
             self.dtype = torch.bfloat16 if comfy.model_management.should_use_bf16(self.load_device) else torch.float32
+        if model_type == "yingmusic":
+            self.dtype = torch.float32
         model_config = dict(config)
         model_config.update({
             "dtype": self.dtype,
@@ -33,6 +36,8 @@ class AudioEncoderModel():
             self.model = WhisperLargeV3(**model_config)
         elif model_type == "sheetsage2":
             self.model = SheetSage2(**model_config)
+        elif model_type == "yingmusic":
+            self.model = MelodyEncoder(**model_config)
         self.model.eval()
         self.patcher = comfy.model_patcher.CoreModelPatcher(self.model, load_device=self.load_device, offload_device=offload_device, fast_disk=fast_disk)
         comfy.model_management.archive_model_dtypes(self.model)
@@ -63,6 +68,23 @@ class SheetSage2AudioEncoder(AudioEncoderModel):
             events = self.model.transcribe(waveform[None].to(self.load_device))
             scores.append(events_to_abc(events, waveform.shape[-1] / self.model_sample_rate, melody_only=melody_only))
         return scores
+
+
+class YingMusicAudioEncoder(AudioEncoderModel):
+    def encode_audio(self, audio, sample_rate):
+        comfy.model_management.load_model_gpu(self.patcher)
+        audio = comfy.audio.resample(audio, sample_rate, self.model_sample_rate).to(device=self.load_device, dtype=self.dtype)
+        midi, boundaries = self.model(spectrogram(audio, self.model.mel_basis).transpose(1, 2))
+        return {"encoded_audio": midi, "encoded_audio_all_layers": midi.unsqueeze(0),
+                "audio_samples": audio.shape[-1], "boundaries": boundaries}
+
+    def encode_reference_pair(self, reference, melody):
+        comfy.model_management.load_model_gpu(self.patcher)
+        reference = reference.to(device=self.load_device, dtype=self.dtype)
+        melody = melody.to(device=self.load_device, dtype=self.dtype)
+        features = torch.cat((spectrogram(reference, self.model.mel_basis), spectrogram(melody, self.model.mel_basis)), dim=-1)
+        midi, _ = self.model(features.transpose(1, 2))
+        return midi.to(comfy.model_management.intermediate_device())
 
 
 def load_audio_encoder_from_sd(sd, prefix=""):
@@ -100,11 +122,14 @@ def load_audio_encoder_from_sd(sd, prefix=""):
         }
     elif "encoder.feature_extractor.mel_mean" in sd and "decoder.layernorm_embedding.weight" in sd and "layer_weight" in sd:
         config = {"model_type": "sheetsage2", "model_sample_rate": 24000}
+    elif all(key in sd for key in ("mel_basis", "inln.weight", "cf_lay.7.att1.att.to_q.weight", "outln.weight", "cutheard.weight")):
+        config = {"model_type": "yingmusic", "model_sample_rate": 44100}
     else:
         raise RuntimeError("ERROR: audio encoder not supported.")
 
     fast_disk = comfy.storage.state_dict_fast_disk(sd)
-    audio_encoder = SheetSage2AudioEncoder(config, fast_disk=fast_disk) if config["model_type"] == "sheetsage2" else AudioEncoderModel(config, fast_disk=fast_disk)
+    encoder_class = {"sheetsage2": SheetSage2AudioEncoder, "yingmusic": YingMusicAudioEncoder}.get(config["model_type"], AudioEncoderModel)
+    audio_encoder = encoder_class(config, fast_disk=fast_disk)
     m, u = audio_encoder.load_sd(sd)
     if len(m) > 0:
         logging.warning("missing audio encoder: {}".format(m))

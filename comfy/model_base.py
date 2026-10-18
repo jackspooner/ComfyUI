@@ -24,6 +24,7 @@ import comfy.ldm.lightricks.av_model
 import comfy.ldm.minimax.model
 import comfy.ldm.minimax_music.dit
 import comfy.ldm.yue2.model
+import comfy.ldm.yingmusic.model
 import comfy.nested_tensor
 import comfy.ldm.lightricks.symmetric_patchifier
 import comfy.context_windows
@@ -2616,6 +2617,26 @@ class YuE2(BaseModel):
     def memory_required(self, input_shape, cond_shapes={}):
         context_size = sum(math.prod(shape) for shape in cond_shapes.get("c_crossattn", []))
         return super().memory_required(input_shape, cond_shapes) + context_size * comfy.model_management.dtype_size(self.get_dtype_inference())
+
+
+class YingMusic(BaseModel):
+    def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
+        super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.yingmusic.model.YingMusic)
+
+    def process_timestep(self, timestep, **kwargs):
+        return 1.0 - timestep
+
+    def extra_conds(self, **kwargs):
+        out = super().extra_conds(**kwargs)
+        device, dtype = kwargs["device"], self.get_dtype_inference()
+        context = self.diffusion_model.preprocess_conditioning(
+            kwargs["ying_tokens"].to(device=device),
+            kwargs["ying_melody"].to(device=device, dtype=dtype),
+            kwargs["ying_reference"].to(device=device, dtype=dtype),
+            unconditioned=kwargs.get("ying_unconditioned", False),
+        )
+        out["c_crossattn"] = comfy.conds.CONDRegular(context)
+        return out
 
 
 class MiniMaxMusic3(BaseModel):

@@ -84,6 +84,7 @@ import comfy.text_encoders.qwen3vl
 import comfy.text_encoders.auk
 import comfy.ldm.auk.vae
 import comfy.text_encoders.moss_audio
+import comfy.text_encoders.audio_flamingo
 import comfy.text_encoders.glm_ocr
 import comfy.text_encoders.qwen3_omni
 import comfy.text_encoders.minimax
@@ -761,6 +762,8 @@ class VAE:
                 if yue2_vae:
                     config.update(channels=64, c_mults=[1, 2, 4, 8, 16, 32], strides=[2, 2, 4, 4, 5, 6],
                                   sample_latent=False)
+                if metadata is not None and metadata.get("source") == "ASLP-lab/YingMusic-Singer-Plus":
+                    self.crop_input = False
                 self.first_stage_model = AudioOobleckVAE(**config)
                 self.memory_used_encode = lambda shape, dtype: (1000 * shape[2]) * model_management.dtype_size(dtype)
                 self.memory_used_decode = lambda shape, dtype: (1000 * shape[2] * 2048) * model_management.dtype_size(dtype)
@@ -1661,7 +1664,8 @@ class CLIPType(Enum):
     FLUX3 = 37
     MOSS_AUDIO = 38
     AUK = 39
-    QWEN3_OMNI = 40
+    AUDIO_FLAMINGO = 40
+    QWEN3_OMNI = 41
 
 
 
@@ -1723,7 +1727,8 @@ class TEModel(Enum):
     MOSS_AUDIO = 39
     GLM_OCR = 40
     AUK = 41
-    QWEN3_OMNI = 42
+    AUDIO_FLAMINGO = 42
+    QWEN3_OMNI = 43
 
 
 def detect_te_model(sd):
@@ -1777,6 +1782,11 @@ def detect_te_model(sd):
                      "layer_weights": 36, "layer_scale": 1, "model.norm.weight": 2048}
     if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in auk_signature.items()):
         return TEModel.AUK
+    flamingo_signature = {"audio_tower.conv1.weight": 1280, "audio_tower.embed_positions.weight": 1500,
+                          "multi_modal_projector.linear_1.weight": 3584, "model.embed_tokens.weight": 151672,
+                          "model.layers.27.self_attn.q_proj.weight": 3584, "model.lm_head.weight": 151672}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in flamingo_signature.items()):
+        return TEModel.AUDIO_FLAMINGO
     if 'model.layers.0.self_attn.k_proj.bias' in sd:
         weight = sd['model.layers.0.self_attn.k_proj.bias']
         if weight.shape[0] == 256:
@@ -2026,6 +2036,10 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.tokenizer = comfy.text_encoders.auk.AuKTokenizer
             for key in ("tokenizer_json", "auk_config_json"):
                 tokenizer_data[key] = clip_data[0].pop(key)
+        elif te_model == TEModel.AUDIO_FLAMINGO:
+            clip_target.clip = comfy.text_encoders.audio_flamingo.te(**llama_detect(clip_data))
+            clip_target.tokenizer = comfy.text_encoders.audio_flamingo.AudioFlamingoTokenizer
+            tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
         elif te_model == TEModel.MOSS_AUDIO:
             clip_target.clip = comfy.text_encoders.moss_audio.te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.moss_audio.MossAudioTokenizer

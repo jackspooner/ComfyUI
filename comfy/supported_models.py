@@ -2356,6 +2356,21 @@ class YuE2(supported_models_base.BASE):
         return supported_models_base.ClipTarget(comfy.text_encoders.yue2.YuE2Tokenizer, comfy.text_encoders.yue2.te(**detect))
 
 
+class YingMusic(supported_models_base.BASE):
+    unet_config = {"audio_model": "yingmusic"}
+    unet_extra_config = {}
+    latent_format = latent_formats.StableAudio1
+    supported_inference_dtypes = [torch.float32, torch.bfloat16]
+    sampling_settings = {"multiplier": 1.0}
+    memory_usage_factor = 4.0
+
+    def get_model(self, state_dict, prefix="", device=None):
+        return model_base.YingMusic(self, device=device)
+
+    def model_type(self, state_dict, prefix=""):
+        return model_base.ModelType.FLOW
+
+
 class MiniMaxMusic3(supported_models_base.BASE):
     unet_config = {
         "audio_model": "minimax_music3",
@@ -2692,6 +2707,7 @@ models = [
     ACEStep15,
     MiniMaxMusic3,
     YuE2,
+    YingMusic,
     Omnigen2,
     Boogu,
     MageFlow,
