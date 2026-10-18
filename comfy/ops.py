@@ -1710,6 +1710,7 @@ def mixed_precision_ops(quant_config={}, compute_dtype=torch.bfloat16, full_prec
                         not self._full_precision_mm
                         and qw.layout_cls.supports_fast_matmul()
                         and input.dim() == 2
+                        and not input.requires_grad
                     )
                     if use_fast:
                         if self.quant_format == "nvfp4" and self._nvfp4_input_passes > 1:

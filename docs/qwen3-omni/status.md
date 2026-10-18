@@ -9,6 +9,12 @@ with **zero new assertion failures**: native and reference each pass 20/24 cases
 The artifact is installed and live text/audio/image/combined queue acceptance
 passes. Source errors remain documented below.
 
+The [18 October compatibility audit](upstream-readiness.md) separates the pinned
+converter from native dense/NVFP4 projection loading, adds early layout checks and
+fixes gradient-bearing expert dispatch. It preserves the accepted inference
+precision/defaults. Its CPU and bounded CUDA unit checks are additional evidence;
+they do not replace the full-model/live results below or validate a new checkpoint.
+
 ## Verified source and package
 
 - Source: `shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4`, revision

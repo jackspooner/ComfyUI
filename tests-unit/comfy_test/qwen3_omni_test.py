@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import torch
 from torch.nn import functional as F
@@ -10,6 +12,7 @@ from transformers.models.qwen3_omni_moe.modeling_qwen3_omni_moe import (
 from comfy.cli_args import args
 args.cpu = True
 import comfy.ops
+from comfy.quant_ops import QuantizedTensor, TensorCoreNVFP4Layout
 from comfy.text_encoders import qwen3_omni as omni
 
 
@@ -188,3 +191,78 @@ def test_explicit_omni_type_rejects_an_unrecognized_package():
     from comfy.sd import CLIPType, load_text_encoder_state_dicts
     with pytest.raises(ValueError, match='converted native package'):
         load_text_encoder_state_dicts([{}], clip_type=CLIPType.QWEN3_OMNI)
+
+
+@pytest.fixture
+def native_state(tiny_clip):
+    model = tiny_clip.qwen3_omni.transformer
+    state = {name: torch.randn_like(value) for name, value in model.named_parameters()}
+    for name, module in model.named_modules():
+        if isinstance(module, comfy.ops.MixedPrecisionOp):
+            state[name + '.weight'] = torch.randn(module._orig_shape)
+    return state
+
+
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float16, torch.bfloat16])
+def test_native_package_accepts_dense_projections(tiny_clip, native_state, dtype):
+    state = {name: value.to(dtype) for name, value in native_state.items()}
+    missing, unexpected = tiny_clip.qwen3_omni.load_sd(state)
+    assert not missing and not unexpected
+    model = tiny_clip.qwen3_omni.transformer.model
+    inputs = torch.randn(2, 32)
+    expected = F.linear(inputs, state['model.layers.0.self_attn.q_proj.weight'].float())
+    torch.testing.assert_close(model.layers[0].self_attn.q_proj(inputs), expected)
+    expected = F.linear(inputs, state['model.layers.0.mlp.experts.gate_up_proj.weight'][1].float())
+    torch.testing.assert_close(model.layers[0].mlp.experts.gate_up_proj.expert_linear(inputs, 1), expected)
+
+
+@pytest.fixture
+def mixed_state(native_state):
+    for name in ('model.layers.0.self_attn.q_proj', 'model.layers.0.mlp.experts.gate_up_proj'):
+        weight = native_state[name + '.weight']
+        values = weight.unbind() if weight.ndim == 3 else [weight]
+        parts = [TensorCoreNVFP4Layout.get_plain_tensors(QuantizedTensor.from_float(value.bfloat16(), 'TensorCoreNVFP4Layout'))
+                 for value in values]
+        for index, suffix in enumerate(('.weight', '.weight_scale_2', '.weight_scale')):
+            native_state[name + suffix] = torch.stack([part[index] for part in parts]) if weight.ndim == 3 else parts[0][index]
+        descriptor = {'format': 'nvfp4'}
+        if weight.ndim == 3:
+            descriptor['num_experts'] = weight.shape[0]
+        native_state[name + '.comfy_quant'] = torch.tensor(list(json.dumps(descriptor).encode()), dtype=torch.uint8)
+    return native_state
+
+
+def test_native_package_mixes_dense_and_nvfp4(tiny_clip, mixed_state):
+    missing, unexpected = tiny_clip.qwen3_omni.load_sd(mixed_state)
+    assert not missing and not unexpected
+    model = tiny_clip.qwen3_omni.transformer.model
+    inputs = torch.randn(2, 32)
+    for module in (model.layers[0].self_attn.q_proj, model.layers[0].mlp.experts.gate_up_proj):
+        assert module.quant_format == 'nvfp4'
+        bank = module.weight.ndim == 3
+        weight = module.expert_weight(1).dequantize() if bank else module.weight.dequantize()
+        actual = module.expert_linear(inputs, 1) if bank else module(inputs)
+        expected = F.linear(inputs, weight)
+        torch.testing.assert_close(actual, expected)
+
+
+@pytest.mark.parametrize('fault', ['descriptor', 'format', 'weight_shape', 'weight_dtype', 'blocks_shape',
+                                  'blocks_dtype', 'scale_shape', 'scale_dtype', 'experts', 'dense_shape', 'orphan_scales'])
+def test_native_package_rejects_invalid_projection_before_loading(tiny_clip, mixed_state, fault, monkeypatch):
+    name = 'model.layers.0.mlp.experts.gate_up_proj'
+    if fault == 'descriptor':
+        del mixed_state[name + '.comfy_quant']
+    elif fault in ('format', 'experts'):
+        descriptor = {'format': 'nvfp4', 'num_experts': 3} if fault == 'experts' else {'format': 'float8_e4m3fn'}
+        mixed_state[name + '.comfy_quant'] = torch.tensor(list(json.dumps(descriptor).encode()), dtype=torch.uint8)
+    elif fault == 'dense_shape':
+        mixed_state['model.lm_head.weight'] = torch.zeros(1, 32)
+    elif fault == 'orphan_scales':
+        mixed_state['model.lm_head.weight_scale'] = torch.tensor(1.)
+    else:
+        suffix = {'weight': '.weight', 'blocks': '.weight_scale', 'scale': '.weight_scale_2'}[fault.split('_')[0]]
+        value = mixed_state[name + suffix]
+        mixed_state[name + suffix] = value.unsqueeze(0) if fault.endswith('shape') else value.to(torch.int32)
+    monkeypatch.setattr(omni.sd1_clip.SDClipModel, 'load_sd', lambda *a: pytest.fail('invalid package reached state loading'))
+    with pytest.raises(ValueError, match='Qwen3-Omni'):
+        tiny_clip.qwen3_omni.load_sd(mixed_state)

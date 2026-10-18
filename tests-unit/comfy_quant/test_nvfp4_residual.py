@@ -43,19 +43,21 @@ def quantized_fixture(device='cpu'):
 
 
 @pytest.mark.parametrize('rank', [2, 3])
-def test_linear_residual_accuracy_bias_shape_and_packed_weights(rank, cpu_matmul):
+@pytest.mark.parametrize('dtype', [torch.bfloat16, torch.float16, torch.float32])
+def test_linear_residual_accuracy_bias_shape_and_packed_weights(rank, dtype, cpu_matmul):
     with registry.use_backend('eager'):
         state, weight, x = quantized_fixture()
-        bias = torch.linspace(.2, .9, 32, dtype=torch.bfloat16)
+        x = x.to(dtype)
+        bias = torch.linspace(.2, .9, 32, dtype=dtype)
         state['bias'] = bias
         packed = state['weight'].clone()
-        target = F.linear(x.float(), weight, bias.float()).bfloat16()
+        target = F.linear(x.float(), weight, bias.float()).to(dtype)
         errors = []
         for passes in (1, 2, 3):
-            module = ops.mixed_precision_ops(nvfp4_input_passes=passes).Linear(64, 32)
+            module = ops.mixed_precision_ops(compute_dtype=dtype, nvfp4_input_passes=passes).Linear(64, 32)
             module.load_state_dict(state.copy(), strict=True)
             actual = module(x if rank == 2 else x.view(2, 3, 64))
-            assert actual.dtype == torch.bfloat16
+            assert actual.dtype == dtype
             assert actual.shape == ((6, 32) if rank == 2 else (2, 3, 32))
             errors.append((actual.reshape(6, 32).float() - target.float()).square().mean().sqrt())
             assert torch.equal(module.weight._qdata, packed)
@@ -67,6 +69,17 @@ def test_linear_residual_accuracy_bias_shape_and_packed_weights(rank, cpu_matmul
             actual = module(inputs)
         expected = F.linear(inputs, module.weight.dequantize(), bias)
         torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+
+
+def test_residual_linear_preserves_weight_patch_owner(cpu_matmul):
+    with registry.use_backend('eager'):
+        state, _, inputs = quantized_fixture()
+        module = ops.mixed_precision_ops(nvfp4_input_passes=3).Linear(64, 32, bias=False)
+        module.load_state_dict(state, strict=True)
+        module.weight_function = [lambda weight: weight * .5]
+        with mock.patch.object(ops, '_nvfp4_residual_linear', side_effect=AssertionError('bypassed patch owner')):
+            actual = module(inputs)
+        torch.testing.assert_close(actual, F.linear(inputs, module.weight.dequantize() * .5), atol=0, rtol=0)
 
 
 def test_expert_bank_residual_and_full_precision_owner(cpu_matmul):
@@ -91,6 +104,27 @@ def test_residual_configuration_rejects_invalid_pass_counts():
     for value in (0, -1, 1.5):
         with pytest.raises(ValueError, match='positive integer'):
             ops.mixed_precision_ops(nvfp4_input_passes=value)
+
+
+@pytest.mark.parametrize('passes', [1, 3])
+def test_expert_residual_preserves_input_gradients(passes, cpu_matmul):
+    with registry.use_backend('eager'):
+        state, _, x = quantized_fixture()
+        bank_state = {key: torch.stack([value, value]) for key, value in state.items() if key != 'comfy_quant'}
+        bank_state['comfy_quant'] = torch.tensor(list(json.dumps({'format': 'nvfp4', 'num_experts': 2}).encode()), dtype=torch.uint8)
+        bank = ops.mixed_precision_ops(nvfp4_input_passes=passes).MoEExperts(2, 64, 32, bias=False)
+        bank.load_state_dict(bank_state, strict=True)
+        weight = bank.expert_weight(1).dequantize()
+        with torch.set_grad_enabled(True):
+            inputs = x.clone().requires_grad_()
+            expected = F.linear(inputs, weight)
+            with mock.patch.object(TensorCoreNVFP4Layout, 'supports_fast_matmul', return_value=True):
+                actual = bank.expert_linear(inputs, 1)
+            assert actual.requires_grad
+            gradient, = torch.autograd.grad(actual.sum(), inputs)
+            expected_gradient, = torch.autograd.grad(expected.sum(), inputs)
+            torch.testing.assert_close(gradient, expected_gradient, atol=0, rtol=0)
+            torch.testing.assert_close(actual, expected, atol=0, rtol=0)
 
 
 @pytest.mark.skipif(os.environ.get('COMFY_TEST_NVFP4_CUDA') != '1', reason='Requires an owned idle CUDA validation window')
