@@ -1,0 +1,9 @@
+{
+  "scope": "Actual packaged model, media expansion admission before load_model/generation workspace",
+  "raw_token_count": 65535,
+  "budget": 1,
+  "context_limit": 65536,
+  "model_load_called": false,
+  "error": "Qwen3-Omni needs 65702 context tokens after media expansion; its context holds 65536.",
+  "passed": true
+}
