@@ -197,7 +197,7 @@ class BlockWiseFP8E4M3Layout(QuantizedLayout):
     Params = _CKFp8Layout.Params if _CK_AVAILABLE else None
 
     @classmethod
-    def quantize(cls, tensor, scale=None, **kwargs):
+    def quantize(cls, tensor, scale=None, stochastic_rounding=0, inplace_ops=False):
         rows, columns = tensor.shape[-2:]
         padded = tensor.float()
         if rows % 128 or columns % 128:
@@ -206,7 +206,8 @@ class BlockWiseFP8E4M3Layout(QuantizedLayout):
         if scale is None or isinstance(scale, str) and scale == "recalculate":
             scale = (blocks.abs().amax(dim=(-3, -1)) / 448).clamp_min(torch.finfo(torch.float32).tiny)
         scale = scale.to(device=tensor.device, dtype=torch.float32)
-        quantized = (blocks / scale[..., :, None, :, None]).clamp(-448, 448).to(torch.float8_e4m3fn)
+        normalized = (blocks / scale[..., :, None, :, None]).clamp(-448, 448)
+        quantized = comfy.float.stochastic_rounding(normalized, torch.float8_e4m3fn, seed=stochastic_rounding) if stochastic_rounding > 0 else normalized.to(torch.float8_e4m3fn)
         quantized = quantized.reshape(padded.shape)[..., :rows, :columns].contiguous()
         return quantized, cls.Params(scale=scale, orig_dtype=tensor.dtype, orig_shape=tuple(tensor.shape))
 

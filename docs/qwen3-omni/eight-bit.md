@@ -125,7 +125,7 @@ versions, source hashes, tensor/key counts, planned bytes and the unexecuted sta
 
 ## Verification and remaining work
 
-The cumulative unit command passes **120 tests**, with one expected owned-CUDA
+The cumulative unit command passes **121 tests**, with one expected owned-CUDA
 skip, using Python 3.13.16, Torch 2.14.1+cu130, Transformers 5.20.0 and Comfy Kitchen
 0.2.37:
 
@@ -141,11 +141,14 @@ CUDA_VISIBLE_DEVICES='' /path/to/prepared/python -m pytest \
 New checks cover independent FP32-to-FP8 rounding, per-expert scales, all-zero
 experts, gate/up order, padding, dense exclusions, missing/invalid native layouts,
 NaN refusal, insufficient-space cleanup and rejection of NVFP4 as an FP8 source.
-The earlier accepted NVFP4 tests still pass. Six RTX 5090 component probes match
+Seeded requantization is covered for patched block FP8 weights. The earlier
+accepted NVFP4 tests still pass. Six RTX 5090 component probes match
 the pinned Transformers decoder and BF16 matmul outputs exactly; decode plus
 matmul takes 0.022–0.054 ms in these synthetic shapes. [Retained evidence](results/published-fp8-components.json)
-records shapes and source hashes. These timings exclude loading/offload and are
-not full-model latency. No full-model, lifecycle or quality result is claimed.
+records shapes and source hashes. Eight real projections from one SHA-256-verified
+source shard also decode identically on CPU/CUDA and produce identical CUDA BF16
+linear outputs. These timings exclude loading/offload and are not full-model
+latency. No full-model, lifecycle or quality result is claimed.
 Other backends remain unverified.
 
 Remaining: finish the pinned published FP8 download and source verification;

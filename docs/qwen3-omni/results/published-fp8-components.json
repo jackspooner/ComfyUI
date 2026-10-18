@@ -78,5 +78,167 @@
     "payload_bytes": 33551468278,
     "model_weights_loaded_or_executed": false
   },
-  "hold_released": true
+  "hold_released": true,
+  "real_source_cpu_projections": {
+    "scope": "Eight real source projections from one completed, SHA256-verified shard; not full-model acceptance",
+    "source_file": "model-00002-of-00015.safetensors",
+    "source_sha256": "11c79a1bd08ba070fdca2e0f1a7f088a316bc52b6f1991b342f073e4d748fadb",
+    "probes": [
+      {
+        "name": "thinker.model.layers.1.mlp.experts.100.down_proj",
+        "shape": [
+          2048,
+          768
+        ],
+        "native_upstream_bf16_equal": true,
+        "finite": true
+      },
+      {
+        "name": "thinker.model.layers.2.mlp.experts.109.up_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "finite": true
+      },
+      {
+        "name": "thinker.model.layers.2.mlp.experts.53.gate_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "finite": true
+      },
+      {
+        "name": "thinker.model.layers.3.mlp.experts.109.up_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "finite": true
+      },
+      {
+        "name": "thinker.model.layers.3.mlp.experts.53.gate_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "finite": true
+      },
+      {
+        "name": "thinker.model.layers.4.mlp.experts.109.up_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "finite": true
+      },
+      {
+        "name": "thinker.model.layers.4.mlp.experts.53.gate_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "finite": true
+      },
+      {
+        "name": "thinker.model.layers.5.mlp.experts.2.up_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "finite": true
+      }
+    ]
+  },
+  "real_source_cuda_projections": {
+    "scope": "Eight real source projections on CUDA; not full-model acceptance",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "source_file": "model-00002-of-00015.safetensors",
+    "source_sha256": "11c79a1bd08ba070fdca2e0f1a7f088a316bc52b6f1991b342f073e4d748fadb",
+    "probes": [
+      {
+        "name": "thinker.model.layers.1.mlp.experts.100.down_proj",
+        "shape": [
+          2048,
+          768
+        ],
+        "native_upstream_bf16_equal": true,
+        "linear_output_equal": true
+      },
+      {
+        "name": "thinker.model.layers.2.mlp.experts.109.up_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "linear_output_equal": true
+      },
+      {
+        "name": "thinker.model.layers.2.mlp.experts.53.gate_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "linear_output_equal": true
+      },
+      {
+        "name": "thinker.model.layers.3.mlp.experts.109.up_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "linear_output_equal": true
+      },
+      {
+        "name": "thinker.model.layers.3.mlp.experts.53.gate_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "linear_output_equal": true
+      },
+      {
+        "name": "thinker.model.layers.4.mlp.experts.109.up_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "linear_output_equal": true
+      },
+      {
+        "name": "thinker.model.layers.4.mlp.experts.53.gate_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "linear_output_equal": true
+      },
+      {
+        "name": "thinker.model.layers.5.mlp.experts.2.up_proj",
+        "shape": [
+          768,
+          2048
+        ],
+        "native_upstream_bf16_equal": true,
+        "linear_output_equal": true
+      }
+    ],
+    "harness_sha256": "4d3e96521b8003e78123277ba843199b47c7ea7ad96a79e629428b666afcbff0",
+    "native_layout_sha256": "5e26c92dbe4325952234bda45e7d16bd357997d801257f8c7618676f5ad2a2c5",
+    "hold_released": true
+  }
 }

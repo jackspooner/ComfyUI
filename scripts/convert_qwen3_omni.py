@@ -1,4 +1,4 @@
-"""Offline source-verified NVFP4 packaging or original-weight FP8 conversion for Qwen3-Omni."""
+"""Offline source-verified NVFP4/block FP8 packaging or original-weight FP8 conversion for Qwen3-Omni."""
 import argparse
 from contextlib import ExitStack
 import hashlib
@@ -289,7 +289,7 @@ def convert(source, destination, revision, quantization='nvfp4'):
     if quantization not in ('nvfp4', 'fp8', 'fp8-block128'):
         raise ValueError('Choose nvfp4 preservation, original fp8 conversion or published fp8-block128 preservation')
     if revision != {'nvfp4': SOURCE_REVISION, 'fp8': ORIGINAL_REVISION, 'fp8-block128': FP8_REVISION}[quantization]:
-        raise ValueError('FP8 conversion requires the pinned original Qwen source; NVFP4 preservation requires the pinned ModelOpt source.')
+        raise ValueError('Use the pinned source revision for the selected mode: ModelOpt NVFP4, original Qwen FP8 conversion or published block FP8.')
     records, evidence = validate_source(source, revision)
     if quantization in ('fp8', 'fp8-block128'):
         processor = AutoProcessor.from_pretrained(source, local_files_only=True)

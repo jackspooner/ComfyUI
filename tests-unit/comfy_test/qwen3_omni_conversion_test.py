@@ -179,7 +179,7 @@ def test_fp8_nonfinite_source_does_not_publish(tmp_path):
 
 
 def test_fp8_requires_original_source_not_decoded_nvfp4(tmp_path):
-    with pytest.raises(ValueError, match='pinned original Qwen source'):
+    with pytest.raises(ValueError, match='pinned source revision for the selected mode'):
         converter.convert(tmp_path, tmp_path / 'fp8.safetensors', converter.SOURCE_REVISION, 'fp8')
 
 
