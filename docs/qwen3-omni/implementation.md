@@ -2,10 +2,12 @@
 
 [Project index](README.md)
 
-M0 preparation and M1 storage investigation have started. The pinned model has
-downloaded and an offline diagnostic is implemented. M1 has not passed: source
-metadata and reference-loading issues remain, and accelerated execution has not
-been evaluated. See [execution evidence](status.md). M2–M6 remain pending.
+M0 preparation is complete in the resumed worktree. M1 now has a verified complete
+source inventory, actual ModelOpt decoding and a reconstructed full-model CPU
+text smoke result. Accelerated execution and multimodal acceptance remain pending.
+M2's converter code and isolated tests are implemented; full-artifact validation
+and installation remain pending. See [execution evidence](status.md). M3–M6 remain
+pending.
 
 | Milestone | Work | Exit evidence |
 | --- | --- | --- |

@@ -6,44 +6,15 @@ import importlib.metadata
 import json
 from pathlib import Path
 import resource
-import struct
 
 import comfy_kitchen as kitchen
-from comfy_kitchen.float_utils import from_blocked, swap_nibbles, to_blocked
+from comfy_kitchen.float_utils import from_blocked, swap_nibbles
 from safetensors import safe_open
 import torch
 
-from scripts.convert_moss_audio import read_json, unique_object
-
-
-def inspect_source(source):
-    # Diagnostics retain a stale total_size as a failed gate while still examining
-    # independently valid shards. The production converter must not silently repair it.
-    index = read_json(source / 'model.safetensors.index.json')
-    records = {}
-    for filename in sorted(set(index['weight_map'].values())):
-        path = source / filename
-        if path.resolve().parent != source.resolve():
-            raise ValueError(f'Shard escapes source directory: {filename}')
-        with safe_open(path, framework='pt', device='cpu') as tensors:
-            keys = set(tensors.keys())
-        with path.open('rb') as stream:
-            header_size = struct.unpack('<Q', stream.read(8))[0]
-            if header_size > 100_000_000:
-                raise ValueError(f'Oversized shard header: {filename}')
-            header = json.loads(stream.read(header_size), object_pairs_hook=unique_object)
-        if keys != set(header) - {'__metadata__'}:
-            raise ValueError(f'Invalid shard inventory: {filename}')
-        for key in keys:
-            if key in records or index['weight_map'].get(key) != filename:
-                raise ValueError(f'Duplicate or misassigned tensor: {key}')
-            records[key] = (path, header_size + 8, header[key])
-    if set(records) != set(index['weight_map']):
-        raise ValueError('Shard inventory differs from index')
-    actual = sum(r[2]['data_offsets'][1] - r[2]['data_offsets'][0] for r in records.values())
-    declared = index['metadata']['total_size']
-    return records, {'declared_payload_bytes': declared, 'actual_payload_bytes': actual,
-                     'size_matches': actual == declared}
+from scripts.convert_moss_audio import read_json
+from scripts.convert_qwen3_omni import blocked_scales, packed_weight
+from scripts.qwen3_omni_checkpoint import PROJECTION_SAMPLES, inspect_source
 
 
 def source_decode(weight, block_scale, scale):
@@ -56,23 +27,26 @@ def source_decode(weight, block_scale, scale):
 
 
 def native_storage(weight, block_scale):
-    return swap_nibbles(weight), to_blocked(block_scale, flatten=False)
+    return packed_weight(weight), blocked_scales(block_scale)
 
 
 def check_projection(weight, block_scale, scale):
     packed, blocked = native_storage(weight, block_scale)
-    if not torch.equal(swap_nibbles(packed), weight):
+    if not torch.equal(swap_nibbles(packed)[:, :weight.shape[1]], weight):
         raise ValueError('Packed-weight round trip changed bytes')
-    restored = from_blocked(blocked, *block_scale.shape)
+    restored = from_blocked(blocked, weight.shape[0], packed.shape[1] // 8)[:, :block_scale.shape[1]]
     if not torch.equal(restored.view(torch.uint8), block_scale.view(torch.uint8)):
         raise ValueError('Block-scale round trip changed bytes')
     reference = source_decode(weight, block_scale, scale)
-    actual = kitchen.dequantize_nvfp4(packed, scale.float(), blocked, output_type=torch.float32)
+    decoded = kitchen.dequantize_nvfp4(packed, scale.float(), blocked, output_type=torch.float32)
+    if torch.count_nonzero(decoded[:, reference.shape[1]:]):
+        raise ValueError('Native alignment padding is not zero')
+    actual = decoded[:, :reference.shape[1]]
     if not torch.equal(reference, actual):
         raise ValueError(f'FP32 format decode differs: {(reference - actual).abs().max().item()}')
     if not torch.isfinite(actual).all():
         raise ValueError('Decoded weights contain non-finite values')
-    return {'logical_shape': list(actual.shape), 'packed_roundtrip': True,
+    return {'logical_shape': list(actual.shape), 'native_shape': list(decoded.shape), 'packed_roundtrip': True,
             'scale_roundtrip': True, 'fp32_decode_max_abs_error': 0.0}
 
 
@@ -165,15 +139,8 @@ def audit(source, revision, manifest_path):
                            ('torch', 'transformers', 'comfy-kitchen', 'safetensors')},
               'source_integrity': integrity, 'inventory': check_inventory(records),
               'shards': check_hashes(records, manifest_path)}
-    prefixes = ['thinker.model.layers.0.self_attn.q_proj',
-                'thinker.audio_tower.conv_out', 'thinker.audio_tower.layers.0.self_attn.k_proj',
-                'thinker.visual.blocks.0.attn.qkv', 'thinker.visual.merger.mlp.0']
-    for layer in (0, 23, 47):
-        for expert in (0, 63, 127):
-            prefixes.extend(f'thinker.model.layers.{layer}.mlp.experts.{expert}.{proj}_proj'
-                            for proj in ('gate', 'up', 'down'))
     result['projections'] = {}
-    for prefix in prefixes:
+    for prefix in PROJECTION_SAMPLES:
         tensors = [load_tensor(records, prefix + suffix) for suffix in ('.weight', '.weight_scale', '.weight_scale_2')]
         result['projections'][prefix] = check_projection(*tensors)
         del tensors

@@ -1,8 +1,9 @@
 # Qwen3-Omni native CLIP integration
 
-Status: checkpoint investigation in progress, 16 October 2026. The offline storage
-diagnostic is implemented. No Qwen3-Omni converter, native loader or validated
-workflow is delivered. See [current results and unresolved gates](status.md).
+Status: implementation in progress, 18 October 2026. The offline converter,
+complete source validator, reconstructed reference and fixture tools are
+implemented. Native loading, a verified installation and GPU acceptance remain
+pending. See [current results and unresolved gates](status.md).
 
 Build a native ComfyUI integration that loads a converted version of
 [`shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4`](https://huggingface.co/shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4)
@@ -21,6 +22,7 @@ make the model a diffusion-conditioning encoder.
 | [Architecture](architecture.md) | Native owners, data flow and likely integration points |
 | [Checkpoint and quantization](quantization.md) | Payload inspection, feasibility experiment and conversion contract |
 | [Implementation plan](implementation.md) | Ordered work packages, dependencies and delivery gates |
+| [Reconstructed reference](reference.md) | Offline environment, component and fixture commands |
 | [Validation](validation.md) | Correctness, modality, memory and regression acceptance |
 | [Evidence and decisions](evidence.md) | Sources, verified observations and unresolved questions |
 

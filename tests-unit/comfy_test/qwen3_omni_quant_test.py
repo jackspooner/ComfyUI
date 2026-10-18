@@ -7,15 +7,17 @@ from safetensors.torch import save_file
 import torch
 
 from scripts.check_qwen3_omni_quant import check_inventory, check_projection, inspect_source, source_decode
+from scripts.qwen3_omni_checkpoint import SOURCE_REVISION, validate_layout, validate_source
 
 
-@pytest.mark.parametrize('rows,cols', [(3, 16), (128, 64), (144, 80)])
+@pytest.mark.parametrize('rows,cols', [(3, 16), (128, 64), (144, 80), (16, 4304)])
 def test_all_fp4_codes_and_padded_scale_tiles(rows, cols):
     weight = torch.arange(rows * cols // 2, dtype=torch.int64).remainder(256).to(torch.uint8).reshape(rows, cols // 2)
     scales = torch.arange(rows * cols // 16, dtype=torch.float32).remainder(31).add(1).reshape(rows, cols // 16).to(torch.float8_e4m3fn)
     result = check_projection(weight, scales, torch.tensor(.125, dtype=torch.bfloat16))
     assert result['fp32_decode_max_abs_error'] == 0
     assert result['logical_shape'] == [rows, cols]
+    assert result['native_shape'] == [rows, (cols + 31) // 32 * 32]
 
 
 def test_source_nibble_order_and_signed_zero():
@@ -46,6 +48,29 @@ def test_stale_size_is_reported_as_failed_integrity(tmp_path):
     _, integrity = inspect_source(tmp_path)
     assert not integrity['size_matches']
     assert integrity['actual_payload_bytes'] == 146
+
+
+def test_metadata_reconciliation_requires_exact_revision(tmp_path):
+    with pytest.raises(ValueError, match='Only the verified source revision'):
+        validate_source(tmp_path, 'unverified')
+
+
+@pytest.mark.parametrize('fault', ['missing', 'extra', 'shape', 'dtype'])
+def test_complete_architecture_inventory_is_required(tmp_path, fault):
+    fixture_source(tmp_path)
+    records, _ = inspect_source(tmp_path)
+    expected = {key: (value[2]['dtype'], value[2]['shape'][:]) for key, value in records.items()}
+    key = next(iter(expected))
+    if fault == 'missing':
+        del records[key]
+    elif fault == 'extra':
+        records['unexpected.weight'] = records[key]
+    elif fault == 'shape':
+        records[key][2]['shape'] = [999]
+    else:
+        records[key][2]['dtype'] = 'F32'
+    with pytest.raises(ValueError):
+        validate_layout(records, expected)
 
 
 @pytest.mark.parametrize('fault', ['missing_scale', 'scale_shape', 'scale_dtype', 'packed_rank'])

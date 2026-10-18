@@ -2,8 +2,12 @@
 
 [Project index](README.md)
 
-Status: planned tests; none of the Omni cases below has been executed. Use owned,
-licensed or synthetic fixtures and record their checksums. Keep test fixtures and
+Status: complete source accounting, actual ModelOpt component decoding and 24
+synthetic integrity tests pass. The reconstructed reference has passed its first
+text/EOS fixture; its full CPU fixture run is in progress. GPU, native-model and
+live acceptance remain pending. See [recorded evidence](status.md) and
+[offline validation commands](reference.md). Use owned, licensed or synthetic
+fixtures and record their checksums. Keep test fixtures and
 configuration isolated from production. GPU acceptance is separate from CPU
 fixture success and node registration.
 
