@@ -971,6 +971,7 @@ from .quant_ops import (
     QuantizedTensor,
     QUANT_ALGOS,
     TensorCoreFP8Layout,
+    TensorCoreNVFP4Layout,
     TensorWiseINT8Layout,
     get_layout_class,
 )
@@ -1401,12 +1402,32 @@ class MixedPrecisionOp(CastWeightBiasOp):
                 and self.quant_format not in disabled_formats)
 
 
-def mixed_precision_ops(quant_config={}, compute_dtype=torch.bfloat16, full_precision_mm=False, disabled=[]):
+def _nvfp4_residual_linear(input, weight, bias, passes, input_scale=None):
+    weight_data, weight_scale, weight_blocks = TensorCoreNVFP4Layout.get_plain_tensors(weight)
+    residual, result = input, None
+    for index in range(passes):
+        quantized = QuantizedTensor.from_float(residual, "TensorCoreNVFP4Layout", scale=input_scale if index == 0 else None)
+        data, scale, blocks = TensorCoreNVFP4Layout.get_plain_tensors(quantized)
+        output = quant_ops.ck.scaled_mm_nvfp4(data, weight_data, scale, weight_scale, blocks, weight_blocks, out_dtype=torch.float16)
+        output = output[:input.shape[0], :weight.shape[0]]
+        # Keep the sum and final bias out of the intermediate FP16 rounding.
+        result = output.float() if result is None else result + output.float()
+        if index + 1 < passes:
+            residual = residual - quantized.dequantize()
+    if bias is not None:
+        result = result + bias.float()
+    return result.to(input.dtype)
+
+
+def mixed_precision_ops(quant_config={}, compute_dtype=torch.bfloat16, full_precision_mm=False, disabled=[], nvfp4_input_passes=1):
+    if not isinstance(nvfp4_input_passes, int) or nvfp4_input_passes < 1:
+        raise ValueError("nvfp4_input_passes must be a positive integer")
     class MixedPrecisionOps(manual_cast):
         _quant_config = quant_config
         _compute_dtype = compute_dtype
         _full_precision_mm = full_precision_mm
         _disabled = disabled
+        _nvfp4_input_passes = nvfp4_input_passes
 
         class Linear(torch.nn.Module, MixedPrecisionOp):
             _disabled_formats = disabled
@@ -1427,6 +1448,7 @@ def mixed_precision_ops(quant_config={}, compute_dtype=torch.bfloat16, full_prec
                 self.tensor_class = None
                 self._full_precision_mm = MixedPrecisionOps._full_precision_mm
                 self._full_precision_mm_config = False
+                self._nvfp4_input_passes = MixedPrecisionOps._nvfp4_input_passes
 
             def reset_parameters(self):
                 return None
@@ -1511,7 +1533,7 @@ def mixed_precision_ops(quant_config={}, compute_dtype=torch.bfloat16, full_prec
                             input, weight, bias, self.layout_type, scale, compute_dtype
                         )
 
-                # Inference path (unchanged)
+                # Inference path
                 if _use_quantized and quantize_input:
 
                     # Reshape >=3D tensors to 2D for quantization (needed for NVFP4 and others)
@@ -1524,6 +1546,10 @@ def mixed_precision_ops(quant_config={}, compute_dtype=torch.bfloat16, full_prec
                         scale = getattr(self, 'input_scale', None)
                         if scale is not None:
                             scale = comfy.model_management.cast_to_device(scale, input.device, None)
+                        if self.quant_format == "nvfp4" and self._nvfp4_input_passes > 1:
+                            with CastBiasWeightContext(self, input_reshaped, offloadable=True, compute_dtype=compute_dtype, want_requant=True) as (weight, bias):
+                                output = _nvfp4_residual_linear(input_reshaped, weight, bias, self._nvfp4_input_passes, scale)
+                            return output.reshape((*input_shape[:-1], self.out_features))
                         input = QuantizedTensor.from_float(input_reshaped, self.layout_type, scale=scale)
 
                 weight_only_quant = _use_quantized and not quantize_input and isinstance(self.weight, QuantizedTensor)
@@ -1599,6 +1625,7 @@ def mixed_precision_ops(quant_config={}, compute_dtype=torch.bfloat16, full_prec
                 self._full_precision_mm = MixedPrecisionOps._full_precision_mm
                 self._full_precision_mm_config = False
                 self._resident_bank = None
+                self._nvfp4_input_passes = MixedPrecisionOps._nvfp4_input_passes
 
             def reset_parameters(self):
                 return None
@@ -1685,6 +1712,8 @@ def mixed_precision_ops(quant_config={}, compute_dtype=torch.bfloat16, full_prec
                         and input.dim() == 2
                     )
                     if use_fast:
+                        if self.quant_format == "nvfp4" and self._nvfp4_input_passes > 1:
+                            return _nvfp4_residual_linear(input, qw, b, self._nvfp4_input_passes)
                         qin = QuantizedTensor.from_float(input, self.layout_type) if QUANT_ALGOS[self.quant_format].get("quantize_input", True) else input
                         return torch.nn.functional.linear(qin, qw, b)
                     qw = cast_to_input(qw.dequantize(), input, copy=False)

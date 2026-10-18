@@ -106,6 +106,38 @@ its regression fixture loads the converted projections into the actual native
 main/DeepStack merger classes. The rejected candidate remains outside model roots
 with failure evidence; it is not an accepted or installed artifact.
 
+The corrected candidate is 18,781,862,813 bytes, SHA-256
+`039c9d4347a4be90ddbc8994909bd9870e610228dd95b336f612bf2936f2fe9b`.
+Conversion peaked at 8,454,549,504 bytes host RSS. Its manifest records clean
+converter sources at `69ccd9a51e68e24d5c6e028f548cbb92c975fa18`.
+A CPU package-only probe loads `Qwen3Omni`, all 599 quantized modules and the
+embedded tokenizer without the original directory. This establishes packaging,
+not GPU inference or accelerated precision acceptance. The branch also includes
+current AuK main changes; 147 combined component and regression tests pass.
+
+Full native decoded BF16 execution completed all 24 frozen cases with no new
+reference assertion failures (20/24 cases pass), and exact modality positions in
+every case. This remains diagnostic execution. The single-pass accelerated CUDA
+candidate enables all 599 quantized modules, but adds failures for speech
+classification and click recognition (19/24 cases pass, including one improvement
+on a source failure). It is rejected for production. The missing capability is
+higher-precision activation execution with the preserved NVFP4 weights; successful
+storage conversion and CUDA execution alone do not satisfy that gate.
+
+A research composition of existing CUDA operations quantizes the activation's
+residual for additional matmuls, without decoding or requantizing weights. Across
+33 captured projections and three token shapes, worst relative RMSE is 0.11115
+for one pass, 0.01077 for two and 0.00434 for three. Median warm operation times
+are 0.120, 0.253 and 0.383 ms respectively. These component measurements do not
+accept a full-model execution policy. Full-model precision investigation remains
+in progress; no accelerated candidate is installed.
+
+The [native precision investigation](results/native-precision-investigation.json)
+records per-case assertions/outputs and hashes of the retained native comparison
+reports. The [IMAGE-batch reference](results/reconstructed-reference-image-batch.json)
+uses the frozen version 2 input convention. Short/stereo/resampled preprocessing
+checks are in [the audio boundary record](results/audio-preprocessing-boundaries.json).
+
 The version 2 input convention has also completed a reconstructed GPU run with
 encoder/position/routing captures: 20/24 case assertions pass. Unicode copying,
 silence, standalone sign reading and combined sign reading remain source errors;
