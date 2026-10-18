@@ -57,8 +57,9 @@ weight reference is useful evidence but is not the promised production fast path
 
 ## Offline converter
 
-The converter is implemented, with synthetic integrity/publication tests. A
-converted artifact has not yet passed native GPU acceptance or been installed.
+The converter is implemented, with integrity/publication tests. The selected
+artifact passed native GPU and live queue acceptance and is installed; see
+[status](status.md) for exact hashes, precision and remaining source failures.
 From the repository root, using the prepared ComfyUI interpreter:
 
 ```bash
@@ -114,3 +115,19 @@ explicitly cleaned task-owned destination; do not overwrite an accepted artifact
 Budget disk for source plus converted output and temporary files. The published
 repository size is not a Thinker-only size or peak-VRAM estimate. Determine those
 from the selected revision and measurements, including media and KV workspace.
+
+## Native loading versus conversion
+
+The converter remains pinned to one verified source inventory. Native projection
+loading accepts NVFP4 descriptors/scales or dense BF16/FP16/FP32 tensors in the
+same normalized package. Each weight must match the architecture, including fused
+expert banks and padded vision input columns. Packed weights without descriptors,
+orphan scales, mismatched expert counts and invalid packed/scale layouts fail
+before state loading. Other quantization descriptors remain unsupported here.
+
+This separation allows mixed dense/NVFP4 native packages without requiring every
+projection to match the selected source's quantization choices. It does not add
+an original BF16 HF converter or validate another complete checkpoint. Embedded
+assets, detector signature and all required parameters remain mandatory. Tiny
+dense/mixed fixtures and a header audit of all 599 installed quantized projections
+pass. See [compatibility and upstream assessment](upstream-readiness.md).

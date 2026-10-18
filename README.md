@@ -156,6 +156,9 @@ prompt sensitivity. See [operation and saved workflow](docs/qwen3-omni/usage.md)
 [measurements and live evidence](docs/qwen3-omni/status.md), and
 [conversion/recovery](docs/qwen3-omni/quantization.md). Video, speech output,
 diffusion conditioning and Omni history are outside this integration.
+Native packages may mix validated dense and NVFP4 projections; the offline
+converter still targets the pinned source. [Compatibility and upstream assessment](docs/qwen3-omni/upstream-readiness.md)
+records reference blockers, residual precision limits and proposed patch boundaries.
 
 ## Native MOSS-Audio in this fork
 

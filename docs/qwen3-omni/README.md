@@ -26,6 +26,7 @@ make the model a diffusion-conditioning encoder.
 | [Checkpoint and quantization](quantization.md) | Payload inspection, feasibility experiment and conversion contract |
 | [Implementation plan](implementation.md) | Ordered work packages, dependencies and delivery gates |
 | [Reconstructed reference](reference.md) | Offline environment, component and fixture commands |
+| [Compatibility and upstream readiness](upstream-readiness.md) | Precision limits, loading separation, reference blockers and proposed contribution boundaries |
 | [Validation](validation.md) | Correctness, modality, memory and regression acceptance |
 | [Evidence and decisions](evidence.md) | Sources, verified observations and unresolved questions |
 
