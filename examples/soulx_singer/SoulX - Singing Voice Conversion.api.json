@@ -1,0 +1,96 @@
+{
+  "1": {
+    "class_type": "SoulXSingerLoader",
+    "inputs": {
+      "singer_name": "soulx_singer_svc.safetensors",
+      "vocoder_name": "soulx_singer_svc_vocos.safetensors",
+      "precision": "float32",
+      "whisper_name": "soulx_singer_whisper_base.safetensors"
+    }
+  },
+  "2": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "soulx-en-prompt.mp3"
+    }
+  },
+  "3": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "soulx-en-target.mp3"
+    }
+  },
+  "4": {
+    "class_type": "SoulXAudioModelLoader",
+    "inputs": {
+      "model_name": "soulx_singer_rmvpe.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "SoulXExtractPitch",
+    "inputs": {
+      "pitch_model": [
+        "4",
+        0
+      ],
+      "audio": [
+        "2",
+        0
+      ],
+      "voicing_threshold": 0.03
+    }
+  },
+  "6": {
+    "class_type": "SoulXExtractPitch",
+    "inputs": {
+      "pitch_model": [
+        "4",
+        0
+      ],
+      "audio": [
+        "3",
+        0
+      ],
+      "voicing_threshold": 0.03
+    }
+  },
+  "7": {
+    "class_type": "SoulXVoiceConvert",
+    "inputs": {
+      "singer": [
+        "1",
+        0
+      ],
+      "reference_audio": [
+        "2",
+        0
+      ],
+      "source_audio": [
+        "3",
+        0
+      ],
+      "reference_pitch": [
+        "5",
+        0
+      ],
+      "source_pitch": [
+        "6",
+        0
+      ],
+      "pitch_shift": 0,
+      "steps": 32,
+      "guidance": 3.0,
+      "seed": 421
+    }
+  },
+  "8": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "audio": [
+        "7",
+        0
+      ],
+      "filename_prefix": "audio/SoulX-Singer/voice-conversion"
+    }
+  }
+}

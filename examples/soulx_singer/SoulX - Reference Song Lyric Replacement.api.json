@@ -1,0 +1,295 @@
+{
+  "1": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "soulx-reference-song.wav"
+    }
+  },
+  "2": {
+    "class_type": "SoulXAudioModelLoader",
+    "inputs": {
+      "model_name": "soulx_singer_karaoke.safetensors"
+    }
+  },
+  "3": {
+    "class_type": "SoulXSeparateVocals",
+    "inputs": {
+      "separator": [
+        "2",
+        0
+      ],
+      "audio": [
+        "1",
+        0
+      ],
+      "chunk_seconds": 5.0
+    }
+  },
+  "4": {
+    "class_type": "SoulXAudioModelLoader",
+    "inputs": {
+      "model_name": "soulx_singer_dereverb.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "SoulXSeparateVocals",
+    "inputs": {
+      "separator": [
+        "4",
+        0
+      ],
+      "audio": [
+        "3",
+        0
+      ],
+      "chunk_seconds": 5.0
+    }
+  },
+  "6": {
+    "class_type": "SoulXAudioModelLoader",
+    "inputs": {
+      "model_name": "soulx_singer_rmvpe.safetensors"
+    }
+  },
+  "7": {
+    "class_type": "SoulXExtractPitch",
+    "inputs": {
+      "pitch_model": [
+        "6",
+        0
+      ],
+      "audio": [
+        "5",
+        0
+      ],
+      "voicing_threshold": 0.03
+    }
+  },
+  "8": {
+    "class_type": "CutleryFasterWhisperLoader",
+    "inputs": {
+      "model_name": "large-v3-turbo",
+      "device": "cpu",
+      "compute_type": "int8",
+      "cpu_threads": 4
+    }
+  },
+  "9": {
+    "class_type": "CutleryFasterWhisperTranscribeLyrics",
+    "inputs": {
+      "asr_model": [
+        "8",
+        0
+      ],
+      "audio": [
+        "5",
+        0
+      ],
+      "language": "en",
+      "beam_size": 5,
+      "batch_size": 1,
+      "vad_filter": false,
+      "condition_on_previous_text": false,
+      "initial_prompt": "",
+      "phrase_separator": "|",
+      "strip_punctuation": true,
+      "word_timestamps": true
+    }
+  },
+  "10": {
+    "class_type": "SoulXAlignLyrics",
+    "inputs": {
+      "pitch_json": [
+        "23",
+        0
+      ],
+      "timing_json": [
+        "24",
+        2
+      ],
+      "lyrics": "",
+      "pronunciations_json": "{}"
+    }
+  },
+  "11": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "[{\"start\": 0.49, \"end\": 4.47, \"text\": \"When I find myself in times of trouble\"}, {\"start\": 4.47, \"end\": 7.25, \"text\": \"Mother Mary comes to me\"}, {\"start\": 7.25, \"end\": 9.95, \"text\": \"Speaking words of wisdom\"}, {\"start\": 10.31, \"end\": 11.35, \"text\": \"Let it be\"}]"
+    }
+  },
+  "12": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "When I find myself in times of trouble | Blue Fig's books come after me | Nasally words of wisdom | David B"
+    }
+  },
+  "13": {
+    "class_type": "SoulXAlignLyrics",
+    "inputs": {
+      "pitch_json": [
+        "7",
+        0
+      ],
+      "timing_json": [
+        "11",
+        0
+      ],
+      "lyrics": [
+        "12",
+        0
+      ],
+      "pronunciations_json": "{}"
+    }
+  },
+  "14": {
+    "class_type": "SoulXSingerLoader",
+    "inputs": {
+      "singer_name": "soulx_singer_svs.safetensors",
+      "vocoder_name": "soulx_singer_svs_vocos.safetensors",
+      "precision": "float32"
+    }
+  },
+  "15": {
+    "class_type": "SoulXSynthesize",
+    "inputs": {
+      "singer": [
+        "14",
+        0
+      ],
+      "reference_audio": [
+        "22",
+        0
+      ],
+      "reference_metadata": [
+        "10",
+        0
+      ],
+      "target_metadata": [
+        "13",
+        0
+      ],
+      "control": "melody",
+      "pitch_shift": 0,
+      "steps": 32,
+      "guidance": 3.0,
+      "seed": 421
+    }
+  },
+  "16": {
+    "class_type": "AudioMerge",
+    "inputs": {
+      "audio1": [
+        "3",
+        1
+      ],
+      "audio2": [
+        "15",
+        0
+      ],
+      "merge_method": "add"
+    }
+  },
+  "17": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "audio": [
+        "16",
+        0
+      ],
+      "filename_prefix": "audio/SoulX-Singer/lyric-replacement-mix"
+    }
+  },
+  "18": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "audio": [
+        "15",
+        0
+      ],
+      "filename_prefix": "audio/SoulX-Singer/lyric-replacement-lead"
+    }
+  },
+  "19": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "7",
+        0
+      ]
+    }
+  },
+  "20": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "10",
+        0
+      ]
+    }
+  },
+  "21": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "13",
+        0
+      ]
+    }
+  },
+  "22": {
+    "class_type": "TrimAudioDuration",
+    "inputs": {
+      "audio": [
+        "5",
+        0
+      ],
+      "start_index": 0.0,
+      "duration": 4.4
+    }
+  },
+  "23": {
+    "class_type": "SoulXExtractPitch",
+    "inputs": {
+      "pitch_model": [
+        "6",
+        0
+      ],
+      "audio": [
+        "22",
+        0
+      ],
+      "voicing_threshold": 0.03
+    }
+  },
+  "24": {
+    "class_type": "CutleryFasterWhisperTranscribeLyrics",
+    "inputs": {
+      "asr_model": [
+        "8",
+        0
+      ],
+      "audio": [
+        "22",
+        0
+      ],
+      "language": "en",
+      "beam_size": 5,
+      "batch_size": 1,
+      "vad_filter": false,
+      "condition_on_previous_text": false,
+      "initial_prompt": "",
+      "phrase_separator": "|",
+      "strip_punctuation": true,
+      "word_timestamps": true
+    }
+  },
+  "25": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "9",
+        2
+      ]
+    }
+  }
+}
