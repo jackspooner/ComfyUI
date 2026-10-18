@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import resource
+import re
 import subprocess
 import sys
 import threading
@@ -19,6 +20,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.qwen3_omni_checkpoint import SOURCE_REVISION, sha256_file
+from qwen3_omni_lifecycle import check_lifecycle, memory_snapshot
 
 
 def capture(model, tensors=True):
@@ -106,6 +108,7 @@ def main():
     parser.add_argument('--capture', action='store_true')
     parser.add_argument('--profile', action='store_true', help='Record a CUDA/CPU trace for the first case')
     parser.add_argument('--comfy-url', default='http://127.0.0.1:8188', help='Serving queue to check before and during isolated GPU validation')
+    parser.add_argument('--lifecycle-transition-model', type=Path, help='After the final combined fixture, verify repeat/cancel/offload and transition to this existing text-generation CLIP')
     options = parser.parse_args()
     if options.precision == 'decoded-reference' and options.nvfp4_input_passes is not None:
         raise ValueError('Activation passes apply to NVFP4 execution, not the decoded reference')
@@ -115,6 +118,8 @@ def main():
     if manifest['source_revision'] != SOURCE_REVISION or sha256_file(options.model) != manifest['output_sha256']:
         raise ValueError('Candidate artifact hash/revision does not match its provenance manifest')
     cases = json.loads(options.cases.read_text())
+    if not cases or len({case['id'] for case in cases}) != len(cases) or any(re.fullmatch(r'[A-Za-z0-9_-]+', case['id']) is None for case in cases):
+        raise ValueError('Provide nonempty fixtures with unique safe capture IDs')
     if options.case:
         if set(options.case) - {case['id'] for case in cases}:
             raise ValueError('Unknown selected fixture case')
@@ -163,6 +168,7 @@ def main():
               'git_revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repository, text=True).strip(),
               'source_changes': subprocess.check_output(['git', 'status', '--porcelain', '--', *source_files], cwd=repository, text=True),
               'nvfp4_input_passes_override': options.nvfp4_input_passes,
+              'lifecycle_harness_sha256': sha256_file(Path(__file__).with_name('qwen3_omni_lifecycle.py')),
               'versions': {name: importlib.metadata.version(name) for name in ('torch', 'transformers', 'comfy-kitchen', 'comfy-aimdo')},
               'cache_condition': 'Fresh native process; OS file cache uncontrolled and warmed by integrity verification', 'cases': []}
     start = time.perf_counter()
@@ -208,11 +214,12 @@ def main():
             if case.get('audio'):
                 waveform, rate = sf.read(case['audio'], dtype='float32', always_2d=True)
                 audio = {'waveform': torch.from_numpy(waveform.T.copy()).unsqueeze(0), 'sample_rate': rate}
-            tokens = clip.tokenize(case['prompt'], image=image, audio=audio, thinking=False, system_prompt=case.get('system_prompt', ''))
+            tokens = clip.tokenize(case['prompt'], image=image, audio=audio, thinking=False,
+                                   skip_template=case.get('skip_template', False), system_prompt=case.get('system_prompt', ''))
             finish_capture = capture(model, tensors=options.capture)
             torch.cuda.reset_peak_memory_stats()
             start = time.perf_counter()
-            profile = torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA]) if options.profile and index == 0 else None
+            profile = torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA], record_shapes=True) if options.profile and index == 0 else None
             try:
                 with profile if profile is not None else ExitStack():
                     budget = case['max_new_tokens'] if options.tokens is None else options.tokens
@@ -230,7 +237,8 @@ def main():
             result = {'id': case['id'], 'text': final.strip(), 'raw_text': raw, 'generated_ids': ids,
                       'eos_reached': bool(ids and ids[-1] == model.model.config.stop_tokens[0]),
                       'elapsed_seconds': elapsed, 'peak_torch_gpu_bytes': torch.cuda.max_memory_allocated(),
-                      'peak_host_rss_bytes': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024}
+                      'peak_host_rss_bytes': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
+                      'memory_after_generation': memory_snapshot()}
             result['assertions'] = [{'alternatives': group, 'passed': any(value.casefold() in final.casefold() for value in group)}
                                     for group in case.get('assert_all', [])]
             result['fixture_passed'] = all(assertion['passed'] for assertion in result['assertions'])
@@ -249,6 +257,11 @@ def main():
             report['peak_driver_gpu_bytes'] = driver_peak[0]
             (options.output / 'results.json').write_text(json.dumps(report, indent=2) + '\n')
             print(case['id'], result['text'], flush=True)
+        if options.lifecycle_transition_model is not None:
+            report['lifecycle'] = check_lifecycle(clip, tokens, ids, options.lifecycle_transition_model, budget,
+                                                   contention, options.output / 'lifecycle.json')
+        if source_hashes != {path: sha256_file(repository / path) for path in source_files}:
+            raise RuntimeError('Inference source changed during validation')
     finally:
         stop_monitor.set()
         monitor_thread.join(timeout=3)

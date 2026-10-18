@@ -126,8 +126,8 @@ its provenance manifest and the frozen test inputs:
 decode individual projections/indexed experts with BF16 matmul. It is diagnostic
 and cannot satisfy accelerated production acceptance. Establish matching-precision
 numerical behavior first, then repeat with `--precision nvfp4` and compare the same
-fixture assertions, features, routing and logits. The native run checks its fast
-operation policy when capture is enabled; a disabled accelerated path is a failure.
+fixture assertions, features, routing and logits. The native run always checks its fast
+operation policy; a disabled accelerated path is a failure.
 `--case ID` selects named fixtures and `--tokens N` records an explicit smoke or
 budget override, including zero for automatic capacity. `--profile` writes a trace
 for the first case. Captures/profiling affect timings; measure performance separately.
@@ -145,8 +145,8 @@ passes quantize the remaining activation error, run existing NVFP4 CUDA matmuls
 with FP16 outputs, sum in FP32, add bias once and return the compute dtype. No
 weight matrix is decoded or requantized by this operation. This is not a claim
 to reproduce publisher W4A8 execution. Two-pass probes still fail speech
-classification; the three-pass FP16-output probe passes that case, but requires
-full-suite, lifecycle and resource acceptance before model-default selection.
+classification; three-pass FP16-output execution passes the full frozen fixture comparison and
+is the Omni default. Lifecycle, resource and installation evidence remain separate.
 The harness records inference-source hashes and refuses source changes during
 evaluation. First-token/decode timing and the fast-operation policy are collected
 even without `--capture`; use that mode for performance runs.
@@ -156,3 +156,35 @@ before releasing its exact validation hold or retrying with a new destination.
 Do not compare cached logits beyond a divergent generated context as though the
 inputs were still identical. Native model acceptance and live service activation
 are separate requirements.
+
+## CPU input audit and capture comparison
+
+The input audit uses the artifact's actual tokenizer/preprocessing and compares
+expanded IDs, FP32 pixels/mel features and positions against upstream captures.
+Encoder forwards are replaced with shape fixtures for this CPU-only audit; it
+does not claim full-model parity:
+
+```bash
+CUDA_VISIBLE_DEVICES='' /path/to/prepared/python tests-inference/check_qwen3_omni_preprocessing.py \
+  --model /absolute/path/to/candidate.safetensors \
+  --cases /absolute/path/to/fixtures-v2/cases.json \
+  --reference /absolute/path/to/reconstructed-reference \
+  --output /absolute/path/to/new-input-audit.json
+```
+
+All 24 frozen cases match exactly. For numerical/fixture comparison:
+
+```bash
+CUDA_VISIBLE_DEVICES='' /path/to/prepared/python tests-inference/compare_qwen3_omni.py \
+  --reference /absolute/path/to/reconstructed-reference \
+  --native /absolute/path/to/native-run-1 /absolute/path/to/native-run-2 \
+  --output /absolute/path/to/new-comparison.json
+```
+
+Combining runs requires identical artifact, inference-source hashes, fixture list
+and precision policy. The tool reports missing cases, retains each run's status,
+compares cached logits only while generated contexts match and never marks
+production accepted. The three-pass cohort spans three GPU windows (16+4+4
+completed cases); interrupted cases are excluded. Its 24 completed cases have
+exact positions/compute pixels, finite captured tensors and zero new assertion
+failures. Four source failures remain. This is not an uninterrupted lifecycle run.

@@ -498,7 +498,7 @@ def te(config, dtype_llama=None, llama_quantization_metadata=None):
             dtype = dtype_llama or dtype
             options = {**model_options, 'qwen3_omni_config': config}
             if options.get('custom_operations') is None:
-                options['custom_operations'] = comfy.ops.mixed_precision_ops(llama_quantization_metadata or {}, dtype, full_precision_mm=True)
+                options['custom_operations'] = comfy.ops.mixed_precision_ops(llama_quantization_metadata or {}, dtype, full_precision_mm=True, nvfp4_input_passes=3)
             super().__init__(device=device, dtype=dtype, name='qwen3_omni', clip_model=OmniClipModel, model_options=options)
 
         def generation_memory_estimation_function(self, tokens, max_length, device):

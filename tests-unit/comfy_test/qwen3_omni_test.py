@@ -174,6 +174,7 @@ def test_automatic_budget_and_overflow_precede_generation_workspace(tiny_clip, m
 
 
 def test_admission_counts_expanded_images_and_incomplete_artifacts(tiny_clip):
+    assert tiny_clip.qwen3_omni.transformer.model.layers[0].self_attn.q_proj._nvfp4_input_passes == 3
     row = [(1, 1.)] * 4
     assert tiny_clip.generation_memory_estimation_function({'qwen3_omni': [row]}, 0, torch.device('cpu')) > 0
     image_row = [(1, 1.), ({'type': 'image', 'data': torch.zeros(1, 16, 16, 3)}, 1.), (2, 1.), (3, 1.)]
@@ -181,3 +182,9 @@ def test_admission_counts_expanded_images_and_incomplete_artifacts(tiny_clip):
         tiny_clip.generation_memory_estimation_function({'qwen3_omni': [image_row]}, 13, torch.device('cpu'))
     with pytest.raises(ValueError, match='Incomplete Qwen3-Omni artifact'):
         tiny_clip.qwen3_omni.load_sd({})
+
+
+def test_explicit_omni_type_rejects_an_unrecognized_package():
+    from comfy.sd import CLIPType, load_text_encoder_state_dicts
+    with pytest.raises(ValueError, match='converted native package'):
+        load_text_encoder_state_dicts([{}], clip_type=CLIPType.QWEN3_OMNI)

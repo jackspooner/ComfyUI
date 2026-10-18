@@ -2,8 +2,10 @@
 
 Status: implementation in progress, 18 October 2026. The offline converter,
 complete source validator, reconstructed reference, native adapter and fixture
-tools are implemented on the project branch. Native component tests pass; full
-native loading, precision acceptance and installation remain pending. See
+tools are implemented on the project branch. The single-file package loads, and
+three-pass native NVFP4 execution has no new assertions across the 24-case
+reference suite. Lifecycle and isolated resource checks pass; boundary and live
+installation checks remain pending. See
 [current results and unresolved gates](status.md).
 
 Build a native ComfyUI integration that loads a converted version of
@@ -35,9 +37,10 @@ Download Manager 2 and the repository's scoped Hugging Face cookie procedure.
 Development requires the repository's prepared Python runtime and worktree setup.
 GPU acceptance requires provisioned checkpoints, a compatible GPU/kernel runtime,
 licensed test media and enough RAM/disk for source, output and working space.
-No measured latency, final package size or peak VRAM guarantee exists yet.
+The candidate is 18.78 GB; measured limits and remaining performance checks are
+recorded in the status document. No latency or memory guarantee is implied.
 
 The diagnostic command in the status document is runnable; installation remains
-planned. Names such
-as `qwen3_omni` below are proposed interfaces until implementation lands. Runtime
+planned. The `qwen3_omni` selector exists on the project branch; discover the
+running schema after activation. Runtime
 activation and actual inference must be recorded separately from source delivery.
