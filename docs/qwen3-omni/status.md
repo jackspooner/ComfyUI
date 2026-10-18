@@ -97,6 +97,23 @@ conversion tests pass, including zero-padding, ordering, unequal scales, unsafe
 source paths, dangling output links and interrupted publication. An artifact is
 not installed or accepted merely because the converter tests pass.
 
+The first complete converted file was 18,781,862,653 bytes with peak converter
+host RSS 9,898,446,848 bytes (including mapped source pages). It was rejected by
+the native package probe: numeric vision-merger module prefixes were not renamed
+when they lacked a trailing dot. Packed data remained intact, but tensor names
+were wrong. The converter now handles both module prefixes and full keys, and
+its regression fixture loads the converted projections into the actual native
+main/DeepStack merger classes. The rejected candidate remains outside model roots
+with failure evidence; it is not an accepted or installed artifact.
+
+The version 2 input convention has also completed a reconstructed GPU run with
+encoder/position/routing captures: 20/24 case assertions pass. Unicode copying,
+silence, standalone sign reading and combined sign reading remain source errors;
+the combined source answer additionally omits the blue object. The corrected
+native package must be evaluated against this convention, not the earlier PIL
+scouting results. Fifteen native component/boundary tests pass, including
+automatic budgets, expanded-context admission and incomplete-package refusal.
+
 ## Reproduce the diagnostic
 
 Use the prepared ComfyUI Python after the repository worktree setup command.
