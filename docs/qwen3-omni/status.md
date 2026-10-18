@@ -1,10 +1,63 @@
 # Execution status: storage gate
 
-[Project index](README.md) · 16 October 2026
+[Project index](README.md) · updated 18 October 2026
 
-The selected checkpoint is downloaded. Native loading, conversion, accelerated
-execution, multimodal acceptance and deployment are **not complete**. The storage
-diagnostic does not install or run a model and does not declare M1 passed.
+The selected checkpoint is downloaded. The offline converter is implemented and
+its synthetic integrity/publication checks pass. Native loading, full-artifact
+validation, accelerated execution, multimodal acceptance and deployment are
+**not complete**. The storage diagnostic does not install a model or declare M1
+passed.
+
+## Resumed implementation
+
+The task worktree merged main at `db18b279`, preserving both earlier project
+commits. Setup and the exact graph ensure passed with embeddings disabled. The
+previous unrelated README modification is no longer present; other canonical
+local state remains unrelated and must be preserved.
+
+The [complete source reconciliation](results/source-reconciliation.json) checks
+all 15 input hashes and matches **all 65,880 expected tensor shapes and dtypes**,
+including excluded speech modules, after expanding upstream fused expert banks.
+The 1,408-byte stale aggregate is now a documented exception confined to this
+exact hash-verified source. Original files and their declared index total remain
+unchanged. This resolves source accounting, rather than waiving integrity checks.
+
+ModelOpt 0.42.0 requires Python >=3.10,<3.13. Its optional HF extra additionally
+requires Transformers <5; that integration extra is not used. A separate Python
+3.12.15 environment now imports the actual ModelOpt decoder alongside Transformers
+5.20.0 and PyTorch 2.14.1+cu130. New wheels were obtained through Download Manager 2,
+hash verified and installed offline with a complete dependency lock. Compatible
+native CUDA libraries are shared read-only from the serving deployment. `pip check`
+passes. The serving Python 3.13 environment was not modified. ModelOpt warns that
+Transformers 5.20.0 is outside its tested HF integration range; successful decoder
+use does not establish support for its quantization/export integrations.
+
+The reconstructed full-model reference preserves upstream routing, attention,
+positions and generation, replacing packed-weight access only. It reached the
+correct `OMEGA` answer in the CPU smoke case using BF16 compute/cache. The original
+run continued past its end token because standalone Thinker generation inherited
+no EOS setting; that run is not accepted as EOS parity. Reference generation now
+binds EOS and padding to the embedded tokenizer. The incomplete first acceptance
+run was stopped and retained with its reason. The corrected suite returned `12`
+for `text_arithmetic` and stopped at EOS after 69.39 seconds on CPU; the remaining
+cases are running.
+No CPU result establishes GPU performance or multimodal quality.
+
+Actual ModelOpt decoding now numerically matches native FP32 decoding on 33
+projections, including a 4,304-column vision down projection. The CPU native BF16
+decoder differs by up to 0.001953125 because of intermediate rounding; GPU and
+full-model differences require separate evaluation. Twenty-four functional
+fixtures (six per modality group) are frozen outside Git, with checksums and audio
+attribution, including independent modality replacement/removal. Upstream
+tokenization/preprocessing executes for text, audio, image and combined fixtures.
+
+The converter uses the verified transformations, fuses expert banks only when
+global scales match, embeds inference assets, inventories excluded speech weights
+and validates output checksums before publication. See [the command and recovery
+procedure](quantization.md#offline-converter). Twenty-four synthetic storage and
+conversion tests pass, including zero-padding, ordering, unequal scales, unsafe
+source paths, dangling output links and interrupted publication. An artifact is
+not installed or accepted merely because the converter tests pass.
 
 ## Reproduce the diagnostic
 
@@ -33,7 +86,12 @@ in the report and causes a nonzero exit, even if component comparisons pass.
 Other integrity failures abort without a success report. Retry with a new report
 path after investigating the failure; preserve original model files and receipts.
 
-## Pinned input and actual layout
+## Original diagnostic evidence (17 October)
+
+The following observations describe the earlier equation-based diagnostic. The
+resumed results above supersede its pending source-accounting and decoder gates.
+
+### Pinned input and actual layout
 
 - Repository: `shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4`.
 - Revision: `0ed3aa2b00eeedbb0d38b6d4738f506af759213b`.
@@ -76,7 +134,7 @@ The diagnostic exits nonzero for the published index discrepancy. No conversion
 artifact was produced. Non-LFS configuration/template assets were also checked
 against their publisher Git blob hashes; the tokenizer's LFS SHA-256 matched.
 
-## Reference and execution gates
+### Original reference and execution gates
 
 The serving environment remains Python 3.13.16, PyTorch 2.14.1+cu130,
 Transformers 5.20.0 and Comfy Kitchen 0.2.37. No dependencies were changed.
@@ -108,6 +166,6 @@ Next required work before accepting a production path:
 
 The GPU was serving queued ComfyUI work during investigation; no competing GPU
 benchmark was launched. No latency, throughput, GPU-memory or multimodal-quality
-acceptance is reported. The unrelated canonical README edits still prevent final
-integration/activation. Documentation commit `2813252d` is preserved on the task
-branch; the exact task graph was current with embeddings disabled before edits.
+acceptance is reported. Documentation commit `2813252d` is preserved on the task
+branch. Recheck current canonical state and serving ownership before integration
+and activation; the earlier README blocker is no longer present.

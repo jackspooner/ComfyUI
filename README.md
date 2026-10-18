@@ -134,8 +134,8 @@ ComfyUI is the AI creation engine for visual professionals who demand control ov
 The [Qwen3-Omni project documents](docs/qwen3-omni/README.md) define a planned
 native CLIP integration using the community NVFP4 Instruct checkpoint: text,
 audio and image inputs, including combined inputs, with text output through
-Generate Text. The converter, model integration and GPU acceptance are not yet
-implemented or verified. An offline storage diagnostic is available; see the
+Generate Text. The offline converter and reference tools are implemented; native
+loading, GPU acceptance and installation remain pending. See the
 [checkpoint findings, command and unresolved gates](docs/qwen3-omni/status.md).
 
 ## Native MOSS-Audio in this fork

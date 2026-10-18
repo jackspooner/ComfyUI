@@ -55,7 +55,41 @@ memory. FP4 activations in place of advertised FP8 activations are a numerical
 change requiring separate acceptance, not a metadata conversion. A slow decoded
 weight reference is useful evidence but is not the promised production fast path.
 
-## Converter contract (proposed)
+## Offline converter
+
+The converter is implemented, with synthetic integrity/publication tests. A
+converted artifact has not yet passed native GPU acceptance or been installed.
+From the repository root, using the prepared ComfyUI interpreter:
+
+```bash
+python scripts/convert_qwen3_omni.py \
+  --source /absolute/path/to/pinned-source \
+  --destination /absolute/path/to/new-candidate.safetensors \
+  --source-revision 0ed3aa2b00eeedbb0d38b6d4738f506af759213b
+```
+
+All 15 pinned input files are hash checked and every source tensor is compared
+with the pinned upstream architecture on the meta device. The known index total
+is reconciled only for this exact input; there is no general integrity bypass.
+The script streams unchanged tensors and transforms individual projections or
+experts. Gate/up banks retain expert order and require bit-identical global
+scales. Original packed values/scales round-trip during transformation. The 27
+vision down projections need 16 zero input columns for CUDA's K%32 alignment;
+the native vision adapter must append the corresponding zero activations.
+
+The artifact embeds tokenizer/config/processor/template data and native quantization
+descriptors. Its companion `.manifest.json` accounts for every source tensor,
+excluded speech tensor, source hash, output tensor hash and complete artifact hash.
+Peak host RSS is recorded separately from any later inference measurement.
+
+Publication uses validated temporary files and no-overwrite hard links. A normal
+exception/interruption removes only its temporary files. After a process kill,
+preserve hidden `.DESTINATION.*` files for inspection. If only the final manifest
+exists, confirm no converter is active and the final weights do not exist before
+removing that task-owned orphan manifest and retrying. Never remove another
+process's files or overwrite an accepted artifact. Originals remain unchanged.
+
+## Artifact contract
 
 Inputs: an explicit local source directory, pinned revision/provenance and an
 explicit destination. Outputs: a ComfyUI-readable checkpoint and manifest with
