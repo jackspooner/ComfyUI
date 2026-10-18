@@ -85,6 +85,15 @@ See what ComfyUI can do with the [newer template workflows](https://comfy.org/wo
 - Support for saving and loading HDR videos and images in various formats.
 
 
+### Krea 2 output projection
+
+This contribution branch builds on [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+and its [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md), whose
+local workflow, model loading and execution capabilities are described above.
+Krea 2 now applies its final output layer only to target image tokens. Text and
+reference tokens still participate in all transformer blocks. Existing workflows
+and checkpoints need no changes; full-checkpoint GPU performance is not yet measured.
+
 ## Release Process
 
 ComfyUI follows a weekly release cycle targeting Monday but this regularly changes because of model releases or large changes to the codebase. There are three interconnected repositories:

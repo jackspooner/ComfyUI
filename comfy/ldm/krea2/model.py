@@ -371,9 +371,8 @@ class SingleStreamDiT(nn.Module):
             transformer_options["block_index"] = i
             combined = block(combined, tvec, freqs, None, timestep_zero_index=timestep_zero_index, transformer_options=transformer_options)
 
-        final = self.last(combined, t)
+        out = self.last(combined[:, txtlen:txtlen + img_tokens], t)
         del combined
-        out = final[:, txtlen:txtlen + img_tokens, :]
         out = rearrange(out, "b (h w) (c ph pw) -> b c (h ph) (w pw)",
                         h=h_, w=w_, ph=patch, pw=patch, c=self.channels)
         out = out[:, :, :h_orig, :w_orig]  # crop padding back off
