@@ -107,6 +107,7 @@ def main():
     parser.add_argument('--case', action='append', help='Select named frozen cases; may repeat')
     parser.add_argument('--tokens', type=int, help='Explicit smoke/performance budget override, recorded in results')
     parser.add_argument('--capture', action='store_true')
+    parser.add_argument('--vram-headroom', type=float, help='Explicit extra DynamicVRAM headroom in GiB, matching the serving CLI policy; recorded in results')
     parser.add_argument('--profile', action='store_true', help='Record a CUDA/CPU trace for the first case')
     parser.add_argument('--comfy-url', default='http://127.0.0.1:8188', help='Serving queue to check before and during isolated GPU validation')
     parser.add_argument('--lifecycle-transition-model', type=Path, help='After the final combined fixture, verify repeat/cancel/offload and transition to this existing text-generation CLIP')
@@ -142,7 +143,8 @@ def main():
     import comfy.sd
     import comfy.memory_management
     import comfy.model_patcher
-    if not comfy_aimdo.control.init_devices([(0, int(args.vram_headroom * 1024**3))]):
+    vram_headroom = args.vram_headroom if options.vram_headroom is None else options.vram_headroom
+    if not comfy_aimdo.control.init_devices([(0, int(vram_headroom * 1024**3))]):
         raise RuntimeError('Native acceptance requires the serving dynamic-VRAM allocator')
     comfy.model_patcher.CoreModelPatcher = comfy.model_patcher.ModelPatcherDynamic
     comfy.memory_management.aimdo_enabled = True
@@ -173,6 +175,7 @@ def main():
               'lifecycle_harness_sha256': sha256_file(Path(__file__).with_name('qwen3_omni_lifecycle.py')),
               'versions': {name: importlib.metadata.version(name) for name in ('torch', 'transformers', 'comfy-kitchen', 'comfy-aimdo')},
               'cache_condition': 'Fresh native process; OS file cache uncontrolled and warmed by integrity verification', 'cases': []}
+    report['vram_headroom_gib'] = vram_headroom
     start = time.perf_counter()
     clip = comfy.sd.load_clip([str(options.model)], clip_type=comfy.sd.CLIPType.QWEN3_OMNI, model_options=model_options)
     report['checkpoint_load_seconds'] = time.perf_counter() - start

@@ -575,5 +575,5 @@
       }
     ]
   },
-  "status": "Scale interpretation verified by component comparison and one reference smoke. Corrected native and full acceptance pending."
+  "status": "Scale convention corrected and tested end to end. Full native evaluation passes 18/24 versus reference 15/24, with one new assertion failure; deployment parity is not accepted. See published-fp8-validation.json."
 }
