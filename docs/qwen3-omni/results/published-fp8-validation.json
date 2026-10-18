@@ -1,0 +1,888 @@
+{
+  "status": "experimental_not_accepted",
+  "source_revision": "042db39a102171d5994b72ab717fade92e80061a",
+  "scope": "Native Thinker with FP8 weight storage and normalized FP32 scales; BF16 compute/cache. Original BF16/FP16 full-model and INT8 execution were not run. Publisher dynamic-FP8 activation parity is unverified.",
+  "conversion": {
+    "source_revision": "042db39a102171d5994b72ab717fade92e80061a",
+    "verified_files": 24,
+    "verified_tensors": 54494,
+    "all_shapes_and_dtypes_match": true,
+    "output_bytes": 33555350854,
+    "output_sha256": "bb454fc267e2b46a701defb15c800a9638f6f22e351f200543d0924110f4b443",
+    "peak_host_rss_bytes": 13324300288,
+    "precision": {
+      "weights": "FP8 E4M3 block128, original weight bytes with normalized inverse scales",
+      "activations": "BF16",
+      "cache": "BF16",
+      "publisher_w4a8_parity": false
+    },
+    "source_scale_convention": "Decode weight / BF16 weight_scale_inv; native weight_scale stores its FP32 reciprocal.",
+    "converter_git_revision": "8bbfcfcb2860e11002d265939a875e6d1f48de89",
+    "converter_sources_dirty": true,
+    "converter_source_sha256": "22a1d4abfdd9eea773a51a4fe0949d4fc25be47abe342af979c0651ca7ef5d5f",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "transformers": "5.20.0",
+      "comfy-kitchen": "0.2.37",
+      "safetensors": "0.8.0"
+    },
+    "status": "Converted and checksum verified; evaluated experimentally, not accepted for deployment"
+  },
+  "verified_converter_source_commit": "0bbfead3f9f21f56c3b56b4527e307d2c9037d39",
+  "source_reference": {
+    "fixture_passed": 15,
+    "fixture_count": 24,
+    "result_sha256": "78dd97767500d6ca0ef162540f421356047c47fff44f93c6187c01974e4d89bc",
+    "source_code_sha256": {
+      "harness": "10a645dd52d68aaae6b0e3586c1ee9d06ab680d6080ed5b903ad5cb1fa8b4f66",
+      "checkpoint_reader": "172c1b9a97e393fbb9e36475826d5b55286b61c7e1642aa4e5b7b8b64c7746ea",
+      "upstream_model": "4143fcbb28c93b7a7a79c12a7066be001164f1e51d921d6ff31c12fe16bbf32e",
+      "upstream_processor": "6371b86629dec798c3334b7ca82833a0c4d5c0b65bdb042d8a209f9704fef035",
+      "weight_decoder": "e86cb993a148ba7e1baffb2f8c892fa5afb31504e81992a27da75a505c914624"
+    },
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "transformers": "5.20.0"
+    },
+    "resources": {
+      "pid": 135748,
+      "output": "/home/jack/services/runtime/omni-fp8-int8/reference-normalized",
+      "peak_driver_bytes": 5293211648,
+      "peak_host_rss_bytes": 26542407680,
+      "queue_interruption": null,
+      "monitor_sha256": "522cbc1e09f64d136d4de8c6abeee0e0a3d925b1893f41211b69beb19a05251a",
+      "process_exited_or_interruption_requested": true
+    }
+  },
+  "native": {
+    "fixture_passed": 18,
+    "fixture_count": 24,
+    "status": "complete",
+    "result_sha256": "87c1352eff7f68770acc7c867d357aa248fd57b893bd1482078fb7bc738f4c07",
+    "source_code_sha256": {
+      "comfy/text_encoders/qwen3_omni.py": "c3aa0c5845c51fe881c0a6f506e312389eeb3857a76355bdbee94d503ac297bb",
+      "comfy/text_encoders/llama.py": "0ad0bc7385cccba6339eb3c9fdc7aa93da1c9acd207ce99a06a850054b01bbb7",
+      "comfy/ops.py": "ac2f656fc53203972e92872c71afd101122841209b877ca57b0ea51070531152",
+      "comfy/quant_ops.py": "5e26c92dbe4325952234bda45e7d16bd357997d801257f8c7618676f5ad2a2c5",
+      "comfy/sd.py": "c2a01143637d906e299f9ba89ca8f9d6a5c7ea5b2d1185bdda3b678cadbaa576",
+      "comfy/sd1_clip.py": "9eb20b561ed3746d760087d3407ce5ce527ff772e94ceae36da43264a88d516e",
+      "comfy/model_management.py": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+      "comfy/model_prefetch.py": "21db82f85592362a5a96b31a0746ad463bb8f9a5973c2e6f658684c44ef715fd",
+      "comfy/model_patcher.py": "7edc88d9eae6a88637625d257dc73684cfc012a29446bf88e70d22e3a6be3994"
+    },
+    "harness_sha256": "a385586b9f9f34822316a0f6ce06f801149a5c72dad01217690ef3d31971fc29",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "transformers": "5.20.0",
+      "comfy-kitchen": "0.2.37",
+      "comfy-aimdo": "0.5.6"
+    },
+    "vram_headroom_gib": 1.0,
+    "peak_driver_gpu_bytes": 28160557056,
+    "peak_host_rss_bytes": 11128774656,
+    "decode_tokens_per_second_median": 3.308042595809608,
+    "checkpoint_load_seconds_excludes_integrity_hashing": 0.6413995589991828
+  },
+  "comparison": {
+    "complete_fixture_coverage": true,
+    "missing_cases": [],
+    "new_assertion_failure_count": 1,
+    "generated_ids_equal_cases": 16,
+    "all_positions_equal": true,
+    "all_compute_pixels_equal": true,
+    "shape_mismatch_count": 0,
+    "nonfinite_metric_count": 0,
+    "full_comparison_sha256": "6483839e491b7e8f0a02f143054e9440552b293ef406da412fd90c870faac7b4",
+    "interpretation": "Encoder/routing/logit differences and one new combined_batch assertion failure remain. The cause has not been isolated; equal input positions/pixels and aggregate quality improvements do not establish parity."
+  },
+  "cases": [
+    {
+      "id": "text_arithmetic",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "12",
+      "native_text": "12",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.124267578125,
+          "relative_rmse": 0.09060419350862503
+        }
+      }
+    },
+    {
+      "id": "text_capital",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "Paris",
+      "native_text": "Paris",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.9375,
+          "relative_rmse": 0.08637262135744095
+        }
+      }
+    },
+    {
+      "id": "text_copy",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "OMEGA",
+      "native_text": "OMEGA",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 2.125,
+          "relative_rmse": 0.10008201748132706
+        }
+      }
+    },
+    {
+      "id": "text_unicode",
+      "reference_passed": false,
+      "native_passed": false,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "",
+      "native_text": "",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 3.3125,
+          "relative_rmse": 0.1418190449476242
+        }
+      }
+    },
+    {
+      "id": "text_extract",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "code\nBLUE42",
+      "native_text": "code\nBLUE42",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 3.5625,
+          "relative_rmse": 0.1338803917169571
+        }
+      }
+    },
+    {
+      "id": "text_compare",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "9",
+      "native_text": "9",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.2109375,
+          "relative_rmse": 0.1350902020931244
+        }
+      }
+    },
+    {
+      "id": "audio_speech",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "Speech",
+      "native_text": "Speech",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.0078125,
+          "relative_rmse": 0.018867630511522293
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.8984375,
+          "relative_rmse": 0.07309078425168991
+        }
+      }
+    },
+    {
+      "id": "audio_music",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "The main instrument is a trumpet playing a short, bright, and celebratory fanfare.",
+      "native_text": "The main instrument is a trumpet playing a short, bright, and celebratory fanfare.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.005859375,
+          "relative_rmse": 0.017716972157359123
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.09375,
+          "relative_rmse": 0.046789512038230896
+        }
+      }
+    },
+    {
+      "id": "audio_birds",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": false,
+      "reference_text": "The main sound is a bird chirping and singing.",
+      "native_text": "The main sound is a bird singing a clear, melodic song.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.005859375,
+          "relative_rmse": 0.01706068217754364
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.515625,
+          "relative_rmse": 0.06341485679149628
+        }
+      }
+    },
+    {
+      "id": "audio_silence",
+      "reference_passed": false,
+      "native_passed": false,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "The audio contains a clearly audible sound. It is a single, sustained, low-pitched electronic tone, similar to a dial tone or a test signal.",
+      "native_text": "The audio contains a clearly audible sound. It is a single, sustained, low-pitched electronic tone, similar to a dial tone or a test signal.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.0283203125,
+          "relative_rmse": 0.0568135604262352
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.390625,
+          "relative_rmse": 0.042267054319381714
+        }
+      }
+    },
+    {
+      "id": "audio_tone",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "This is a single, sustained, low-pitched electronic tone, similar to a dial tone or a test signal.",
+      "native_text": "This is a single, sustained, low-pitched electronic tone, similar to a dial tone or a test signal.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.0257568359375,
+          "relative_rmse": 0.07468084990978241
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.875,
+          "relative_rmse": 0.04930916056036949
+        }
+      }
+    },
+    {
+      "id": "audio_clicks",
+      "reference_passed": false,
+      "native_passed": false,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "The repeated sound is a series of short, sharp, electronic beeps, similar to a digital alarm or a notification chime.",
+      "native_text": "The repeated sound is a series of short, sharp, electronic beeps, similar to a digital alarm or a notification chime.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.0263671875,
+          "relative_rmse": 0.061391424387693405
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.46484375,
+          "relative_rmse": 0.04441434144973755
+        }
+      }
+    },
+    {
+      "id": "image_red",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "Red",
+      "native_text": "Red",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.1875,
+          "relative_rmse": 0.08708792924880981
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.5390625,
+          "relative_rmse": 0.06302693486213684
+        }
+      }
+    },
+    {
+      "id": "image_blue",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": false,
+      "reference_text": "The central shape is blue.",
+      "native_text": "Blue",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.75,
+          "relative_rmse": 0.1533696949481964
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.19921875,
+          "relative_rmse": 0.044571783393621445
+        }
+      }
+    },
+    {
+      "id": "image_triangle",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "Triangle",
+      "native_text": "Triangle",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.375,
+          "relative_rmse": 0.08891163766384125
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.375,
+          "relative_rmse": 0.05095694586634636
+        }
+      }
+    },
+    {
+      "id": "image_sign",
+      "reference_passed": false,
+      "native_passed": false,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "",
+      "native_text": "",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.3125,
+          "relative_rmse": 0.12768219411373138
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.265625,
+          "relative_rmse": 0.03886236995458603
+        }
+      }
+    },
+    {
+      "id": "image_wide",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": false,
+      "reference_text": "Based on the image provided, we can identify the two colored objects by observing their shape and color from left to right.\n\n- The object on the left is a red square.\n- The object on the right is a blue circle.\n\nTherefore, the two colored objects from left to right are a red square and a blue circle.",
+      "native_text": "Based on the image provided, we can identify the two colored objects from left to right.\n\n- The object on the left is a red square.\n- The object on the right is a blue circle.\n\nTherefore, the two colored objects from left to right are a red square and a blue circle.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.60546875,
+          "relative_rmse": 0.05463426560163498
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.1875,
+          "relative_rmse": 0.036770377308130264
+        }
+      }
+    },
+    {
+      "id": "image_batch",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "The color in the first image is red, and the color in the second image is blue.",
+      "native_text": "The color in the first image is red, and the color in the second image is blue.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.3232421875,
+          "relative_rmse": 0.05655409395694733
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.62109375,
+          "relative_rmse": 0.062331099063158035
+        }
+      }
+    },
+    {
+      "id": "combined_baseline",
+      "reference_passed": false,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": false,
+      "reference_text": ".com",
+      "native_text": "The image displays a solid red square. The audio contains a male voice speaking.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.0078125,
+          "relative_rmse": 0.018867630511522293
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.3203125,
+          "relative_rmse": 0.10834065079689026
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.5390625,
+          "relative_rmse": 0.06302693486213684
+        }
+      }
+    },
+    {
+      "id": "combined_replace_image",
+      "reference_passed": true,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": false,
+      "reference_text": "The image displays a solid blue circle on a white background.\n\nThe audio contains a male voice speaking.",
+      "native_text": "The image displays a solid blue circle. The audio contains a male voice speaking.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.0078125,
+          "relative_rmse": 0.018867630511522293
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.78125,
+          "relative_rmse": 0.047490932047367096
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.19921875,
+          "relative_rmse": 0.044571783393621445
+        }
+      }
+    },
+    {
+      "id": "combined_replace_audio",
+      "reference_passed": false,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": false,
+      "reference_text": "",
+      "native_text": "Assistant: The visible image is a solid red square.\n\nThe main audio sound is a bird chirping.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.005859375,
+          "relative_rmse": 0.01706068217754364
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.640625,
+          "relative_rmse": 0.15336354076862335
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.5390625,
+          "relative_rmse": 0.06302693486213684
+        }
+      }
+    },
+    {
+      "id": "combined_remove_image",
+      "reference_passed": false,
+      "native_passed": false,
+      "new_assertion_failures": [],
+      "generated_ids_equal": true,
+      "reference_text": "",
+      "native_text": "",
+      "position_ids_equal": true,
+      "compute_pixels_equal": null,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.0078125,
+          "relative_rmse": 0.018867630511522293
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 7.0390625,
+          "relative_rmse": 0.27175283432006836
+        }
+      }
+    },
+    {
+      "id": "combined_remove_audio",
+      "reference_passed": false,
+      "native_passed": true,
+      "new_assertion_failures": [],
+      "generated_ids_equal": false,
+      "reference_text": "ent",
+      "native_text": "Assistant: The image contains a red square on a white background. There is no text or other color visible in the image.\n\nThere is no audio provided in the input.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.0625,
+          "relative_rmse": 0.11908459663391113
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.5390625,
+          "relative_rmse": 0.06302693486213684
+        }
+      }
+    },
+    {
+      "id": "combined_batch",
+      "reference_passed": false,
+      "native_passed": false,
+      "new_assertion_failures": [
+        1
+      ],
+      "generated_ids_equal": false,
+      "reference_text": "The image contains the following:\n\n*   **Text:** The word \"WOW\" is written in a bold, black, sans-serif font.\n*   **Color:** The image is in black and white, with a solid blue circle in the background.\n\nThe audio contains a single, sustained, low-pitched electronic tone.",
+      "native_text": "The image contains the following:\n\n*   **Text:** The word \"WOW\" is written in a bold, black, sans-serif font.\n*   **Color:** The image is in black and white, with a solid black background and white text.\n\nThe audio contains a single, sustained, low-pitched electronic tone.",
+      "position_ids_equal": true,
+      "compute_pixels_equal": true,
+      "tensor_metrics": {
+        "audio_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.0257568359375,
+          "relative_rmse": 0.07468084990978241
+        },
+        "decode_logits": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 1.6875,
+          "relative_rmse": 0.057148516178131104
+        },
+        "vision_features": {
+          "equal": false,
+          "finite": true,
+          "max_absolute_error": 0.59375,
+          "relative_rmse": 0.05266638472676277
+        }
+      }
+    }
+  ],
+  "lifecycle": {
+    "status": "complete",
+    "transition_model": "/home/jack/models/text_encoders/moss_audio_8b_instruct_bf16.safetensors",
+    "steps": [
+      {
+        "name": "repeat_1",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 28131196928,
+          "torch_allocated_bytes": 34625536,
+          "torch_reserved_bytes": 167772160,
+          "host_rss_bytes": 11128774656,
+          "peak_host_rss_bytes": 11128774656
+        }
+      },
+      {
+        "name": "repeat_2",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 28131196928,
+          "torch_allocated_bytes": 34625536,
+          "torch_reserved_bytes": 167772160,
+          "host_rss_bytes": 11131101184,
+          "peak_host_rss_bytes": 11129274368
+        }
+      },
+      {
+        "name": "repeat_3",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 28131196928,
+          "torch_allocated_bytes": 34625536,
+          "torch_reserved_bytes": 167772160,
+          "host_rss_bytes": 11133460480,
+          "peak_host_rss_bytes": 11131699200
+        }
+      },
+      {
+        "name": "cancel_preprocessing",
+        "propagation_seconds": 0.002583178000350017,
+        "memory": {
+          "gpu_driver_bytes": 28131196928,
+          "torch_allocated_bytes": 37013504,
+          "torch_reserved_bytes": 167772160,
+          "host_rss_bytes": 11134246912,
+          "peak_host_rss_bytes": 11132485632
+        }
+      },
+      {
+        "name": "cancel_prefill",
+        "propagation_seconds": 0.00011664100020425394,
+        "memory": {
+          "gpu_driver_bytes": 27999076352,
+          "torch_allocated_bytes": 64448000,
+          "torch_reserved_bytes": 169869312,
+          "host_rss_bytes": 11134255104,
+          "peak_host_rss_bytes": 11132616704
+        }
+      },
+      {
+        "name": "cancel_decode",
+        "propagation_seconds": 0.0011930529999517603,
+        "memory": {
+          "gpu_driver_bytes": 28131196928,
+          "torch_allocated_bytes": 63577088,
+          "torch_reserved_bytes": 167772160,
+          "host_rss_bytes": 11134259200,
+          "peak_host_rss_bytes": 11132616704
+        }
+      },
+      {
+        "name": "cancellation_recovery",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 28131196928,
+          "torch_allocated_bytes": 34625536,
+          "torch_reserved_bytes": 167772160,
+          "host_rss_bytes": 11134267392,
+          "peak_host_rss_bytes": 11132616704
+        }
+      },
+      {
+        "name": "offloaded",
+        "memory": {
+          "gpu_driver_bytes": 3403677696,
+          "torch_allocated_bytes": 33554944,
+          "torch_reserved_bytes": 35651584,
+          "host_rss_bytes": 3093790720,
+          "peak_host_rss_bytes": 11132616704
+        }
+      },
+      {
+        "name": "reloaded",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 28127002624,
+          "torch_allocated_bytes": 34625536,
+          "torch_reserved_bytes": 163577856,
+          "host_rss_bytes": 10913243136,
+          "peak_host_rss_bytes": 11132616704
+        }
+      },
+      {
+        "name": "other_model",
+        "generated_ids": [
+          45578,
+          151645
+        ],
+        "raw_text": "READY",
+        "memory": {
+          "gpu_driver_bytes": 26740785152,
+          "torch_allocated_bytes": 35603456,
+          "torch_reserved_bytes": 52428800,
+          "host_rss_bytes": 11116253184,
+          "peak_host_rss_bytes": 11132616704
+        }
+      },
+      {
+        "name": "model_transition_recovery",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 28129099776,
+          "torch_allocated_bytes": 35603456,
+          "torch_reserved_bytes": 165675008,
+          "host_rss_bytes": 11118911488,
+          "peak_host_rss_bytes": 11132616704
+        }
+      },
+      {
+        "name": "final_offload",
+        "memory": {
+          "gpu_driver_bytes": 3403677696,
+          "torch_allocated_bytes": 33555456,
+          "torch_reserved_bytes": 35651584,
+          "host_rss_bytes": 3299237888,
+          "peak_host_rss_bytes": 11132616704
+        }
+      }
+    ],
+    "retained_torch_delta_bytes": 0
+  },
+  "cleanup": {
+    "gpu_hold_released": true,
+    "owned_gpu_processes_exited": true,
+    "rejected_binary_removed": {
+      "removed_candidate": "/home/jack/services/runtime/omni-fp8-int8/candidates/qwen3_omni_30b_a3b_fp8.safetensors",
+      "bytes": 33551701582,
+      "sha256": "dc15c9cafbe4f4831d097963c520a6d2f0aefa0c9623a44b00750a68c8330b33",
+      "reason": "Native and independent reference generated only token 0 with multiplicative source scales. Reciprocal-scale reference passes arithmetic. Retained manifest, logs, captures and source allow reproduction."
+    },
+    "source_and_corrected_candidate_retained": true,
+    "serving_restarted": false,
+    "nvfp4_installation_changed": false
+  },
+  "delivery": {
+    "branch": "omni-fp8-int8",
+    "integration": "blocked",
+    "reason": "Exact-worktree GitNexus refresh refused graph-incomplete / writeComplete:false; prior authenticated graph preserved. No forced rebuild or manual owner-state changes.",
+    "graph_blocker": {
+      "checkout": "/home/jack/services/worktrees/comfyui-omni-fp8-int8",
+      "expected_head": "8bbfcfcb2860e11002d265939a875e6d1f48de89",
+      "jobs": [
+        "03b42ddf-3d6d-4362-937f-5324e87e7795",
+        "042374e1-3be7-47cc-9935-487f4e287aae",
+        "96415099-5f84-4c52-99f2-c52f6f5f45c7"
+      ],
+      "preserved_index_head": "338af6682f1e301d26b4837cdc8dbce926b80bee",
+      "diagnostic": {
+        "ec0c27f1-f450-4711-9516-5a951c6ac49a": {
+          "graph": {
+            "files": 1322,
+            "nodes": 35998,
+            "edges": 78050,
+            "writeComplete": false,
+            "scopeComplete": true,
+            "analysisFeatures": {
+              "graph.class-framework-annotations": 1,
+              "objective-c.provider-0.1.8.tree-sitter-objc-3.0.2": 1
+            },
+            "ftsComplete": true,
+            "pdgComplete": true
+          },
+          "ineligibleReasons": [
+            "graph-incomplete"
+          ]
+        }
+      },
+      "embeddings_generated": false,
+      "owner_state_modified_manually": false
+    }
+  },
+  "cpu_checks": {
+    "passed": 121,
+    "skipped": 1,
+    "skip_reason": "Owned CUDA unit fixture skipped in CPU run; separate actual GPU evidence retained",
+    "log_sha256": "aad6779734ed03ec22484212ca437da859689d472000526152dc1c6befecd34d"
+  },
+  "fixtures_sha256": "861b09419d72547a4e843658824652b06327710b8376cbf6a13f04faa2e70b7c"
+}

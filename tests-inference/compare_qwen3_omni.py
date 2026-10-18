@@ -49,7 +49,7 @@ def main():
         native = json.loads(path.read_text())
         if native['source_revision'] != revision:
             raise ValueError('Native revision differs')
-        current = {key: native.get(key) for key in ('artifact_sha256', 'source_code_sha256', 'cases_sha256', 'precision', 'nvfp4_input_passes_override')}
+        current = {key: native.get(key) for key in ('artifact_sha256', 'source_code_sha256', 'cases_sha256', 'precision', 'nvfp4_input_passes_override', 'vram_headroom_gib')}
         if identity is None:
             identity = current
         elif current != identity or not current['source_code_sha256']:

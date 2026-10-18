@@ -4,8 +4,12 @@ Status, 19 October 2026: the published source passed every pinned hash and all
 54,494 tensor shapes/dtypes. Full-model testing caught a source scale convention
 incompatible with the standard HF decoder: multiplication generates token zero,
 while division passes the independent arithmetic smoke. The converter now
-normalizes these pinned multipliers. Corrected full-model and lifecycle acceptance
-are pending. The installed NVFP4 artifact and serving service are unchanged.
+normalizes these pinned multipliers. The completed native suite passes 18/24,
+versus 15/24 for the independent reference, but adds one assertion failure in
+`combined_batch`. Lifecycle checks pass with 1 GiB extra headroom. This candidate
+is **experimental, not accepted for deployment**; the installed NVFP4 artifact and
+serving service are unchanged. [Full evidence](results/published-fp8-validation.json)
+records the quality gap and resource results.
 
 The selected source is [marksverdhei/Qwen3-Omni-30B-A3B-FP8](https://huggingface.co/marksverdhei/Qwen3-Omni-30B-A3B-FP8),
 revision `042db39a102171d5994b72ab717fade92e80061a`, based on the Instruct model.
@@ -86,6 +90,11 @@ the existing NVFP4 reference and its separate supported Python runtime.
 Run `scripts/qwen3_omni_reference.py` with the source/revision, frozen 24-case
 fixture file and new output directory, then `tests-inference/check_qwen3_omni.py`
 with the native artifact, the same fixtures and `--precision fp8-block128`.
+For this 32 GiB RTX 5090 validation, pass `--vram-headroom 1`, matching the existing
+serving CLI policy. With zero extra headroom, the corrected model answered `12`
+then rejected the next call: 703,037,440 bytes were required including reserve,
+but only 517,908,480 were free after weights remained resident. The explicit
+headroom setting is recorded separately and does not change precision or fixtures.
 Use `--capture-parity` / `--capture` for features, positions, routing and logits;
 `tests-inference/compare_qwen3_omni.py` refuses mismatched source revisions.
 CPU component probes use `--components --device cpu` without loading the model.
@@ -129,7 +138,7 @@ versions, source hashes, tensor/key counts, planned bytes and the unexecuted sta
   48 layers × 4 KV heads × 128 dimensions × K/V × 2 bytes. At 65,536 tokens that is
   6 GiB before attention/media workspace, even with eight-bit stored weights.
 
-## Verification and remaining work
+## Verification and acceptance limits
 
 The cumulative unit command passes **121 tests**, with one expected owned-CUDA
 skip, using Python 3.13.16, Torch 2.14.1+cu130, Transformers 5.20.0 and Comfy Kitchen
@@ -158,13 +167,35 @@ do not establish usable model semantics. The [scale correction record](results/p
 retains the failed native/reference smoke, 28 comparisons against a separately
 quantized NVFP4 source and the passing reciprocal reference smoke. This comparison
 supports scale interpretation, not original BF16 quality parity. These timings
-exclude loading/offload and are not full-model latency. No full-model lifecycle
-or full-suite quality acceptance is claimed.
-Other backends remain unverified.
+exclude loading/offload and are not full-model latency. Other backends remain
+unverified.
 
-Remaining: finish corrected packaging to a fresh destination; run the independent
-quantized reference and all 24
-unchanged multimodal fixtures, plus explicit
-resource/lifecycle measurements in owned GPU windows. Failed/contended runs remain
-separate from completed evidence. The existing NVFP4 reference cannot be relabeled
-as the original-weight FP8 reference because its underlying weights differ.
+Corrected packaging is complete: 33,555,350,854 bytes, SHA-256
+`bb454fc267e2b46a701defb15c800a9638f6f22e351f200543d0924110f4b443`.
+Both implementations completed the same 24 cases without reducing token budgets.
+Native passes 18, reference 15; one previously passing assertion regresses in
+`combined_batch`. Generated IDs match for 16 cases. All 24 position tensors and
+all 11 compute-image inputs match exactly; captures have no shape mismatches or
+non-finite values. Encoder features, routing and logits differ, and the cause has
+not been isolated. Overall score improvement does not establish parity.
+
+On the RTX 5090 with `--vram-headroom 1`, native peak driver VRAM was
+28,160,557,056 bytes and median recorded decoding throughput was 3.31 tokens/s.
+These are this fixture run's measurements, with existing serving residency and
+uncontrolled OS file cache, not a general performance claim. Reference CPU
+offload peaked at 5,293,211,648 driver bytes. Torch-only accounting misses the
+native allocator's resident pages; use the driver measurements.
+
+All twelve lifecycle steps pass: three identical repeats, cancellation during
+preprocessing/prefill/decode, recovery, offload/reload, transition through the
+existing MOSS model (`READY`), Omni recovery and final offload. The retained Torch
+allocation delta after cancellation is zero. Process exit and release of the exact
+GPU hold were confirmed; no serving restart or model replacement occurred.
+
+The implementation is pushed on `omni-fp8-int8`; integration remains blocked by
+the exact-worktree GitNexus writer's `graph-incomplete` refusal. Its previous valid
+graph is preserved; no force, hidden source or manual owner-state changes were
+used. The worktree, source, corrected candidate and failed-run diagnostics remain.
+Further acceptance needs investigation of the numerical/combined-batch regression
+and successful owner index recovery. The NVFP4 reference cannot stand in for
+original BF16 quality or this different FP8 checkpoint.

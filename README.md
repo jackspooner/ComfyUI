@@ -161,9 +161,10 @@ converter still targets the pinned source. [Compatibility and upstream assessmen
 records reference blockers, residual precision limits and proposed patch boundaries.
 The experimental FP8 path can preserve the pinned published 128×128 block-scaled
 checkpoint with explicit inverse-scale normalization, BF16 compute/cache and
-CPU/CUDA component coverage. Full-model
-validation is pending. [Eight-bit operation](docs/qwen3-omni/eight-bit.md) records
-source/template pins, conversion, resource requirements and remaining acceptance.
+CPU/CUDA coverage. Its completed native suite passes 18/24 versus 15/24 for the
+reference, with one new assertion regression; lifecycle checks pass using 1 GiB
+extra headroom. It is not accepted for deployment. [Eight-bit operation](docs/qwen3-omni/eight-bit.md)
+records source/template pins, conversion, resource requirements and acceptance limits.
 
 ## Native MOSS-Audio in this fork
 
