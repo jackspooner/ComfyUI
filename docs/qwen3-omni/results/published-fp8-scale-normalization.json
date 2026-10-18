@@ -1,0 +1,579 @@
+{
+  "source_revision": "042db39a102171d5994b72ab717fade92e80061a",
+  "source_scale_convention": "Published BF16 weight_scale_inv contains quantization multipliers: decoded weight = FP8 weight / weight_scale_inv. Native scales use FP32 reciprocal.",
+  "interpretation_evidence": "Both architectures collapse with multiplication; 28 probes align in magnitude/direction with a separate NVFP4 quantization of the same original when source multipliers are inverted; reciprocal reference smoke passes.",
+  "rejected_candidate_sha256": "dc15c9cafbe4f4831d097963c520a6d2f0aefa0c9623a44b00750a68c8330b33",
+  "native_multiply_smoke": [
+    {
+      "id": "text_arithmetic",
+      "text": "!!!!!!!!!!!!!!!!",
+      "raw_text": "!!!!!!!!!!!!!!!!",
+      "generated_ids": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "eos_reached": false,
+      "elapsed_seconds": 28.313770906999707,
+      "peak_torch_gpu_bytes": 123521536,
+      "peak_host_rss_bytes": 7157219328,
+      "memory_after_generation": {
+        "gpu_driver_bytes": 29118955520,
+        "torch_allocated_bytes": 34625536,
+        "torch_reserved_bytes": 125829120,
+        "host_rss_bytes": 7158865920,
+        "peak_host_rss_bytes": 7157219328
+      },
+      "assertions": [
+        {
+          "alternatives": [
+            "12"
+          ],
+          "passed": false
+        }
+      ],
+      "fixture_passed": false,
+      "execution_policy": [
+        {
+          "quantized_modules": 0,
+          "fp8_block_modules": 288,
+          "fast_modules": 0,
+          "nvfp4_input_passes": []
+        }
+      ],
+      "first_token_seconds": 24.795003105000433,
+      "decode_tokens_per_second": 4.263809985230866
+    }
+  ],
+  "independent_multiply_smoke": [
+    {
+      "id": "text_arithmetic",
+      "input_ids": [
+        151644,
+        872,
+        198,
+        3838,
+        374,
+        220,
+        22,
+        5519,
+        220,
+        20,
+        30,
+        17841,
+        1172,
+        448,
+        279,
+        7546,
+        13,
+        151645,
+        198,
+        151644,
+        77091,
+        198,
+        151667,
+        271,
+        151668,
+        271
+      ],
+      "generated_ids": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "text": "!!!!!!!!!!!!!!!!",
+      "raw_text": "!!!!!!!!!!!!!!!!",
+      "template": "<|im_start|>user\nWhat is 7 plus 5? Reply only with the integer.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "eos_reached": false,
+      "elapsed_seconds": 21.079524589998982,
+      "images": [],
+      "assertions": [
+        {
+          "alternatives": [
+            "12"
+          ],
+          "passed": false
+        }
+      ],
+      "fixture_passed": false
+    }
+  ],
+  "reciprocal_reference_smoke": [
+    {
+      "id": "text_arithmetic",
+      "input_ids": [
+        151644,
+        872,
+        198,
+        3838,
+        374,
+        220,
+        22,
+        5519,
+        220,
+        20,
+        30,
+        17841,
+        1172,
+        448,
+        279,
+        7546,
+        13,
+        151645,
+        198,
+        151644,
+        77091,
+        198,
+        151667,
+        271,
+        151668,
+        271
+      ],
+      "generated_ids": [
+        16,
+        17,
+        151645
+      ],
+      "text": "12",
+      "raw_text": "12",
+      "template": "<|im_start|>user\nWhat is 7 plus 5? Reply only with the integer.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "eos_reached": true,
+      "elapsed_seconds": 30.083347427000263,
+      "images": [],
+      "assertions": [
+        {
+          "alternatives": [
+            "12"
+          ],
+          "passed": true
+        }
+      ],
+      "fixture_passed": true
+    }
+  ],
+  "diagnostic_wrapper_sha256": "5af629ad88fcf10556da69b35bd981493ef935f93acba930f7fe509b5bf75969",
+  "cross_quantization_components": {
+    "scope": "Comparison against an independently quantized NVFP4 checkpoint of the same original; not BF16 quality proof",
+    "probes": [
+      {
+        "prefix": "thinker.model.layers.0.self_attn.q_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.8984914422035217,
+        "relative_rms_to_nvfp4": 16132629.0,
+        "absmax": 3139584.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.self_attn.q_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9956110119819641,
+        "relative_rms_to_nvfp4": 0.09620250761508942,
+        "absmax": 0.2403433471918106
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.0.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9512141942977905,
+        "relative_rms_to_nvfp4": 22207716.0,
+        "absmax": 2594816.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.0.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9951291084289551,
+        "relative_rms_to_nvfp4": 0.09831376373767853,
+        "absmax": 0.1944444477558136
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.0.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9768615961074829,
+        "relative_rms_to_nvfp4": 25090146.0,
+        "absmax": 2666496.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.0.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9951034784317017,
+        "relative_rms_to_nvfp4": 0.09836284816265106,
+        "absmax": 0.1428571343421936
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.0.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9407626986503601,
+        "relative_rms_to_nvfp4": 22172546.0,
+        "absmax": 2580480.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.0.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.99510657787323,
+        "relative_rms_to_nvfp4": 0.09862636774778366,
+        "absmax": 0.30434784293174744
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.63.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9536076784133911,
+        "relative_rms_to_nvfp4": 22598294.0,
+        "absmax": 2809856.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.63.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9951026439666748,
+        "relative_rms_to_nvfp4": 0.09767360985279083,
+        "absmax": 0.16568046808242798
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.63.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9580168724060059,
+        "relative_rms_to_nvfp4": 32908044.0,
+        "absmax": 3268608.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.63.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9950589537620544,
+        "relative_rms_to_nvfp4": 0.09826269000768661,
+        "absmax": 0.14814814925193787
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.63.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9273881316184998,
+        "relative_rms_to_nvfp4": 21260852.0,
+        "absmax": 2838528.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.63.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9952985048294067,
+        "relative_rms_to_nvfp4": 0.09821780025959015,
+        "absmax": 0.2679425776004791
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.127.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9601062536239624,
+        "relative_rms_to_nvfp4": 24272464.0,
+        "absmax": 2852864.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.127.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953193664550781,
+        "relative_rms_to_nvfp4": 0.09727688133716583,
+        "absmax": 0.161849707365036
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.127.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9654688835144043,
+        "relative_rms_to_nvfp4": 32607768.0,
+        "absmax": 3168256.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.127.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.995309054851532,
+        "relative_rms_to_nvfp4": 0.09753603488206863,
+        "absmax": 0.12389380484819412
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.127.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9191418886184692,
+        "relative_rms_to_nvfp4": 17176074.0,
+        "absmax": 2652160.0
+      },
+      {
+        "prefix": "thinker.model.layers.0.mlp.experts.127.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953933954238892,
+        "relative_rms_to_nvfp4": 0.09648417681455612,
+        "absmax": 0.35668790340423584
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.0.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.983366847038269,
+        "relative_rms_to_nvfp4": 28674868.0,
+        "absmax": 2752512.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.0.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9951579570770264,
+        "relative_rms_to_nvfp4": 0.09864851087331772,
+        "absmax": 0.10606060922145844
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.0.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9806957840919495,
+        "relative_rms_to_nvfp4": 26497454.0,
+        "absmax": 2580480.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.0.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9951333403587341,
+        "relative_rms_to_nvfp4": 0.0984809622168541,
+        "absmax": 0.13084112107753754
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.0.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9827026128768921,
+        "relative_rms_to_nvfp4": 26209682.0,
+        "absmax": 2666496.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.0.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9950878024101257,
+        "relative_rms_to_nvfp4": 0.09853673726320267,
+        "absmax": 0.17499999701976776
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.63.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.8724430799484253,
+        "relative_rms_to_nvfp4": 15731455.0,
+        "absmax": 2508800.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.63.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953426122665405,
+        "relative_rms_to_nvfp4": 0.0982397273182869,
+        "absmax": 0.46280989050865173
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.63.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9071016311645508,
+        "relative_rms_to_nvfp4": 20014086.0,
+        "absmax": 2580480.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.63.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953635931015015,
+        "relative_rms_to_nvfp4": 0.09832746535539627,
+        "absmax": 0.3971630930900574
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.63.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.8671532869338989,
+        "relative_rms_to_nvfp4": 18875700.0,
+        "absmax": 2594816.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.63.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9952065944671631,
+        "relative_rms_to_nvfp4": 0.09826461970806122,
+        "absmax": 0.4552845358848572
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.127.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9796959161758423,
+        "relative_rms_to_nvfp4": 24876492.0,
+        "absmax": 2580480.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.127.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9952350854873657,
+        "relative_rms_to_nvfp4": 0.09833817183971405,
+        "absmax": 0.12903225421905518
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.127.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9835765957832336,
+        "relative_rms_to_nvfp4": 24498204.0,
+        "absmax": 2494464.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.127.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9952070116996765,
+        "relative_rms_to_nvfp4": 0.09818962961435318,
+        "absmax": 0.11522633582353592
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.127.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9776639938354492,
+        "relative_rms_to_nvfp4": 23085948.0,
+        "absmax": 2523136.0
+      },
+      {
+        "prefix": "thinker.model.layers.23.mlp.experts.127.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9951489567756653,
+        "relative_rms_to_nvfp4": 0.09849424660205841,
+        "absmax": 0.180645152926445
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.0.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.8642816543579102,
+        "relative_rms_to_nvfp4": 7883324.5,
+        "absmax": 2021376.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.0.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953060150146484,
+        "relative_rms_to_nvfp4": 0.098173126578331,
+        "absmax": 0.40875911712646484
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.0.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.8661849498748779,
+        "relative_rms_to_nvfp4": 8032734.5,
+        "absmax": 1949696.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.0.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953347444534302,
+        "relative_rms_to_nvfp4": 0.09838208556175232,
+        "absmax": 0.36129030585289
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.0.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.8715792298316956,
+        "relative_rms_to_nvfp4": 12559623.0,
+        "absmax": 2078720.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.0.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9952259063720703,
+        "relative_rms_to_nvfp4": 0.09847375750541687,
+        "absmax": 0.6829267740249634
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.63.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9786085486412048,
+        "relative_rms_to_nvfp4": 16819742.0,
+        "absmax": 2164736.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.63.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953560829162598,
+        "relative_rms_to_nvfp4": 0.09848307073116302,
+        "absmax": 0.2074074000120163
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.63.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9689889550209045,
+        "relative_rms_to_nvfp4": 17879150.0,
+        "absmax": 2236416.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.63.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953814744949341,
+        "relative_rms_to_nvfp4": 0.0985591784119606,
+        "absmax": 0.20143885910511017
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.63.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.8964039087295532,
+        "relative_rms_to_nvfp4": 17280968.0,
+        "absmax": 2351104.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.63.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9951553344726562,
+        "relative_rms_to_nvfp4": 0.09831655770540237,
+        "absmax": 0.6187845468521118
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.127.gate_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9388858079910278,
+        "relative_rms_to_nvfp4": 16243371.0,
+        "absmax": 2322432.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.127.gate_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9952530860900879,
+        "relative_rms_to_nvfp4": 0.09835248440504074,
+        "absmax": 0.21052631735801697
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.127.up_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.9289053678512573,
+        "relative_rms_to_nvfp4": 14821085.0,
+        "absmax": 2666496.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.127.up_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9953086972236633,
+        "relative_rms_to_nvfp4": 0.09834634512662888,
+        "absmax": 0.4117647111415863
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.127.down_proj",
+        "scale_mode": "multiply",
+        "cosine_to_nvfp4": 0.8571822643280029,
+        "relative_rms_to_nvfp4": 21208632.0,
+        "absmax": 3067904.0
+      },
+      {
+        "prefix": "thinker.model.layers.47.mlp.experts.127.down_proj",
+        "scale_mode": "reciprocal",
+        "cosine_to_nvfp4": 0.9951558113098145,
+        "relative_rms_to_nvfp4": 0.09740658104419708,
+        "absmax": 0.695652186870575
+      }
+    ]
+  },
+  "status": "Scale interpretation verified by component comparison and one reference smoke. Corrected native and full acceptance pending."
+}

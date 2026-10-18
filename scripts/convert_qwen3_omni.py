@@ -91,7 +91,7 @@ def make_plan(records, assets, num_experts, quantization='nvfp4'):
                 raise ValueError(f'FP8 gate/up fusion requires block-aligned rows: {target}')
             add(target + '.weight', 'fp8_block_weight', 'F8_E4M3', [*leading, rows, packed_cols],
                 [[p + '.weight' for p in group] for group in prefixes])
-            add(target + '.weight_scale', 'fp8_block_scale', 'BF16', [*leading, (rows + 127) // 128, (packed_cols + 127) // 128],
+            add(target + '.weight_scale', 'fp8_block_scale', 'F32', [*leading, (rows + 127) // 128, (packed_cols + 127) // 128],
                 [[p + '.weight_scale_inv' for p in group] for group in prefixes])
             descriptor = {'format': 'float8_e4m3fn_block128', 'full_precision_matrix_mult': True}
             if leading:
@@ -177,6 +177,10 @@ def transformed_parts(spec, tensors):
                 raise ValueError(f'Non-finite published FP8 data: {group}')
             if spec['kind'] == 'fp8_block_scale' and not (value > 0).all():
                 raise ValueError(f'Non-positive published FP8 scale: {group}')
+            if spec['kind'] == 'fp8_block_scale':
+                # This pinned publisher stores quantization multipliers, despite
+                # the standard HF dequantization-scale name weight_scale_inv.
+                value = value.float().reciprocal()
             if spec['kind'] == 'pad_dense':
                 value = F.pad(value, (0, spec['shape'][-1] - value.shape[-1]))
         elif spec['kind'] == 'global':
@@ -319,9 +323,11 @@ def convert(source, destination, revision, quantization='nvfp4'):
                   'source_to_target': mapping, 'excluded_speech_tensors': excluded,
                   'expert_order': list(range(config['num_experts'])), 'gate_up_order': ['gate_proj', 'up_proj'],
                   'alignment': 'Zero-extend input columns to multiples of 32',
-                  'precision': {'weights': 'FP8 E4M3 block128, lossless layout conversion' if quantization == 'fp8-block128' else 'FP8 E4M3' if quantization == 'fp8' else 'NVFP4',
+                  'precision': {'weights': 'FP8 E4M3 block128, original weight bytes with normalized inverse scales' if quantization == 'fp8-block128' else 'FP8 E4M3' if quantization == 'fp8' else 'NVFP4',
                                 'activations': 'NVFP4' if quantization == 'nvfp4' else 'BF16',
                                 'cache': 'BF16', 'publisher_w4a8_parity': False}}
+    if quantization == 'fp8-block128':
+        provenance['source_scale_convention'] = 'Decode weight / BF16 weight_scale_inv; native weight_scale stores its FP32 reciprocal.'
     return stream_checkpoint(source, records, plan, destination, provenance)
 
 

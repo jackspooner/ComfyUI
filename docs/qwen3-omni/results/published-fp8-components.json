@@ -156,7 +156,8 @@
         "native_upstream_bf16_equal": true,
         "finite": true
       }
-    ]
+    ],
+    "status": "rejected_source_scale_interpretation"
   },
   "real_source_cuda_projections": {
     "scope": "Eight real source projections on CUDA; not full-model acceptance",
@@ -239,6 +240,8 @@
     ],
     "harness_sha256": "4d3e96521b8003e78123277ba843199b47c7ea7ad96a79e629428b666afcbff0",
     "native_layout_sha256": "5e26c92dbe4325952234bda45e7d16bd357997d801257f8c7618676f5ad2a2c5",
-    "hold_released": true
-  }
+    "hold_released": true,
+    "status": "rejected_source_scale_interpretation"
+  },
+  "source_scale_interpretation_correction": "Historical real-source probes below matched the upstream multiplication decoder but used the wrong publisher scale convention. Source multipliers require division; these probes do not establish valid full-model semantics."
 }
