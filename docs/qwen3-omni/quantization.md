@@ -118,13 +118,13 @@ from the selected revision and measurements, including media and KV workspace.
 
 ## Native loading versus conversion
 
-The converter remains pinned to one verified source inventory. Native projection
+Each converter mode remains pinned to its exact source inventory. Native projection
 loading accepts NVFP4 descriptors/scales or dense BF16/FP16/FP32 tensors in the
 same normalized package. Each weight must match the architecture, including fused
 expert banks and padded vision input columns. Packed weights without descriptors,
 orphan scales, mismatched expert counts and invalid packed/scale layouts fail
-before state loading. An experimental FP8 E4M3 descriptor path is covered by
-synthetic tests; its [original-weight conversion and remaining prerequisites](eight-bit.md)
+before state loading. Experimental scalar and 128×128 block FP8 E4M3 descriptor
+paths are covered by synthetic tests; [published-source packaging and validation](eight-bit.md)
 are separate from the accepted NVFP4 artifact. Other descriptors remain unsupported.
 
 This separation allows mixed dense/NVFP4 native packages without requiring every

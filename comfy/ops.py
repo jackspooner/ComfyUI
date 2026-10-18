@@ -1258,7 +1258,7 @@ def _load_quantized_module(module, super_load, state_dict, prefix, local_metadat
         layout_cls = get_layout_class(module.layout_type)
 
         # Per-format scales; fp8 dtype views handle both legacy uint8-on-disk and native fp8.
-        if module.quant_format in ("float8_e4m3fn", "float8_e5m2"):
+        if module.quant_format in ("float8_e4m3fn", "float8_e5m2", "float8_e4m3fn_block128"):
             scales = {"scale": pop_scale("weight_scale")}
         elif module.quant_format == "mxfp8":
             bs = pop_scale("weight_scale", torch.float8_e8m0fnu)

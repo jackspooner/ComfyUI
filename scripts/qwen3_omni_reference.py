@@ -1,4 +1,4 @@
-"""Offline reconstructed Omni reference. Requires ModelOpt 0.42.0 and Transformers 5.20.0."""
+"""Offline Omni reference using pinned Transformers and source-format decoders."""
 import argparse
 from contextlib import ExitStack
 import importlib.metadata
@@ -16,9 +16,13 @@ from torch.nn import functional as F
 from transformers import Qwen3OmniMoeConfig, Qwen3OmniMoeProcessor, Qwen3OmniMoeThinkerForConditionalGeneration
 from transformers.models.qwen3_omni_moe.modeling_qwen3_omni_moe import (
     Qwen3OmniMoeThinkerTextRotaryEmbedding, Qwen3OmniMoeVisionRotaryEmbedding, SinusoidsPositionEmbedding)
-from modelopt.torch.quantization.qtensor.nvfp4_tensor import NVFP4QTensor
+from transformers.integrations.finegrained_fp8 import Fp8Dequantize
+try:
+    from modelopt.torch.quantization.qtensor.nvfp4_tensor import NVFP4QTensor
+except ImportError:
+    NVFP4QTensor = None
 
-from scripts.qwen3_omni_checkpoint import PROJECTION_SAMPLES, SOURCE_REVISION, SourceTensors, sha256_file, validate_source
+from scripts.qwen3_omni_checkpoint import FP8_REVISION, PROJECTION_SAMPLES, SOURCE_REVISION, SourceTensors, sha256_file, validate_source
 
 
 class PackedLinear(nn.Module):
@@ -40,14 +44,32 @@ class PackedLinear(nn.Module):
 
 class ExpertBank(nn.Module):
     """Preserve upstream expert dispatch; decode only the indexed expert's matrices."""
-    def __init__(self, get_tensor, prefix, count, projections, device):
+    def __init__(self, get_tensor, prefix, count, projections, device, projection_class=PackedLinear):
         super().__init__()
-        self.experts = nn.ModuleList([nn.ModuleList([PackedLinear(get_tensor, f'{prefix}.{i}.{proj}', device)
+        self.experts = nn.ModuleList([nn.ModuleList([projection_class(get_tensor, f'{prefix}.{i}.{proj}', device)
                                                    for proj in projections]) for i in range(count)])
 
     def __getitem__(self, index):
         parts = [projection.decode() for projection in self.experts[int(index)]]
         return torch.cat(parts, dim=0) if len(parts) > 1 else parts[0]
+
+
+class BlockFP8Linear(nn.Module):
+    """Keep source FP8 buffers file-backed on CPU and decode selected matrices."""
+    def __init__(self, get_tensor, prefix, device):
+        super().__init__()
+        self.register_buffer('weight', get_tensor(prefix + '.weight'))
+        self.register_buffer('weight_scale_inv', get_tensor(prefix + '.weight_scale_inv'))
+        self.register_buffer('bias', get_tensor(prefix + '.bias').to(device) if get_tensor.contains(prefix + '.bias') else None)
+        self.compute_device = device
+        self.shape = tuple(self.weight.shape)
+
+    def decode(self, dtype=torch.bfloat16):
+        # This pinned upstream decoder is independent of the native layout.
+        return Fp8Dequantize(None)._dequantize_one(self.weight.to(self.compute_device), self.weight_scale_inv.to(self.compute_device), dtype)
+
+    def forward(self, inputs):
+        return F.linear(inputs, self.decode(inputs.dtype), self.bias)
 
 
 def load_reference(source, device):
@@ -58,17 +80,18 @@ def load_reference(source, device):
         model = Qwen3OmniMoeThinkerForConditionalGeneration(config)
     with ExitStack() as stack:
         get_tensor = SourceTensors(source, stack)
+        projection_class = BlockFP8Linear if get_tensor.contains('thinker.model.layers.0.self_attn.q_proj.weight_scale_inv') else PackedLinear
         for name, module in list(model.named_modules()):
             prefix = 'thinker.' + name
-            if isinstance(module, nn.Linear) and get_tensor.contains(prefix + '.weight_scale'):
+            if isinstance(module, nn.Linear) and (get_tensor.contains(prefix + '.weight_scale') or get_tensor.contains(prefix + '.weight_scale_inv')):
                 parent, attribute = name.rsplit('.', 1)
-                setattr(model.get_submodule(parent), attribute, PackedLinear(get_tensor, prefix, device))
+                setattr(model.get_submodule(parent), attribute, projection_class(get_tensor, prefix, device))
         for i, layer in enumerate(model.model.layers):
             experts = layer.mlp.experts
             for name, projections in [('gate_up_proj', ('gate_proj', 'up_proj')), ('down_proj', ('down_proj',))]:
                 delattr(experts, name)
                 setattr(experts, name, ExpertBank(get_tensor, f'thinker.model.layers.{i}.mlp.experts',
-                                                  config.text_config.num_experts, projections, device))
+                                                  config.text_config.num_experts, projections, device, projection_class))
         for name, parameter in list(model.named_parameters()):
             value = get_tensor('thinker.' + name).to(device=device).clone()
             if list(value.shape) != list(parameter.shape):
@@ -119,16 +142,22 @@ def prepare_case(processor, case):
 
 def component_evidence(source, output, integrity, versions):
     report = {'versions': versions, 'source': integrity, 'device': 'cpu',
-              'decoder': 'ModelOpt NVFP4QTensor.dequantize, fast=False', 'projections': []}
+              'decoder': 'Transformers Fp8Dequantize' if integrity['source_revision'] == FP8_REVISION else 'ModelOpt NVFP4QTensor.dequantize, fast=False', 'projections': []}
     with ExitStack() as stack:
         get_tensor = SourceTensors(source, stack)
         for index, prefix in enumerate(PROJECTION_SAMPLES):
-            projection = PackedLinear(get_tensor, prefix, 'cpu')
-            values = {'fp32': projection.decode(torch.float32), 'bf16': projection.decode(torch.bfloat16)}
+            if get_tensor.contains(prefix + '.weight_scale_inv'):
+                projection = BlockFP8Linear(get_tensor, prefix, 'cpu')
+                values = {'fp32': projection.decode(torch.float32), 'bf16': projection.decode(torch.bfloat16)}
+            elif get_tensor.contains(prefix + '.weight_scale'):
+                projection = PackedLinear(get_tensor, prefix, 'cpu')
+                values = {'fp32': projection.decode(torch.float32), 'bf16': projection.decode(torch.bfloat16)}
+            else:
+                values = {'fp32': get_tensor(prefix + '.weight').float(), 'bf16': get_tensor(prefix + '.weight')}
             path = output / f'projection_{index:02d}.pt'
             torch.save(values, path)
             report['projections'].append({'prefix': prefix, 'file': path.name, 'sha256': sha256_file(path),
-                                          'shape': list(projection.shape)})
+                                          'shape': list(values['bf16'].shape)})
             print(prefix, 'decoded', flush=True)
     (output / 'components.json').write_text(json.dumps(report, indent=2) + '\n')
 
@@ -203,14 +232,16 @@ def main():
     parser.add_argument('--capture-activations', action='store_true', help='Record up to 128 actual input rows per component probe for native benchmarks')
     parser.add_argument('--capture-parity', action='store_true', help='Record encoder features, positions and prefill routing for native parity')
     args = parser.parse_args()
-    versions = {name: importlib.metadata.version(name) for name in ('torch', 'transformers', 'nvidia-modelopt')}
-    if versions['transformers'] != '5.20.0' or versions['nvidia-modelopt'] != '0.42.0':
+    versions = {name: importlib.metadata.version(name) for name in ('torch', 'transformers')}
+    if args.source_revision == SOURCE_REVISION:
+        versions['nvidia-modelopt'] = importlib.metadata.version('nvidia-modelopt')
+    if versions['transformers'] != '5.20.0' or versions.get('nvidia-modelopt', '0.42.0') != '0.42.0':
         raise ValueError(f'Reference dependency pins differ: {versions}')
     args.output.mkdir(parents=True, exist_ok=False)
     torch.set_grad_enabled(False)
     torch.set_num_threads(4)
     _, integrity = validate_source(args.source, args.source_revision)
-    if args.source_revision != SOURCE_REVISION:
+    if args.source_revision not in (SOURCE_REVISION, FP8_REVISION):
         raise ValueError('Unverified reference checkpoint revision')
     if args.components:
         component_evidence(args.source, args.output, integrity, versions)
@@ -227,10 +258,10 @@ def main():
                   'checkpoint_reader': sha256_file(Path(__file__).with_name('qwen3_omni_checkpoint.py')),
                   'upstream_model': sha256_file(inspect.getfile(Qwen3OmniMoeThinkerForConditionalGeneration)),
                   'upstream_processor': sha256_file(inspect.getfile(Qwen3OmniMoeProcessor)),
-                  'modelopt_decoder': sha256_file(inspect.getfile(NVFP4QTensor))},
+                  'weight_decoder': sha256_file(inspect.getfile(Fp8Dequantize if args.source_revision == FP8_REVISION else NVFP4QTensor))},
               'image_input': 'ComfyUI-equivalent FP32 CHW RGB in [0,1]; upstream processor do_rescale=False',
               'audio_padding': 'Minimal whole 160-sample hop, with length above STFT reflection padding',
-              'reference': 'Upstream Transformers with ModelOpt decoded weights; publisher W4A8 parity unverified',
+              'reference': 'Upstream Transformers with independently decoded block FP8 weights, CPU weight offload, BF16 compute/cache; FP8 activation parity unverified' if args.source_revision == FP8_REVISION else 'Upstream Transformers with ModelOpt decoded weights; publisher W4A8 parity unverified',
               'eos_token_id': processor.tokenizer.eos_token_id, 'pad_token_id': processor.tokenizer.pad_token_id, 'cases': []}
     for case in json.loads(args.cases.read_text()):
         inputs, template = prepare_case(processor, case)

@@ -8,7 +8,7 @@ import sys
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.qwen3_omni_checkpoint import SOURCE_REVISION, sha256_file
+from scripts.qwen3_omni_checkpoint import FP8_REVISION, SOURCE_REVISION, sha256_file
 
 
 def difference(actual, expected):
@@ -37,7 +37,7 @@ def main():
     torch.set_num_threads(4)
     reference = json.loads((options.reference / 'results.json').read_text())
     revision = reference.get('source_revision', reference.get('source', {}).get('source_revision'))
-    if revision != SOURCE_REVISION:
+    if revision not in (SOURCE_REVISION, FP8_REVISION):
         raise ValueError('Reference revision differs')
     expected_cases = {case['id']: case for case in reference['cases']}
     report = {'source_revision': revision, 'reference_sha256': sha256_file(options.reference / 'results.json'),

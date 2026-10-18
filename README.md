@@ -159,9 +159,10 @@ diffusion conditioning and Omni history are outside this integration.
 Native packages may mix validated dense and NVFP4 projections; the offline
 converter still targets the pinned source. [Compatibility and upstream assessment](docs/qwen3-omni/upstream-readiness.md)
 records reference blockers, residual precision limits and proposed patch boundaries.
-An experimental original-weight FP8 E4M3 converter/loader has synthetic test
-coverage; full-model execution is pending storage. [Eight-bit preparation](docs/qwen3-omni/eight-bit.md)
-records its exact scope and the outstanding INT8 clarification.
+The experimental FP8 path can preserve the pinned published 128×128 block-scaled
+checkpoint, with BF16 compute/cache and synthetic test coverage. Full-model
+validation is pending. [Eight-bit operation](docs/qwen3-omni/eight-bit.md) records
+source/template pins, conversion, resource requirements and remaining acceptance.
 
 ## Native MOSS-Audio in this fork
 

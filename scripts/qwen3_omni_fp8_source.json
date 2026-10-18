@@ -1,0 +1,131 @@
+{
+  "repo": "marksverdhei/Qwen3-Omni-30B-A3B-FP8",
+  "revision": "042db39a102171d5994b72ab717fade92e80061a",
+  "files": [
+    {
+      "name": "README.md",
+      "bytes": 2428,
+      "sha256": "005c7c0ebe6d69d1814240e4923b93a5f8b4f5cac00cd23d63841ac841380dba"
+    },
+    {
+      "name": "config.json",
+      "bytes": 14097,
+      "sha256": "13d428881ad2a920e79d3cc40a6ed935ced6ded037e3f536710c3f4754f48acb"
+    },
+    {
+      "name": "generation_config.json",
+      "bytes": 146,
+      "sha256": "7fa40989be8e43c078907810c41c25d33747523afce3d5a34d5850f930c886cb"
+    },
+    {
+      "name": "merges.txt",
+      "bytes": 1671839,
+      "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+    },
+    {
+      "name": "model-00001-of-00015.safetensors",
+      "bytes": 3997767184,
+      "sha256": "f696ae48f6c823a4583f96292220e8a444a80378f994dbc2da7dba9658408c43"
+    },
+    {
+      "name": "model-00002-of-00015.safetensors",
+      "bytes": 2500556536,
+      "sha256": "11c79a1bd08ba070fdca2e0f1a7f088a316bc52b6f1991b342f073e4d748fadb"
+    },
+    {
+      "name": "model-00003-of-00015.safetensors",
+      "bytes": 2500556544,
+      "sha256": "c13b856a3db8d69088394e4ed0a71bd75ee261bc71122408b933852925ee84b4"
+    },
+    {
+      "name": "model-00004-of-00015.safetensors",
+      "bytes": 2500559840,
+      "sha256": "9c45e872565e6b94b90f676f018bd718d5cc0470242c3f6b1664ab68f0a4db67"
+    },
+    {
+      "name": "model-00005-of-00015.safetensors",
+      "bytes": 2500559696,
+      "sha256": "c0391162f6af96060f2a71d39d5b398fd208fbaadaf37491f4b857fb5648e002"
+    },
+    {
+      "name": "model-00006-of-00015.safetensors",
+      "bytes": 2500559696,
+      "sha256": "b01061196ad032fef2f2d267c7882203e10b5e14deec1bbf1f89c465297af887"
+    },
+    {
+      "name": "model-00007-of-00015.safetensors",
+      "bytes": 2500559712,
+      "sha256": "c1921d61d727de9a345a2297558c60fd4239cf96ad97bda7bc5c3538162f18b5"
+    },
+    {
+      "name": "model-00008-of-00015.safetensors",
+      "bytes": 2500559720,
+      "sha256": "eff10a8e1107e021dd5c8649852ea893a187c05dc0f11dc9ea50e77fdb4b1d91"
+    },
+    {
+      "name": "model-00009-of-00015.safetensors",
+      "bytes": 2500559720,
+      "sha256": "8b26b577d135123edbbd089613939d954143b310480595e9cc3dbfa7511eeb1d"
+    },
+    {
+      "name": "model-00010-of-00015.safetensors",
+      "bytes": 2500559736,
+      "sha256": "b2f768b082d2dc92d103b59eb3ace7ded9403ea4c4c49064f65e0dcd11f317a3"
+    },
+    {
+      "name": "model-00011-of-00015.safetensors",
+      "bytes": 2500559744,
+      "sha256": "5aed3968f11a8333e05ce9e4b59d4c20c46a3e18291d58f133c5b8fc72228159"
+    },
+    {
+      "name": "model-00012-of-00015.safetensors",
+      "bytes": 2500559744,
+      "sha256": "392ac7ccd657862c318a8a1de018cea13a57bec055f349e2908acc26fe784808"
+    },
+    {
+      "name": "model-00013-of-00015.safetensors",
+      "bytes": 2813342472,
+      "sha256": "1fd08397db5865759db0c597e3923618ade6a2e1028bed9ec82c1f70e22d6bc5"
+    },
+    {
+      "name": "model-00014-of-00015.safetensors",
+      "bytes": 2507095568,
+      "sha256": "3d2ae8a264937eecb485511b77dccb9381dfe48036a028263ce2b56febd0d53d"
+    },
+    {
+      "name": "model-00015-of-00015.safetensors",
+      "bytes": 553698762,
+      "sha256": "f30142d3d5f7494808efd32a8aacb54e9ccbbe771b1f79a0776c4e2b2faeedc3"
+    },
+    {
+      "name": "model.safetensors.index.json",
+      "bytes": 5582756,
+      "sha256": "c95dd293a657611808603f1588455e29d3470773d596f669d8eb91b427d4d5c2"
+    },
+    {
+      "name": "preprocessor_config.json",
+      "bytes": 603,
+      "sha256": "b10e27fd4542cf89ec7145942b87f3e65408d4e9f9d031a29acdd293c15fb3fc"
+    },
+    {
+      "name": "tokenizer_config.json",
+      "bytes": 7344,
+      "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670"
+    },
+    {
+      "name": "vocab.json",
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    },
+    {
+      "name": "chat_template.json",
+      "bytes": 6772,
+      "sha256": "90c1b81f29e41b7642b0cc02c877a10c8bf6751a8d8fa1d16ac9a718cf1c3d86",
+      "repo": "Qwen/Qwen3-Omni-30B-A3B-Instruct",
+      "revision": "26291f793822fb6be9555850f06dfe95f2d7e695"
+    }
+  ],
+  "declared_payload_bytes": 70519637090,
+  "actual_payload_bytes": 37370856674,
+  "auxiliary_assets_note": "Publisher omits the chat template; use the immutable original Instruct template, not original model weights."
+}
