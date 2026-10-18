@@ -191,3 +191,34 @@ def test_insufficient_output_space_does_not_create_partial_files(tmp_path, monke
         converter.stream_checkpoint(tmp_path, records, plan, tmp_path / 'candidate.safetensors', {'source_revision': 'fixture'})
     assert not list(tmp_path.glob('*candidate*'))
     assert not list(tmp_path.glob('.*candidate*'))
+
+
+def test_published_block_fp8_preserves_weights_scales_and_dense_vision_padding(tmp_path):
+    generator = torch.Generator().manual_seed(721)
+    weights = {}
+    for expert in range(2):
+        for projection in ('gate_proj', 'up_proj', 'down_proj'):
+            prefix = f'thinker.model.layers.0.mlp.experts.{expert}.{projection}'
+            weights[prefix + '.weight'] = torch.randint(-12, 13, (128, 256), generator=generator).to(torch.float8_e4m3fn)
+            weights[prefix + '.weight_scale_inv'] = torch.rand(1, 2, generator=generator).bfloat16() + .01
+    weights['thinker.visual.blocks.0.mlp.linear_fc2.weight'] = torch.randn(32, 48, dtype=torch.bfloat16, generator=generator)
+    save_file(weights, tmp_path / 'weights.safetensors')
+    (tmp_path / 'model.safetensors.index.json').write_text(json.dumps({'metadata': {
+        'total_size': sum(v.numel() * v.element_size() for v in weights.values())},
+        'weight_map': {key: 'weights.safetensors' for key in weights}}))
+    records, _ = inspect_source(tmp_path)
+    plan, consumed, excluded = converter.make_plan(records, {}, 2, 'fp8-block128')
+    assert set(consumed) == set(weights) and not excluded
+    destination = tmp_path / 'block-fp8.safetensors'
+    converter.stream_checkpoint(tmp_path, records, plan, destination, {'source_revision': 'fixture'})
+    with safe_open(destination, framework='pt') as result:
+        for expert in range(2):
+            target = 'model.layers.0.mlp.experts.gate_up_proj'
+            for suffix, source_suffix in [('weight', 'weight'), ('weight_scale', 'weight_scale_inv')]:
+                expected = torch.cat([weights[f'thinker.model.layers.0.mlp.experts.{expert}.{p}.{source_suffix}']
+                                      for p in ('gate_proj', 'up_proj')])
+                actual = result.get_tensor(target + '.' + suffix)[expert]
+                assert torch.equal(actual.view(torch.uint8), expected.view(torch.uint8))
+        padded = result.get_tensor('visual.blocks.0.mlp.linear_fc2.weight')
+        assert padded.shape == (32, 64) and not padded[:, 48:].count_nonzero()
+        assert torch.equal(padded[:, :48], weights['thinker.visual.blocks.0.mlp.linear_fc2.weight'])

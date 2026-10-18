@@ -411,7 +411,7 @@ class OmniClipModel(sd1_clip.SDClipModel):
                 descriptor = sd.get(name + '.comfy_quant')
                 if descriptor is not None:
                     descriptor = json.loads(asset_bytes(descriptor))
-                    if not isinstance(descriptor, dict) or descriptor.get('format') not in ('nvfp4', 'float8_e4m3fn'):
+                    if not isinstance(descriptor, dict) or descriptor.get('format') not in ('nvfp4', 'float8_e4m3fn', 'float8_e4m3fn_block128'):
                         raise ValueError(f'Unsupported Qwen3-Omni projection format: {name}; expected NVFP4, FP8 E4M3 or dense floating weights.')
                     required.add(name + '.weight_scale')
                     if descriptor['format'] == 'nvfp4':
@@ -430,10 +430,12 @@ class OmniClipModel(sd1_clip.SDClipModel):
                     raise ValueError(f'Qwen3-Omni projection scales without a quantization descriptor: {name}.')
                 continue
             leading, rows, columns = shape[:-2], shape[-2], shape[-1]
-            if descriptor['format'] == 'float8_e4m3fn':
+            if descriptor['format'] in ('float8_e4m3fn', 'float8_e4m3fn_block128'):
                 scale = sd[name + '.weight_scale']
+                block_scaled = descriptor['format'] == 'float8_e4m3fn_block128'
+                scale_shape = (*leading, (rows + 127) // 128, (columns + 127) // 128) if block_scaled else leading
                 if (weight.dtype != torch.float8_e4m3fn or tuple(weight.shape) != shape
-                        or scale.dtype != torch.float32 or tuple(scale.shape) != leading
+                        or scale.dtype not in ((torch.bfloat16, torch.float32) if block_scaled else (torch.float32,)) or tuple(scale.shape) != scale_shape
                         or descriptor.get('num_experts') != (leading[0] if leading else None)
                         or name + '.weight_scale_2' in sd):
                     raise ValueError(f'Invalid Qwen3-Omni FP8 projection layout or scales: {name}.')

@@ -23,7 +23,7 @@ from transformers import AutoProcessor, Qwen3OmniMoeConfig
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.convert_moss_audio import copy_payload, read_json
-from scripts.qwen3_omni_checkpoint import ORIGINAL_MANIFEST, ORIGINAL_REVISION, SOURCE_MANIFEST, SOURCE_REVISION, SourceTensors, sha256_file, validate_source
+from scripts.qwen3_omni_checkpoint import FP8_MANIFEST, FP8_REVISION, ORIGINAL_MANIFEST, ORIGINAL_REVISION, SOURCE_MANIFEST, SOURCE_REVISION, SourceTensors, sha256_file, validate_source
 from comfy.quant_ops import TensorCoreFP8E4M3Layout
 
 
@@ -68,8 +68,8 @@ def blocked_scales(scales):
 
 
 def make_plan(records, assets, num_experts, quantization='nvfp4'):
-    if quantization not in ('nvfp4', 'fp8'):
-        raise ValueError('Choose nvfp4 preservation or fp8 conversion')
+    if quantization not in ('nvfp4', 'fp8', 'fp8-block128'):
+        raise ValueError('Choose nvfp4 preservation, original fp8 conversion or published fp8-block128 preservation')
     plan, consumed, excluded, expert_prefixes = {}, {}, {}, set()
 
     def add(name, kind, dtype, shape, groups=(), data=None):
@@ -86,6 +86,19 @@ def make_plan(records, assets, num_experts, quantization='nvfp4'):
         rows = sum(records[prefix + '.weight'][2]['shape'][0] for prefix in prefixes[0])
         packed_cols = records[prefixes[0][0] + '.weight'][2]['shape'][1]
         leading = [len(prefixes)] if len(prefixes) > 1 else []
+        if quantization == 'fp8-block128':
+            if len(prefixes[0]) > 1 and any(records[p + '.weight'][2]['shape'][0] % 128 for p in prefixes[0]):
+                raise ValueError(f'FP8 gate/up fusion requires block-aligned rows: {target}')
+            add(target + '.weight', 'fp8_block_weight', 'F8_E4M3', [*leading, rows, packed_cols],
+                [[p + '.weight' for p in group] for group in prefixes])
+            add(target + '.weight_scale', 'fp8_block_scale', 'BF16', [*leading, (rows + 127) // 128, (packed_cols + 127) // 128],
+                [[p + '.weight_scale_inv' for p in group] for group in prefixes])
+            descriptor = {'format': 'float8_e4m3fn_block128', 'full_precision_matrix_mult': True}
+            if leading:
+                descriptor['num_experts'] = len(prefixes)
+            data = json.dumps(descriptor, separators=(',', ':')).encode()
+            add(target + '.comfy_quant', 'embedded', 'U8', [len(data)], data=data)
+            return
         if quantization == 'fp8':
             columns = (packed_cols + 31) // 32 * 32
             groups = [[prefix + '.weight' for prefix in group] for group in prefixes]
@@ -130,9 +143,12 @@ def make_plan(records, assets, num_experts, quantization='nvfp4'):
             for bank, projections in [('gate_up_proj', ('gate_proj', 'up_proj')), ('down_proj', ('down_proj',))]:
                 groups = [[f'{prefix}.{i}.{projection}' for projection in projections] for i in range(num_experts)]
                 quantized(groups, mapped_name(prefix + '.' + bank))
-        elif key.endswith('.weight') and (entry['dtype'] == 'U8' or
+        elif key.endswith('.weight') and (entry['dtype'] in ('U8', 'F8_E4M3') or
                 quantization == 'fp8' and len(entry['shape']) == 2 and not key.endswith(('embed_tokens.weight', 'pos_embed.weight', 'lm_head.weight', 'mlp.gate.weight'))):
             quantized([[key.removesuffix('.weight')]], mapped_name(key.removesuffix('.weight')))
+        elif quantization == 'fp8-block128' and key.endswith('mlp.linear_fc2.weight'):
+            rows, columns = entry['shape']
+            add(mapped_name(key), 'pad_dense', entry['dtype'], [rows, (columns + 31) // 32 * 32], [[key]])
         else:
             add(mapped_name(key), 'copy', entry['dtype'], entry['shape'], [[key]])
     if set(consumed) | set(excluded) != set(records):
@@ -155,6 +171,14 @@ def transformed_parts(spec, tensors):
             else:
                 value = F.pad(value, (0, spec['columns'] - value.shape[1]))
                 value, _ = TensorCoreFP8E4M3Layout.quantize(value.float(), scale=scale)
+        elif spec['kind'] in ('fp8_block_weight', 'fp8_block_scale', 'pad_dense'):
+            value = torch.cat(values, dim=0) if len(values) > 1 else values[0]
+            if spec['kind'] != 'pad_dense' and not torch.isfinite(value.float()).all():
+                raise ValueError(f'Non-finite published FP8 data: {group}')
+            if spec['kind'] == 'fp8_block_scale' and not (value > 0).all():
+                raise ValueError(f'Non-positive published FP8 scale: {group}')
+            if spec['kind'] == 'pad_dense':
+                value = F.pad(value, (0, spec['shape'][-1] - value.shape[-1]))
         elif spec['kind'] == 'global':
             if not torch.isfinite(values[0]).all():
                 raise ValueError(f'Non-finite global scale: {group[0]}')
@@ -262,12 +286,12 @@ def convert(source, destination, revision, quantization='nvfp4'):
         raise ValueError('Destination must have the .safetensors extension')
     if os.path.lexists(destination) or os.path.lexists(destination.with_suffix('.manifest.json')):
         raise FileExistsError(destination)
-    if quantization not in ('nvfp4', 'fp8'):
-        raise ValueError('Choose nvfp4 preservation or fp8 conversion')
-    if revision != {'nvfp4': SOURCE_REVISION, 'fp8': ORIGINAL_REVISION}[quantization]:
+    if quantization not in ('nvfp4', 'fp8', 'fp8-block128'):
+        raise ValueError('Choose nvfp4 preservation, original fp8 conversion or published fp8-block128 preservation')
+    if revision != {'nvfp4': SOURCE_REVISION, 'fp8': ORIGINAL_REVISION, 'fp8-block128': FP8_REVISION}[quantization]:
         raise ValueError('FP8 conversion requires the pinned original Qwen source; NVFP4 preservation requires the pinned ModelOpt source.')
     records, evidence = validate_source(source, revision)
-    if quantization == 'fp8':
+    if quantization in ('fp8', 'fp8-block128'):
         processor = AutoProcessor.from_pretrained(source, local_files_only=True)
         model_config = Qwen3OmniMoeConfig.from_pretrained(source, local_files_only=True).to_dict()
         assets = {'tokenizer_json': processor.tokenizer.backend_tokenizer.to_str().encode(),
@@ -276,7 +300,7 @@ def convert(source, destination, revision, quantization='nvfp4'):
                                                          'feature_extractor': processor.feature_extractor.to_dict()}).encode(),
                   'qwen3_omni_tokenizer_config_json': (source / 'tokenizer_config.json').read_bytes(),
                   'qwen3_omni_chat_template': processor.chat_template.encode(),
-                  'qwen3_omni_quant_config_json': json.dumps({'quantization': 'float8_e4m3fn', 'activations': 'BF16', 'cache': 'BF16'}).encode()}
+                  'qwen3_omni_quant_config_json': json.dumps({'quantization': 'float8_e4m3fn_block128' if quantization == 'fp8-block128' else 'float8_e4m3fn', 'activations': 'BF16', 'cache': 'BF16'}).encode()}
     else:
         assets = {key: (source / filename).read_bytes() for key, filename in ASSETS.items()}
         model_config = read_json(source / 'config.json')
@@ -285,8 +309,9 @@ def convert(source, destination, revision, quantization='nvfp4'):
     root = Path(__file__).resolve().parents[1]
     git = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=root, text=True, capture_output=True)
     dirty = subprocess.run(['git', 'status', '--porcelain', '--', 'scripts/convert_qwen3_omni.py',
-                            'scripts/qwen3_omni_checkpoint.py', 'scripts/qwen3_omni_source.json', 'scripts/qwen3_omni_original_source.json'], cwd=root, text=True, capture_output=True)
-    provenance = {**evidence, 'source_files': read_json(ORIGINAL_MANIFEST if quantization == 'fp8' else SOURCE_MANIFEST)['files'],
+                            'scripts/qwen3_omni_checkpoint.py', 'scripts/qwen3_omni_source.json', 'scripts/qwen3_omni_original_source.json', 'scripts/qwen3_omni_fp8_source.json'], cwd=root, text=True, capture_output=True)
+    source_manifest = {'nvfp4': SOURCE_MANIFEST, 'fp8': ORIGINAL_MANIFEST, 'fp8-block128': FP8_MANIFEST}[quantization]
+    provenance = {**evidence, 'source_files': read_json(source_manifest)['files'],
                   'converter_git_revision': git.stdout.strip() if git.returncode == 0 else None,
                   'converter_sources_dirty': bool(dirty.stdout.strip()) if dirty.returncode == 0 else None,
                   'converter_source_sha256': sha256_file(Path(__file__)),
@@ -294,8 +319,8 @@ def convert(source, destination, revision, quantization='nvfp4'):
                   'source_to_target': mapping, 'excluded_speech_tensors': excluded,
                   'expert_order': list(range(config['num_experts'])), 'gate_up_order': ['gate_proj', 'up_proj'],
                   'alignment': 'Zero-extend input columns to multiples of 32',
-                  'precision': {'weights': 'FP8 E4M3' if quantization == 'fp8' else 'NVFP4',
-                                'activations': 'BF16' if quantization == 'fp8' else 'NVFP4',
+                  'precision': {'weights': 'FP8 E4M3 block128, lossless layout conversion' if quantization == 'fp8-block128' else 'FP8 E4M3' if quantization == 'fp8' else 'NVFP4',
+                                'activations': 'NVFP4' if quantization == 'nvfp4' else 'BF16',
                                 'cache': 'BF16', 'publisher_w4a8_parity': False}}
     return stream_checkpoint(source, records, plan, destination, provenance)
 
@@ -305,7 +330,7 @@ def main():
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--destination', type=Path, required=True)
     parser.add_argument('--source-revision', required=True)
-    parser.add_argument('--quantization', choices=('nvfp4', 'fp8'), default='nvfp4', help='Preserve ModelOpt NVFP4 or quantize original BF16 projections to FP8 E4M3 with BF16 compute/cache')
+    parser.add_argument('--quantization', choices=('nvfp4', 'fp8', 'fp8-block128'), default='nvfp4', help='Preserve pinned NVFP4 or block FP8, or quantize original BF16 projections to FP8; FP8 uses BF16 compute/cache')
     args = parser.parse_args()
     torch.set_num_threads(4)
     result = convert(args.source.resolve(), args.destination.absolute(), args.source_revision, args.quantization)

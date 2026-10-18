@@ -1,0 +1,82 @@
+{
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "device": "cuda",
+  "decoder": "Transformers 5.20.0 Fp8Dequantize",
+  "probes": [
+    {
+      "shape": [
+        1,
+        1536,
+        2048
+      ],
+      "decoded_weights_equal": true,
+      "output_equal": true,
+      "weight_decode_and_bf16_linear_ms": 0.037401598691940305
+    },
+    {
+      "shape": [
+        128,
+        1536,
+        2048
+      ],
+      "decoded_weights_equal": true,
+      "output_equal": true,
+      "weight_decode_and_bf16_linear_ms": 0.04053759872913361
+    },
+    {
+      "shape": [
+        1,
+        2048,
+        768
+      ],
+      "decoded_weights_equal": true,
+      "output_equal": true,
+      "weight_decode_and_bf16_linear_ms": 0.02770400047302246
+    },
+    {
+      "shape": [
+        128,
+        2048,
+        768
+      ],
+      "decoded_weights_equal": true,
+      "output_equal": true,
+      "weight_decode_and_bf16_linear_ms": 0.02168319970369339
+    },
+    {
+      "shape": [
+        1,
+        2048,
+        2048
+      ],
+      "decoded_weights_equal": true,
+      "output_equal": true,
+      "weight_decode_and_bf16_linear_ms": 0.028548800945281984
+    },
+    {
+      "shape": [
+        128,
+        512,
+        2048
+      ],
+      "decoded_weights_equal": true,
+      "output_equal": true,
+      "weight_decode_and_bf16_linear_ms": 0.05438079833984375
+    }
+  ],
+  "scope": "Synthetic CUDA component checks only; no full model or publisher FP8-activation/cache claim",
+  "timestamp": "2026-10-18T22:48:26.822084+00:00",
+  "source_revision": "042db39a102171d5994b72ab717fade92e80061a",
+  "code_sha256": {
+    "comfy/quant_ops.py": "d7c2fcdf68f473a06e4d4f296b9de02627fc50728b81518d0292ebb2debe608b",
+    "comfy/ops.py": "ac2f656fc53203972e92872c71afd101122841209b877ca57b0ea51070531152",
+    "comfy/text_encoders/qwen3_omni.py": "c3aa0c5845c51fe881c0a6f506e312389eeb3857a76355bdbee94d503ac297bb"
+  },
+  "meta_plan": {
+    "planned_native_meta_layout_valid": true,
+    "planned_fp8_modules": 288,
+    "payload_bytes": 33551468278,
+    "model_weights_loaded_or_executed": false
+  },
+  "hold_released": true
+}

@@ -19,7 +19,7 @@ import soundfile as sf
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.qwen3_omni_checkpoint import SOURCE_REVISION, sha256_file
+from scripts.qwen3_omni_checkpoint import FP8_REVISION, SOURCE_REVISION, sha256_file
 from qwen3_omni_lifecycle import check_lifecycle, memory_snapshot
 
 
@@ -61,6 +61,7 @@ def capture(model, tensors=True):
         if not policies:
             quantized = [module for module in model.modules() if getattr(module, 'quant_format', None) == 'nvfp4']
             policies.append({'quantized_modules': len(quantized),
+                             'fp8_block_modules': sum(getattr(module, 'quant_format', None) == 'float8_e4m3fn_block128' for module in model.modules()),
                              'fast_modules': sum(not module._full_precision_mm for module in quantized),
                              'nvfp4_input_passes': sorted({module._nvfp4_input_passes for module in quantized})})
         return original_sample(*args, **kwargs)
@@ -101,7 +102,7 @@ def main():
     parser.add_argument('--model', type=Path, required=True)
     parser.add_argument('--cases', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--precision', choices=('nvfp4', 'decoded-reference'), default='nvfp4')
+    parser.add_argument('--precision', choices=('nvfp4', 'decoded-reference', 'fp8-block128'), default='nvfp4')
     parser.add_argument('--nvfp4-input-passes', type=int, help='Research override for the shared residual activation operation')
     parser.add_argument('--case', action='append', help='Select named frozen cases; may repeat')
     parser.add_argument('--tokens', type=int, help='Explicit smoke/performance budget override, recorded in results')
@@ -115,7 +116,8 @@ def main():
     options.output.mkdir(parents=True, exist_ok=False)
     manifest_path = options.model.with_suffix('.manifest.json')
     manifest = json.loads(manifest_path.read_text())
-    if manifest['source_revision'] != SOURCE_REVISION or sha256_file(options.model) != manifest['output_sha256']:
+    source_revision = FP8_REVISION if options.precision == 'fp8-block128' else SOURCE_REVISION
+    if manifest['source_revision'] != source_revision or sha256_file(options.model) != manifest['output_sha256']:
         raise ValueError('Candidate artifact hash/revision does not match its provenance manifest')
     cases = json.loads(options.cases.read_text())
     if not cases or len({case['id'] for case in cases}) != len(cases) or any(re.fullmatch(r'[A-Za-z0-9_-]+', case['id']) is None for case in cases):
@@ -149,7 +151,7 @@ def main():
     if options.precision == 'decoded-reference':
         # Keep the packed banks; the existing operation decodes one indexed matrix.
         model_options['custom_operations'] = comfy.ops.mixed_precision_ops({}, torch.bfloat16, full_precision_mm=True, disabled=['nvfp4'])
-    elif 'nvfp4' in comfy.ops.get_disabled_quant_formats(device):
+    elif options.precision == 'nvfp4' and 'nvfp4' in comfy.ops.get_disabled_quant_formats(device):
         raise RuntimeError('Accelerated NVFP4 is unavailable; decoded execution is not a production substitute')
     elif options.nvfp4_input_passes is not None:
         model_options['custom_operations'] = comfy.ops.mixed_precision_ops({}, torch.bfloat16, full_precision_mm=True,
@@ -159,7 +161,7 @@ def main():
                     'comfy/quant_ops.py', 'comfy/sd.py', 'comfy/sd1_clip.py', 'comfy/model_management.py',
                     'comfy/model_prefetch.py', 'comfy/model_patcher.py']
     source_hashes = {path: sha256_file(repository / path) for path in source_files}
-    report = {'source_revision': SOURCE_REVISION, 'artifact_sha256': manifest['output_sha256'],
+    report = {'source_revision': source_revision, 'artifact_sha256': manifest['output_sha256'],
               'manifest_sha256': sha256_file(manifest_path), 'cases_sha256': sha256_file(options.cases),
               'harness_sha256': sha256_file(__file__), 'precision': options.precision,
               'gpu': torch.cuda.get_device_name(), 'tokens_override': options.tokens,
@@ -250,6 +252,8 @@ def main():
                 result['decode_tokens_per_second'] = (len(times) - 1) / (times[-1] - times[0])
             if options.precision == 'nvfp4' and (not policies or not policies[0]['fast_modules']):
                 raise RuntimeError('Native run selected decoded execution; accelerated acceptance failed')
+            if options.precision == 'fp8-block128' and (not policies or not policies[0]['fp8_block_modules'] or policies[0]['quantized_modules']):
+                raise RuntimeError('Native run did not use the published FP8 block layout')
             if profile is not None:
                 profile.export_chrome_trace(str(options.output / 'native-trace.json'))
                 result['operator_counts'] = {entry.key: entry.count for entry in profile.key_averages() if 'nvfp4' in entry.key}

@@ -48,6 +48,9 @@ except ImportError as e:
     class QuantizedTensor:
         pass
 
+    class QuantizedLayout:
+        pass
+
     class _CKFp8Layout:
         pass
 
@@ -188,6 +191,50 @@ class TensorCoreFP8E5M2Layout(_TensorCoreFP8LayoutBase):
     FP8_DTYPE = torch.float8_e5m2
 
 
+class BlockWiseFP8E4M3Layout(QuantizedLayout):
+    """128x128 E4M3 weight blocks with floating scales and decoded matmul."""
+
+    Params = _CKFp8Layout.Params if _CK_AVAILABLE else None
+
+    @classmethod
+    def quantize(cls, tensor, scale=None, **kwargs):
+        rows, columns = tensor.shape[-2:]
+        padded = tensor.float()
+        if rows % 128 or columns % 128:
+            padded = torch.nn.functional.pad(padded, (0, -columns % 128, 0, -rows % 128))
+        blocks = padded.reshape(*tensor.shape[:-2], padded.shape[-2] // 128, 128, padded.shape[-1] // 128, 128)
+        if scale is None or isinstance(scale, str) and scale == "recalculate":
+            scale = (blocks.abs().amax(dim=(-3, -1)) / 448).clamp_min(torch.finfo(torch.float32).tiny)
+        scale = scale.to(device=tensor.device, dtype=torch.float32)
+        quantized = (blocks / scale[..., :, None, :, None]).clamp(-448, 448).to(torch.float8_e4m3fn)
+        quantized = quantized.reshape(padded.shape)[..., :rows, :columns].contiguous()
+        return quantized, cls.Params(scale=scale, orig_dtype=tensor.dtype, orig_shape=tuple(tensor.shape))
+
+    @classmethod
+    def dequantize(cls, qdata, params):
+        rows, columns = qdata.shape[-2:]
+        padded = qdata.float()
+        if rows % 128 or columns % 128:
+            padded = torch.nn.functional.pad(padded, (0, -columns % 128, 0, -rows % 128))
+        blocks = padded.reshape(*qdata.shape[:-2], padded.shape[-2] // 128, 128, padded.shape[-1] // 128, 128)
+        # Kitchen's per-tensor FP8 and 32-element E8M0 MXFP8 operations do not
+        # represent these arbitrary floating 128x128 block scales.
+        decoded = (blocks * params.scale[..., :, None, :, None]).reshape(padded.shape)
+        return decoded[..., :rows, :columns].to(params.orig_dtype).contiguous()
+
+    @classmethod
+    def supports_fast_matmul(cls):
+        return False
+
+    @classmethod
+    def get_plain_tensors(cls, qtensor):
+        return qtensor._qdata, qtensor._params.scale
+
+    @classmethod
+    def state_dict_tensors(cls, qdata, params):
+        return {"": qdata, "_scale": params.scale}
+
+
 # Backward compatibility alias - default to E4M3
 TensorCoreFP8Layout = TensorCoreFP8E4M3Layout
 TensorWiseINT8Layout = _CKTensorWiseINT8Layout
@@ -201,6 +248,7 @@ AsymW4A8Int8Layout = _CKAsymW4A8Int8Layout
 register_layout_class("TensorCoreFP8Layout", TensorCoreFP8Layout)
 register_layout_class("TensorCoreFP8E4M3Layout", TensorCoreFP8E4M3Layout)
 register_layout_class("TensorCoreFP8E5M2Layout", TensorCoreFP8E5M2Layout)
+register_layout_class("BlockWiseFP8E4M3Layout", BlockWiseFP8E4M3Layout)
 register_layout_class("TensorCoreNVFP4Layout", TensorCoreNVFP4Layout)
 register_layout_class("TensorWiseINT8Layout", _CKTensorWiseINT8Layout)
 register_layout_class("TensorCoreConvRotW4A4Layout", _CKTensorCoreConvRotW4A4Layout)
@@ -242,6 +290,13 @@ QUANT_ALGOS["int8_tensorwise"] = {
     "quantize_input": False,
 }
 
+QUANT_ALGOS["float8_e4m3fn_block128"] = {
+    "storage_t": torch.float8_e4m3fn,
+    "parameters": {"weight_scale"},
+    "comfy_tensor_layout": "BlockWiseFP8E4M3Layout",
+    "quantize_input": False,
+}
+
 QUANT_ALGOS["convrot_w4a4"] = {
     "storage_t": torch.int8,
     "parameters": {"weight_scale"},
@@ -275,6 +330,7 @@ __all__ = [
     "TensorCoreFP8Layout",
     "TensorCoreFP8E4M3Layout",
     "TensorCoreFP8E5M2Layout",
+    "BlockWiseFP8E4M3Layout",
     "TensorCoreNVFP4Layout",
     "TensorCoreConvRotW4A4Layout",
     "TensorWiseINT8Layout",
