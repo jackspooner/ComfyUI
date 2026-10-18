@@ -32,3 +32,16 @@ def test_block_fp8_requantization_handles_zero_and_unaligned_blocks():
     assert torch.isfinite(params.scale).all() and (params.scale > 0).all()
     actual = BlockWiseFP8E4M3Layout.dequantize(data, params)
     torch.testing.assert_close(actual, weights, atol=0, rtol=0)
+
+
+def test_block_fp8_patch_requantization_honors_seed():
+    weights = torch.randn(131, 257, generator=torch.Generator().manual_seed(420))
+    data, params = BlockWiseFP8E4M3Layout.quantize(weights)
+    original = QuantizedTensor(data, 'BlockWiseFP8E4M3Layout', params)
+    patched = weights + 0.01
+    first = original.requantize_from_float(patched, scale='recalculate', stochastic_rounding=41)
+    repeated = original.requantize_from_float(patched, scale='recalculate', stochastic_rounding=41)
+    different = original.requantize_from_float(patched, scale='recalculate', stochastic_rounding=42)
+    torch.testing.assert_close(first.dequantize(), repeated.dequantize(), atol=0, rtol=0)
+    assert not torch.equal(first.dequantize(), different.dequantize())
+    torch.testing.assert_close(first.dequantize(), patched, atol=0.01, rtol=0.13)
