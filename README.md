@@ -3,6 +3,91 @@
 # ComfyUI
 **The most powerful and modular AI engine for content creation.**
 
+## Native PaddleOCR in this fork
+
+This fork adds **Load PaddleOCR Models → PaddleOCR** for local PP-OCRv6 medium
+text detection and CTC recognition. Native ComfyUI model management owns both
+FP32 models. Outputs include text, region geometry, model scores and preprocessing
+transforms; independent batch images remain separate. Default preprocessing avoids
+enlargement, with an explicit upstream-resize comparison mode. See
+[model setup, node contracts and measured limits](docs/paddleocr.md).
+Worktree preparation for this optional capability uses the normal setup command
+with `--paddleocr` to check its preinstalled OpenCV/torchvision prerequisites.
+Source integration requires activation before new nodes appear in a running
+service. Checkpoint validation supports lazy weight allocation; OCR requests FP32
+attention through the selected dispatcher. Recognition errors remain visible;
+no production advert route is added. RTX 5090 advert tests read all five supplied
+text lines correctly with official preprocessing; the tiny circular badge fails.
+
+## Native GLM-OCR in this fork
+
+This fork adds the official Z.ai GLM-OCR recognizer through **Load CLIP → Generate
+Text**, using ComfyUI's native model loading, attention, prefetch and memory owners.
+It processes one original-pixel image/crop with padding and no enlargement, and
+adds a raw decoded-text output. See [setup, conversion and limits](docs/glm-ocr.md).
+Bounded GPU lifecycle checks passed, but the Almay badge failed literal accuracy;
+the production OCR route remains unconfigured. See the linked acceptance limits.
+
+## Native text conversations in this fork
+
+This fork also adds optional text conversation history and exact context budgets
+to the existing **Load CLIP → Generate Text** path for native Qwen3.5/Qwen3.8 and
+MOSS. History is explicit JSON input/output; saving it belongs to the caller.
+Existing single-prompt and media paths remain available. See
+[native text conversations](docs/text-conversations.md) for prerequisites,
+contracts, examples, limits and verification. This source capability requires
+deployment before it appears in a running ComfyUI process.
+
+## Fork: Krea 2 inference
+
+This fork builds on [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+and its [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
+Upstream provides the node graph, model loading, sampling and local image,
+audio and video generation documented below; upstream credits and licenses remain.
+
+Krea 2 uses the shared attention dispatcher's grouped-query support without
+expanding K/V heads in the model, and projects only target tokens at the output.
+The paired Krea2 Edit source-patch update prepares static text fusion once per
+conditioning during sampling preparation. Update both repositories together;
+existing workflow sockets and checkpoint layouts are unchanged. Hooks and dynamic
+patches retain per-step fusion. See [Krea 2 editing efficiency](docs/krea2-edit-efficiency.md)
+for setup, tests and limitations. These changes do not alter other model families.
+
+## Local MiniMax H3 workflows and acceleration
+
+This installation uses [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+and its [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md):
+the node graph UI/API, local image/audio/video inference, model loading and
+memory management described below are upstream functionality.
+
+The saved **MiniMax H3 - 360 Orbit** workflow uses Pablo Dawson's orbit LoRA
+with the same image at both endpoints, 768×768, 73 frames and 28 steps. Open it
+from the Workflows sidebar and press Run; the default input is the latest toy-house
+image from this installation. It saves silent MP4 video under `output/360_orbit`.
+See the [recipe, model requirements and recovery guide](docs/minimax-h3-360-orbit.md)
+and the repository-owned [agent skill](skills/minimax-h3-360-orbit/SKILL.md).
+The graph passed prompt validation and a complete house render on 7 October 2026
+(73 frames at 24 fps, 768×768, no audio track; about 73 seconds on this host).
+The author's training examples are human-centric, so object orbit quality is not
+established by the model card.
+
+The local Linux RTX 5090 installation additionally includes
+[ComfyUI-Sol-H3](https://github.com/xmarre/ComfyUI-Sol-H3) v0.1.9, pinned at
+`09a3320205512cd87f6110397fca1e25c19f5536`. Its Exact Runtime and experimental
+Sana/CuTe sparse attention are available as MODEL patch nodes. In an existing
+native H3 graph, connect the model after other patches through **Sol-H3 Exact
+Runtime**, or **Sol-H3 SOL Attention (Experimental)**, before the sampler.
+The latter includes Exact Runtime and defaults to one dense evaluation and two
+dense leading layers. Sparse attention approximates the dense result.
+
+GPU kernel and native model-patcher checks passed on 7 October 2026; full-sized
+render quality and end-to-end speed have not been measured here. Existing router
+`sol` selections still use the separate `SolAttnPatch` Triton extension. NVIDIA's
+standalone Sol Engine is not installed by this node pack. See the
+[local setup and recovery notes](../services/infrastructure/Workspace2LinuxDeployment/docs/minimax-h3-sol.md)
+for dependencies, verification, limitations and rollback. Upstream credit and
+licensing remain with the projects linked above.
+
 
 [![Website][website-shield]][website-url]
 [![Dynamic JSON Badge][discord-shield]][discord-url]

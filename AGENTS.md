@@ -395,6 +395,15 @@ Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_workt
 
 Prepare the exact worktree GitNexus index separately after setup with embeddings disabled. Operating guidance belongs to the existing shared ComfyUI model-runtimes skill; do not register temporary worktrees as shared skill sources.
 
+### Optional native PaddleOCR
+
+For native PP-OCRv6 work, add `--paddleocr` to the setup command. It checks
+preinstalled OpenCV Python, NumPy and torchvision without installing packages or
+loading models. Run `python -m pytest tests-unit/comfy_test/paddleocr_test.py -q`
+with the prepared interpreter. `docs/paddleocr.md` documents the offline reference
+harness, pinned models, node contracts and acceptance limits. Update the existing
+authoritative `comfyui` and `comfyui-model-runtimes` skills for capability changes.
+
 ### Optional Trellis2 mesh encoder
 
 For mesh-encoder work, use the same setup command with `--trellis-mesh` and
@@ -403,3 +412,15 @@ CPU extension; no downloads or package installs occur. See
 `docs/trellis2-mesh-texturing.md` for compiler/PyTorch prerequisites and tests.
 The shared authoritative `comfyui` skill owns this workflow operating guidance;
 extend it alongside this capability rather than creating a per-model skill.
+
+### Text conversation verification
+
+Native Qwen35 and MOSS TextGenerate history is documented in
+`docs/text-conversations.md`. Use the prepared interpreter to run
+`python -m pytest tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q`.
+Run broader required checks and report external/runtime limitations. The shared
+`comfyui` skill owns operating guidance; locate its authoritative source with
+`skills show comfyui` and update it alongside capability changes. Reconcile
+discovery after integration; never register task worktrees globally. History is
+explicit data, without model-owned sessions, persistent GPU caches or implicit
+trimming. Setup must not restart services.

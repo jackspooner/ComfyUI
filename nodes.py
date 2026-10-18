@@ -2551,6 +2551,7 @@ async def init_builtin_extra_nodes():
         "nodes_mesh_io.py",
         "nodes_moge.py",
         "nodes_mediapipe.py",
+        "nodes_paddleocr.py",
         "nodes_gaussian_splat.py",
         "nodes_camera.py",
         "nodes_camera_angle.py",
