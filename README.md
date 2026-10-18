@@ -135,9 +135,9 @@ The [Qwen3-Omni project documents](docs/qwen3-omni/README.md) define a planned
 native CLIP integration using the community NVFP4 Instruct checkpoint: text,
 audio and image inputs, including combined inputs, with text output through
 Generate Text. The converter, reference tools and native adapter are implemented
-on the project branch. Component tests and a reconstructed GPU reference exist;
-native package loading, precision acceptance and installation remain under
-validation with the local acceptance harness. See the
+on the project branch. Component tests and a reconstructed GPU reference exist.
+The single-file package loads with its embedded tokenizer; full-model native
+parity, precision acceptance and installation remain under validation. See the
 [checkpoint findings, command and unresolved gates](docs/qwen3-omni/status.md).
 
 ## Native MOSS-Audio in this fork

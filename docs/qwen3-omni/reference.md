@@ -133,6 +133,23 @@ budget override, including zero for automatic capacity. `--profile` writes a tra
 for the first case. Captures/profiling affect timings; measure performance separately.
 The harness uses the same dynamic allocator and native CLIP generation owners as
 serving ComfyUI, without changing the running service, configuration or weights.
+It rechecks the serving queue after integrity verification and stops its own
+process-local generation if queued/running work appears. `contention.json`
+preserves the conflicting prompt IDs; do not count an interrupted case as an
+accepted result. `--comfy-url` selects the queue endpoint. A separate caller still
+owns acquiring and releasing the validation hold after confirmed process exit.
+
+For an experimental activation policy, `--nvfp4-input-passes N` selects the
+shared operation explicitly. One pass is the unchanged shared default. Additional
+passes quantize the remaining activation error, run existing NVFP4 CUDA matmuls
+with FP16 outputs, sum in FP32, add bias once and return the compute dtype. No
+weight matrix is decoded or requantized by this operation. This is not a claim
+to reproduce publisher W4A8 execution. Two-pass probes still fail speech
+classification; the three-pass FP16-output probe passes that case, but requires
+full-suite, lifecycle and resource acceptance before model-default selection.
+The harness records inference-source hashes and refuses source changes during
+evaluation. First-token/decode timing and the fast-operation policy are collected
+even without `--capture`; use that mode for performance runs.
 
 Keep failed run directories and reports. Resolve an uncertain process outcome
 before releasing its exact validation hold or retrying with a new destination.
