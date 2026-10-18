@@ -632,6 +632,11 @@ OMP_NUM_THREADS=1 "$COMFYUI_PYTHON" -m pytest -q tests-unit/comfy_test/test_pinn
 The tests inject registration/eviction and prefetch failures without GPU work.
 Live CUDA inference and capacity limits require separate acceptance testing.
 
+The [upstream contribution assessment](docs/upstream-memory-recovery/assessment.md)
+isolates these repairs against upstream `872eb6a3`, with independent regression
+results, related-PR overlap and proposed submission text. These are prepared
+candidates; no upstream PR or serving-checkout integration is part of the assessment.
+
 ## Local fork: existing-mesh Trellis2 texturing
 
 `Trellis2 VAE Encode Mesh` encodes an existing mesh (including a TripoSplat-derived
