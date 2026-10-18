@@ -83,6 +83,7 @@ import comfy.text_encoders.qwen35
 import comfy.text_encoders.qwen3vl
 import comfy.text_encoders.moss_audio
 import comfy.text_encoders.glm_ocr
+import comfy.text_encoders.qwen3_omni
 import comfy.text_encoders.minimax
 import comfy.text_encoders.minimax_music
 import comfy.text_encoders.yue2
@@ -1638,6 +1639,7 @@ class CLIPType(Enum):
     YUE2 = 36
     FLUX3 = 37
     MOSS_AUDIO = 38
+    QWEN3_OMNI = 39
 
 
 
@@ -1698,6 +1700,7 @@ class TEModel(Enum):
     MING_IMAGE = 38
     MOSS_AUDIO = 39
     GLM_OCR = 40
+    QWEN3_OMNI = 41
 
 
 def detect_te_model(sd):
@@ -1780,6 +1783,13 @@ def detect_te_model(sd):
                      "visual.downsample.weight": 1536, "model.norm.weight": 1536}
     if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in glm_signature.items()):
         return TEModel.GLM_OCR
+    omni_signature = {'audio_tower.conv_out.weight': 1280, 'visual.merger.linear_fc2.weight': 2048,
+                      'visual.deepstack_merger_list.0.norm.weight': 4608,
+                      'model.layers.47.self_attn.q_norm.weight': 128, 'model.norm.weight': 2048,
+                      'model.layers.0.mlp.experts.gate_up_proj.weight': 128}
+    if (all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in omni_signature.items())
+            and all(key in sd for key in comfy.text_encoders.qwen3_omni.ASSET_KEYS)):
+        return TEModel.QWEN3_OMNI
     if "model.layers.0.post_attention_layernorm.weight" in sd:
         weight = sd['model.layers.0.post_attention_layernorm.weight']
         if 'model.layers.0.self_attn.q_norm.weight' in sd:
@@ -1990,6 +2000,13 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.clip = comfy.text_encoders.glm_ocr.te(dtype_llama=clip_data[0]['model.norm.weight'].dtype)
             clip_target.tokenizer = comfy.text_encoders.glm_ocr.GlmOCRTokenizer
             tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
+        elif te_model == TEModel.QWEN3_OMNI:
+            tokenizer_data.update({key: clip_data[0].pop(key) for key in comfy.text_encoders.qwen3_omni.ASSET_KEYS})
+            model_config = json.loads(comfy.text_encoders.qwen3_omni.asset_bytes(tokenizer_data['qwen3_omni_config_json']))
+            processor_config = json.loads(comfy.text_encoders.qwen3_omni.asset_bytes(tokenizer_data['qwen3_omni_processor_json']))
+            config = {'thinker_config': model_config['thinker_config'], 'processor_config': processor_config}
+            clip_target.clip = comfy.text_encoders.qwen3_omni.te(config, **llama_detect(clip_data))
+            clip_target.tokenizer = comfy.text_encoders.qwen3_omni.Qwen3OmniTokenizer
         elif te_model == TEModel.QWEN3_4B:
             if clip_type == CLIPType.FLUX or clip_type == CLIPType.FLUX2:
                 clip_target.clip = comfy.text_encoders.flux.klein_te(**llama_detect(clip_data), model_type="qwen3_4b")

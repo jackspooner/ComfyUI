@@ -3,7 +3,8 @@
 [Project index](README.md) · updated 18 October 2026
 
 The selected checkpoint is downloaded. The offline converter is implemented and
-its synthetic integrity/publication checks pass. Native loading, full-artifact
+its synthetic integrity/publication checks pass. The native adapter is implemented
+and component parity tests pass. Full native loading, full-artifact
 validation, accelerated execution, multimodal acceptance and deployment are
 **not complete**. The storage diagnostic does not install a model or declare M1
 passed.
@@ -39,9 +40,35 @@ run continued past its end token because standalone Thinker generation inherited
 no EOS setting; that run is not accepted as EOS parity. Reference generation now
 binds EOS and padding to the embedded tokenizer. The incomplete first acceptance
 run was stopped and retained with its reason. The corrected suite returned `12`
-for `text_arithmetic` and stopped at EOS after 69.39 seconds on CPU; the remaining
-cases are running.
-No CPU result establishes GPU performance or multimodal quality.
+for `text_arithmetic` and stopped at EOS after 69.39 seconds on CPU. Three CPU text
+cases completed before that incomplete run was stopped for the available GPU
+window. No CPU result establishes GPU performance or multimodal quality.
+
+The [reconstructed GPU reference](results/reconstructed-reference-pil.json)
+completed all 24 frozen cases using the original PIL image input convention;
+20 met their assertions. The source returned empty answers for Unicode copying
+and the sign, hallucinated a tone in silence, and misread the sign in the combined
+batch. It also invented a buzzer after audio was removed; that case's image
+assertion passed but does not excuse the hallucination. These are source-model
+limitations, not successful native acceptance. Image/audio replacement changed
+the corresponding observations. All 33 actual activation probes were captured.
+
+The [native kernel comparison](results/native-captured-kernels.json) covers
+99 synthetic and 99 captured projection/shape combinations per backend. The
+CUDA NVFP4 path was eligible for all cases and handled zero inputs exactly.
+Median captured quantize-plus-matmul time was 118.8 microseconds CUDA versus
+409.2 microseconds eager; worst relative RMSE against BF16 decoded-weight matmul
+was 0.1112. Eager failed the all-zero-input check and is not a production candidate.
+These component timings include Python dispatch and do not predict generation
+throughput. Activation precision still requires full-model acceptance.
+
+The reconstructed harness now aligns inputs with ComfyUI's FP32 RGB image
+representation, retains upstream processor math with rescaling disabled, and
+minimally pads audio to a complete hop above the STFT reflection minimum. The
+PIL results above remain labelled as that earlier input convention; they must
+not be used as exact pixel-feature parity for the updated convention. New runs
+can capture encoder features, positions and routing and record executable-source
+hashes. A string-path reporting failure was fixed without changing source files.
 
 Actual ModelOpt decoding now numerically matches native FP32 decoding on 33
 projections, including a 4,304-column vision down projection. The CPU native BF16
@@ -50,6 +77,17 @@ full-model differences require separate evaluation. Twenty-four functional
 fixtures (six per modality group) are frozen outside Git, with checksums and audio
 attribution, including independent modality replacement/removal. Upstream
 tokenization/preprocessing executes for text, audio, image and combined fixtures.
+
+The native adapter uses existing expert banks, Qwen generation/attention, vision
+patch/merger components, ComfyAttention containers, optimized operations and
+prefetch. The existing CLIP generation owner enables supported accelerated
+quantized matmul for the duration of generation; the factory preserves its
+default policy. Tiny FP32 reference
+tests cover routing, prefill/cached decoding, DeepStack, both encoders, padded
+vision columns, non-square batches, modality positions and detector near misses.
+Full-artifact inference, BF16/activation precision, lifecycle and live queue
+acceptance remain pending. Existing targeted regressions passed (85 tests); the
+optional MOSS module was subsequently run in its isolated environment (14 passed).
 
 The converter uses the verified transformations, fuses expert banks only when
 global scales match, embeds inference assets, inventories excluded speech weights

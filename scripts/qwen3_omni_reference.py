@@ -2,6 +2,7 @@
 import argparse
 from contextlib import ExitStack
 import importlib.metadata
+import inspect
 import json
 from pathlib import Path
 import time
@@ -91,7 +92,11 @@ def load_reference(source, device):
 
 def prepare_case(processor, case):
     content = []
-    images = [Image.open(path).convert('RGB') for path in case.get('images', [])]
+    images = [torch.from_numpy(np.array(Image.open(path).convert('RGB'))).permute(2, 0, 1).float() / 255
+              for path in case.get('images', [])]
+    if case.get('image_tensor'):
+        batch = torch.from_numpy(np.load(case['image_tensor'], allow_pickle=False))
+        images = list(batch.permute(0, 3, 1, 2).unbind())
     content.extend({'type': 'image', 'image': image} for image in images)
     audio = None
     if case.get('audio'):
@@ -99,8 +104,8 @@ def prepare_case(processor, case):
         if rate != 16000:
             raise ValueError('Reference fixtures must supply independently resampled 16 kHz audio')
         audio = audio.mean(axis=1)
-        if len(audio) <= 200:
-            audio = np.pad(audio, (0, 201 - len(audio)))
+        padded_length = (max(201, len(audio)) + 159) // 160 * 160
+        audio = np.pad(audio, (0, padded_length - len(audio)))
         content.append({'type': 'audio', 'audio': audio})
     content.append({'type': 'text', 'text': case['prompt']})
     messages = []
@@ -109,7 +114,7 @@ def prepare_case(processor, case):
     messages.append({'role': 'user', 'content': content})
     text = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False, enable_thinking=False)
     return processor(text=text, images=images or None, audio=[audio] if audio is not None else None,
-                     return_tensors='pt', padding=True), text
+                     return_tensors='pt', padding=True, do_rescale=False), text
 
 
 def component_evidence(source, output, integrity, versions):
@@ -160,6 +165,33 @@ def capture_activations(model):
     return values, handles
 
 
+def capture_parity(model):
+    values, handles = {}, []
+
+    def audio_hook(module, args, output):
+        values['audio_features'] = output.last_hidden_state.detach().cpu().clone()
+
+    def vision_hook(module, args, output):
+        values['vision_features'] = output.pooler_output.detach().cpu().clone()
+        for index, features in enumerate(output.deepstack_features):
+            values[f'vision_deepstack_{index}'] = features.detach().cpu().clone()
+
+    def position_hook(module, args):
+        if 'position_ids' not in values:
+            values['position_ids'] = args[1].detach().cpu().clone()
+
+    handles.append(model.audio_tower.register_forward_hook(audio_hook))
+    handles.append(model.visual.register_forward_hook(vision_hook))
+    handles.append(model.model.rotary_emb.register_forward_pre_hook(position_hook))
+    for index, layer in enumerate(model.model.layers):
+        def router_hook(module, args, output, index=index):
+            if f'router_{index}_indices' not in values:
+                for name, value in zip(('logits', 'weights', 'indices'), output):
+                    values[f'router_{index}_{name}'] = value.detach().cpu().clone()
+        handles.append(layer.mlp.gate.register_forward_hook(router_hook))
+    return values, handles
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
@@ -169,6 +201,7 @@ def main():
     parser.add_argument('--device', choices=('cpu', 'cuda'), default='cuda')
     parser.add_argument('--components', action='store_true', help='Decode fixed component probes on CPU instead of loading the full model')
     parser.add_argument('--capture-activations', action='store_true', help='Record up to 128 actual input rows per component probe for native benchmarks')
+    parser.add_argument('--capture-parity', action='store_true', help='Record encoder features, positions and prefill routing for native parity')
     args = parser.parse_args()
     versions = {name: importlib.metadata.version(name) for name in ('torch', 'transformers', 'nvidia-modelopt')}
     if versions['transformers'] != '5.20.0' or versions['nvidia-modelopt'] != '0.42.0':
@@ -190,6 +223,13 @@ def main():
     model = load_reference(args.source, args.device)
     activations, handles = capture_activations(model) if args.capture_activations else ({}, [])
     report = {'versions': versions, 'source': integrity, 'dtype': 'bfloat16',
+              'source_code_sha256': {'harness': sha256_file(__file__),
+                  'checkpoint_reader': sha256_file(Path(__file__).with_name('qwen3_omni_checkpoint.py')),
+                  'upstream_model': sha256_file(inspect.getfile(Qwen3OmniMoeThinkerForConditionalGeneration)),
+                  'upstream_processor': sha256_file(inspect.getfile(Qwen3OmniMoeProcessor)),
+                  'modelopt_decoder': sha256_file(inspect.getfile(NVFP4QTensor))},
+              'image_input': 'ComfyUI-equivalent FP32 CHW RGB in [0,1]; upstream processor do_rescale=False',
+              'audio_padding': 'Minimal whole 160-sample hop, with length above STFT reflection padding',
               'reference': 'Upstream Transformers with ModelOpt decoded weights; publisher W4A8 parity unverified',
               'eos_token_id': processor.tokenizer.eos_token_id, 'pad_token_id': processor.tokenizer.pad_token_id, 'cases': []}
     for case in json.loads(args.cases.read_text()):
@@ -197,9 +237,14 @@ def main():
         inputs = inputs.to(args.device)
         # The HF processor returns FP32 media; upstream encoder owners select compute dtype.
         start = time.perf_counter()
-        output = model.generate(**inputs, max_new_tokens=case.get('max_new_tokens', 512), do_sample=False,
-                                use_cache=True, return_dict_in_generate=True, output_logits=True,
-                                eos_token_id=processor.tokenizer.eos_token_id, pad_token_id=processor.tokenizer.pad_token_id)
+        parity, parity_handles = capture_parity(model) if args.capture_parity else ({}, [])
+        try:
+            output = model.generate(**inputs, max_new_tokens=case.get('max_new_tokens', 512), do_sample=False,
+                                    use_cache=True, return_dict_in_generate=True, output_logits=True,
+                                    eos_token_id=processor.tokenizer.eos_token_id, pad_token_id=processor.tokenizer.pad_token_id)
+        finally:
+            for handle in parity_handles:
+                handle.remove()
         if args.device == 'cuda':
             torch.cuda.synchronize()
         ids = output.sequences[0, inputs.input_ids.shape[-1]:].tolist()
@@ -217,10 +262,13 @@ def main():
                                 for alternatives in case.get('assert_all', [])]
         result['fixture_passed'] = all(assertion['passed'] for assertion in result['assertions'])
         evidence = {key: value.cpu() for key, value in inputs.items() if isinstance(value, torch.Tensor)}
+        evidence.update(parity)
         evidence['decode_logits'] = torch.stack([value[0].float().cpu() for value in output.logits[:8]])
         torch.save(evidence, args.output / (case['id'] + '.pt'))
         if case.get('audio'):
             result['audio'] = {'path': case['audio'], 'sha256': sha256_file(case['audio'])}
+        if case.get('image_tensor'):
+            result['image_tensor'] = {'path': case['image_tensor'], 'sha256': sha256_file(case['image_tensor'])}
         for key in ('image_grid_thw', 'feature_attention_mask'):
             if key in inputs:
                 result[key] = inputs[key].tolist()
