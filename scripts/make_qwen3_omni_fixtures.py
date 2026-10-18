@@ -8,6 +8,9 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from scipy.signal import resample_poly
 import soundfile as sf
+import torch
+
+import comfy.utils
 
 
 def make_fixtures(destination, audio_source):
@@ -94,12 +97,25 @@ def make_fixtures(destination, audio_source):
         cases.append(case)
     for case in cases:
         case['max_new_tokens'] = 96
+        if case.get('images'):
+            tensors = [torch.from_numpy(np.array(Image.open(path).convert('RGB'))).float().unsqueeze(0) / 255
+                       for path in case['images']]
+            first = tensors[0]
+            for index in range(1, len(tensors)):
+                if tensors[index].shape[1:] != first.shape[1:]:
+                    tensors[index] = comfy.utils.common_upscale(tensors[index].movedim(-1, 1), first.shape[2], first.shape[1],
+                                                               'bilinear', 'center').movedim(1, -1)
+            path = destination / (case['id'] + '-images.npy')
+            np.save(path, torch.cat(tensors).numpy(), allow_pickle=False)
+            case['image_tensor'] = str(path)
     (destination / 'cases.json').write_text(json.dumps(cases, indent=2) + '\n')
     attribution = ['5703-47212-0000.txt', 'sorohanro_-_solo-trumpet-06.txt',
                    '456440__inspectorj__bird-whistling-robin-single-13.txt']
     (destination / 'credits.txt').write_text('\n\n'.join((audio_source / name).read_text() for name in attribution))
     hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in destination.iterdir()}
-    (destination / 'manifest.json').write_text(json.dumps({'files': hashes,
+    (destination / 'manifest.json').write_text(json.dumps({'fixture_version': 2, 'files': hashes,
+        'image_input': 'Frozen FP32 BHWC IMAGE tensors; mixed source dimensions assembled with ComfyUI ImageBatch bilinear/center behavior.',
+        'batch_utility_sha256': hashlib.sha256(Path(comfy.utils.__file__).read_bytes()).hexdigest(),
         'audio_source': str(audio_source), 'credits': 'Speech: LibriSpeech/SLR12 CC-BY 4.0; trumpet: sorohanro_; birds: InspectorJ. Preserve original fixture attribution sidecars.',
         'synthetic_assets': 'Images, silence, tone and clicks created locally by this script.'}, indent=2) + '\n')
     return cases

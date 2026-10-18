@@ -67,7 +67,7 @@ def inspect_source(source):
 
 def sha256_file(path):
     digest = hashlib.sha256()
-    with path.open('rb') as stream:
+    with Path(path).open('rb') as stream:
         while chunk := stream.read(8 * 1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()

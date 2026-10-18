@@ -3,11 +3,13 @@
 [Project index](README.md)
 
 M0 preparation is complete in the resumed worktree. M1 now has a verified complete
-source inventory, actual ModelOpt decoding and a reconstructed full-model CPU
-text smoke result. Accelerated execution and multimodal acceptance remain pending.
+source inventory, actual ModelOpt decoding, a reconstructed full-model GPU fixture
+run and a viable accelerated CUDA candidate. Full native precision acceptance
+remains pending.
 M2's converter code and isolated tests are implemented; full-artifact validation
-and installation remain pending. See [execution evidence](status.md). M3–M6 remain
-pending.
+and installation remain pending. M3/M4 adapter code and FP32 component tests are
+implemented; full-model and installation acceptance remain pending. See
+[execution evidence](status.md). M5/M6 remain pending.
 
 | Milestone | Work | Exit evidence |
 | --- | --- | --- |

@@ -49,12 +49,23 @@ tensors plus checksummed provenance. It includes attention, both encoder familie
 a vision projection requiring alignment padding and gate/up/down from nine experts.
 It never materializes a full decoded model.
 
-Prepare the six-case-per-modality suite with the repository fixture tool's `--help`
-options. Its audio inputs must be local licensed speech, music and bird recordings
+Prepare the six-case-per-modality suite with the prepared ComfyUI interpreter:
+
+```bash
+/path/to/prepared/python -m scripts.make_qwen3_omni_fixtures \
+  --audio-fixtures /absolute/path/to/licensed-audio-fixtures \
+  --output /absolute/path/to/new-fixtures
+```
+
+Its audio inputs must be local licensed speech, music and bird recordings
 with attribution sidecars. The tool creates synthetic images, silence, tones and
-clicks, resamples clips to 16 kHz, and records all hashes and credits. Freeze the
-manifest before comparing precision candidates. Fixtures include separate image
-and audio removal/replacement and multiple-image order checks.
+clicks, resamples clips to 16 kHz, and records all hashes and credits. Version 2
+also freezes FP32 BHWC IMAGE arrays. Mixed source dimensions use the existing
+ImageBatch bilinear/center operation before freezing, so both implementations
+receive the same ordinary IMAGE batch. It records the batch utility's source hash.
+Freeze the manifest before comparing precision candidates. Fixtures include
+separate image/audio removal/replacement and multiple-image order checks. Keep
+the original scouting fixtures/results labelled with their earlier convention.
 
 Run reference generation with those frozen cases:
 
@@ -63,13 +74,19 @@ HF_HUB_OFFLINE=1 /path/to/reference/python -m scripts.qwen3_omni_reference \
   --source /absolute/path/to/checkpoint \
   --source-revision 0ed3aa2b00eeedbb0d38b6d4738f506af759213b \
   --cases /absolute/path/to/fixtures/cases.json \
+  --capture-activations --capture-parity \
   --device cpu --output /absolute/path/to/new-reference-results
 ```
 
 The source template receives images in order, audio, then text, with thinking
-disabled. Generation binds EOS/padding to the source tokenizer, records expanded
-IDs, media features, up to eight decoding logits, answers, assertions and elapsed
-times. A fluent answer or a component match is not full-model parity. Source-model
+disabled. Images enter the upstream processor as FP32 RGB with rescaling disabled;
+audio is minimally padded to a full hop above the STFT reflection minimum.
+Generation binds EOS/padding to the source tokenizer, records expanded IDs,
+media features, up to eight decoding logits, answers, assertions and elapsed
+times. The optional capture flags record component activations, encoder features,
+positions and prefill routing. Source-code hashes identify the executed harness,
+upstream model/processor and actual ModelOpt decoder. A fluent answer or a
+component match is not full-model parity. Source-model
 fixture failures must be recorded separately from native integration failures.
 
 ## Native operation comparison

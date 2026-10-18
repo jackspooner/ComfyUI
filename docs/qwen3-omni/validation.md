@@ -4,8 +4,10 @@
 
 Status: complete source accounting, actual ModelOpt component decoding and 24
 synthetic integrity tests pass. The reconstructed reference has passed its first
-text/EOS fixture; its full CPU fixture run is in progress. GPU, native-model and
-live acceptance remain pending. See [recorded evidence](status.md) and
+text/EOS fixtures. The reconstructed GPU reference completed all 24 cases (20
+assertion passes, four source failures). Native FP32 component parity passes;
+full native precision, lifecycle and live acceptance remain pending. See
+[recorded evidence](status.md) and
 [offline validation commands](reference.md). Use owned, licensed or synthetic
 fixtures and record their checksums. Keep test fixtures and
 configuration isolated from production. GPU acceptance is separate from CPU

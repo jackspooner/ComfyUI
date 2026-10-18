@@ -1,9 +1,10 @@
 # Qwen3-Omni native CLIP integration
 
 Status: implementation in progress, 18 October 2026. The offline converter,
-complete source validator, reconstructed reference and fixture tools are
-implemented. Native loading, a verified installation and GPU acceptance remain
-pending. See [current results and unresolved gates](status.md).
+complete source validator, reconstructed reference, native adapter and fixture
+tools are implemented on the project branch. Native component tests pass; full
+native loading, precision acceptance and installation remain pending. See
+[current results and unresolved gates](status.md).
 
 Build a native ComfyUI integration that loads a converted version of
 [`shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4`](https://huggingface.co/shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4)
