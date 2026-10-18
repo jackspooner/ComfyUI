@@ -1,0 +1,206 @@
+{
+  "artifact_sha256": "039c9d4347a4be90ddbc8994909bd9870e610228dd95b336f612bf2936f2fe9b",
+  "source_revision": "0ed3aa2b00eeedbb0d38b6d4738f506af759213b",
+  "harness_sha256": "62394b7cafd0316a2b8ab6b96f31895f649c05587745b7639f0fe8a64568a5d9",
+  "cases_sha256": "861b09419d72547a4e843658824652b06327710b8376cbf6a13f04faa2e70b7c",
+  "reference_sha256": "e9c33337d31ead84e1b87954c96956542ed04fc41e7ad9afe1e40567c106dcd6",
+  "versions": {
+    "torch": "2.14.1+cu130",
+    "transformers": "5.20.0",
+    "tokenizers": "0.23.3",
+    "comfy-kitchen": "0.2.37"
+  },
+  "scope": "Native tokenization, actual preprocessing and modality expansion; encoder forwards replaced with shape fixtures, not full-model parity",
+  "cases": [
+    {
+      "id": "text_arithmetic",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 0
+    },
+    {
+      "id": "text_capital",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 0
+    },
+    {
+      "id": "text_copy",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 0
+    },
+    {
+      "id": "text_unicode",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 0
+    },
+    {
+      "id": "text_extract",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 0
+    },
+    {
+      "id": "text_compare",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 0
+    },
+    {
+      "id": "audio_speech",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 1,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "audio_music",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 1,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "audio_birds",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 1,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "audio_silence",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 1,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "audio_tone",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 1,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "audio_clicks",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 1,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "image_red",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 0,
+      "pixels_fp32_equal": true
+    },
+    {
+      "id": "image_blue",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 0,
+      "pixels_fp32_equal": true
+    },
+    {
+      "id": "image_triangle",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 0,
+      "pixels_fp32_equal": true
+    },
+    {
+      "id": "image_sign",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 0,
+      "pixels_fp32_equal": true
+    },
+    {
+      "id": "image_wide",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 0,
+      "pixels_fp32_equal": true
+    },
+    {
+      "id": "image_batch",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 2,
+      "audio_clips_consumed": 0,
+      "pixels_fp32_equal": true
+    },
+    {
+      "id": "combined_baseline",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 1,
+      "pixels_fp32_equal": true,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "combined_replace_image",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 1,
+      "pixels_fp32_equal": true,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "combined_replace_audio",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 1,
+      "pixels_fp32_equal": true,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "combined_remove_image",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 0,
+      "audio_clips_consumed": 1,
+      "mel_fp32_equal": true
+    },
+    {
+      "id": "combined_remove_audio",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 1,
+      "audio_clips_consumed": 0,
+      "pixels_fp32_equal": true
+    },
+    {
+      "id": "combined_batch",
+      "input_ids_equal": true,
+      "positions_equal": true,
+      "images_consumed": 2,
+      "audio_clips_consumed": 1,
+      "pixels_fp32_equal": true,
+      "mel_fp32_equal": true
+    }
+  ]
+}

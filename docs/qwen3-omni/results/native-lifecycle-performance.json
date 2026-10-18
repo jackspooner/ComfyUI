@@ -1,0 +1,454 @@
+{
+  "scope": "Isolated RTX 5090 native lifecycle/performance; not live service acceptance",
+  "result": {
+    "source_revision": "0ed3aa2b00eeedbb0d38b6d4738f506af759213b",
+    "artifact_sha256": "039c9d4347a4be90ddbc8994909bd9870e610228dd95b336f612bf2936f2fe9b",
+    "manifest_sha256": "e528f128627350c5af52bf17eabbc6eb791c0574aecfcc26237738921a5b4a8d",
+    "cases_sha256": "048dbd28f092a05d42dd0b1869df75269167e1d5b261426c9482272b395e9d23",
+    "harness_sha256": "15dc677957cb3cc815c7daac27ec81141ae89176ce9abeeb1dfe99d3e1bb67db",
+    "precision": "nvfp4",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "tokens_override": null,
+    "capture_enabled": false,
+    "profile_enabled": false,
+    "source_code_sha256": {
+      "comfy/text_encoders/qwen3_omni.py": "bb5f78d797db45e3ffa37d4b64320090bb828caf483a8e236c54449fceba9c96",
+      "comfy/text_encoders/llama.py": "0ad0bc7385cccba6339eb3c9fdc7aa93da1c9acd207ce99a06a850054b01bbb7",
+      "comfy/ops.py": "65457b8e7eb519fd3f9542e8c55131853d483dd65b6f3ba172cdc354f180f967",
+      "comfy/quant_ops.py": "37f0054dfbd8430524ac2c73dafd25b8ad4eabc490a2b7490eeebde8dffbc749",
+      "comfy/sd.py": "1e687915560eec2929a9e389f05797cb4f35518550acebfaa95983fa7c074439",
+      "comfy/sd1_clip.py": "9eb20b561ed3746d760087d3407ce5ce527ff772e94ceae36da43264a88d516e",
+      "comfy/model_management.py": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+      "comfy/model_prefetch.py": "21db82f85592362a5a96b31a0746ad463bb8f9a5973c2e6f658684c44ef715fd",
+      "comfy/model_patcher.py": "7edc88d9eae6a88637625d257dc73684cfc012a29446bf88e70d22e3a6be3994"
+    },
+    "git_revision": "4db4c3993f2d8a75bc185e9453e2e863be3f1179",
+    "source_changes": " M comfy/sd.py\n M comfy/text_encoders/qwen3_omni.py\n",
+    "nvfp4_input_passes_override": null,
+    "lifecycle_harness_sha256": "e3eb1f94dda2537757432c2cb51a79426fb7aae4cb7c150dd73df7959881feec",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "transformers": "5.20.0",
+      "comfy-kitchen": "0.2.37",
+      "comfy-aimdo": "0.5.6"
+    },
+    "cache_condition": "Fresh native process; OS file cache uncontrolled and warmed by integrity verification",
+    "cases": [
+      {
+        "id": "combined_cold",
+        "text": "The image contains a red square. The audio contains a male voice speaking.",
+        "raw_text": "The image contains a red square. The audio contains a male voice speaking.",
+        "generated_ids": [
+          785,
+          2168,
+          5610,
+          264,
+          2518,
+          9334,
+          13,
+          576,
+          7699,
+          5610,
+          264,
+          8593,
+          7743,
+          12094,
+          13,
+          151645
+        ],
+        "eos_reached": true,
+        "elapsed_seconds": 32.804014040004404,
+        "peak_torch_gpu_bytes": 165965824,
+        "peak_host_rss_bytes": 6880530432,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19730006016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 188743680,
+          "host_rss_bytes": 6881603584,
+          "peak_host_rss_bytes": 6880530432
+        },
+        "assertions": [
+          {
+            "alternatives": [
+              "red"
+            ],
+            "passed": true
+          },
+          {
+            "alternatives": [
+              "speech",
+              "voice",
+              "speaking",
+              "narrat"
+            ],
+            "passed": true
+          }
+        ],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 25.92120527100633,
+        "decode_tokens_per_second": 2.179638633540612
+      },
+      {
+        "id": "combined_warm",
+        "text": "The image contains a red square. The audio contains a male voice speaking.",
+        "raw_text": "The image contains a red square. The audio contains a male voice speaking.",
+        "generated_ids": [
+          785,
+          2168,
+          5610,
+          264,
+          2518,
+          9334,
+          13,
+          576,
+          7699,
+          5610,
+          264,
+          8593,
+          7743,
+          12094,
+          13,
+          151645
+        ],
+        "eos_reached": true,
+        "elapsed_seconds": 11.414371402002871,
+        "peak_torch_gpu_bytes": 165965824,
+        "peak_host_rss_bytes": 6891114496,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19730006016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 188743680,
+          "host_rss_bytes": 6892179456,
+          "peak_host_rss_bytes": 6891114496
+        },
+        "assertions": [
+          {
+            "alternatives": [
+              "red"
+            ],
+            "passed": true
+          },
+          {
+            "alternatives": [
+              "speech",
+              "voice",
+              "speaking",
+              "narrat"
+            ],
+            "passed": true
+          }
+        ],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 5.009837340003287,
+        "decode_tokens_per_second": 2.342467525383042
+      }
+    ],
+    "checkpoint_load_seconds": 1.4360041760010063,
+    "status": "complete",
+    "peak_driver_gpu_bytes": 31553748992,
+    "lifecycle": {
+      "status": "complete",
+      "transition_model": "/home/jack/models/text_encoders/moss_audio_8b_instruct_bf16.safetensors",
+      "steps": [
+        {
+          "name": "repeat_1",
+          "ids_equal": true,
+          "memory": {
+            "gpu_driver_bytes": 19730006016,
+            "torch_allocated_bytes": 68179968,
+            "torch_reserved_bytes": 188743680,
+            "host_rss_bytes": 6893993984,
+            "peak_host_rss_bytes": 6892949504
+          }
+        },
+        {
+          "name": "repeat_2",
+          "ids_equal": true,
+          "memory": {
+            "gpu_driver_bytes": 19730006016,
+            "torch_allocated_bytes": 68179968,
+            "torch_reserved_bytes": 188743680,
+            "host_rss_bytes": 6895628288,
+            "peak_host_rss_bytes": 6894653440
+          }
+        },
+        {
+          "name": "repeat_3",
+          "ids_equal": true,
+          "memory": {
+            "gpu_driver_bytes": 19730006016,
+            "torch_allocated_bytes": 68179968,
+            "torch_reserved_bytes": 188743680,
+            "host_rss_bytes": 6889590784,
+            "peak_host_rss_bytes": 6895046656
+          }
+        },
+        {
+          "name": "cancel_preprocessing",
+          "propagation_seconds": 0.001244245002453681,
+          "memory": {
+            "gpu_driver_bytes": 19750977536,
+            "torch_allocated_bytes": 70203392,
+            "torch_reserved_bytes": 209715200,
+            "host_rss_bytes": 6890479616,
+            "peak_host_rss_bytes": 6895046656
+          }
+        },
+        {
+          "name": "cancel_prefill",
+          "propagation_seconds": 0.0009024430037243292,
+          "memory": {
+            "gpu_driver_bytes": 19841155072,
+            "torch_allocated_bytes": 143054336,
+            "torch_reserved_bytes": 299892736,
+            "host_rss_bytes": 6891089920,
+            "peak_host_rss_bytes": 6895046656
+          }
+        },
+        {
+          "name": "cancel_decode",
+          "propagation_seconds": 0.0013121459996909834,
+          "memory": {
+            "gpu_driver_bytes": 19730006016,
+            "torch_allocated_bytes": 141919744,
+            "torch_reserved_bytes": 188743680,
+            "host_rss_bytes": 6892363776,
+            "peak_host_rss_bytes": 6895046656
+          }
+        },
+        {
+          "name": "cancellation_recovery",
+          "ids_equal": true,
+          "memory": {
+            "gpu_driver_bytes": 19730006016,
+            "torch_allocated_bytes": 68179968,
+            "torch_reserved_bytes": 188743680,
+            "host_rss_bytes": 6893322240,
+            "peak_host_rss_bytes": 6895046656
+          }
+        },
+        {
+          "name": "offloaded",
+          "memory": {
+            "gpu_driver_bytes": 1224736768,
+            "torch_allocated_bytes": 67109376,
+            "torch_reserved_bytes": 71303168,
+            "host_rss_bytes": 6893322240,
+            "peak_host_rss_bytes": 6895046656
+          }
+        },
+        {
+          "name": "reloaded",
+          "ids_equal": true,
+          "memory": {
+            "gpu_driver_bytes": 19730006016,
+            "torch_allocated_bytes": 68179968,
+            "torch_reserved_bytes": 188743680,
+            "host_rss_bytes": 6892683264,
+            "peak_host_rss_bytes": 6895046656
+          }
+        },
+        {
+          "name": "other_model",
+          "generated_ids": [
+            45578,
+            151645
+          ],
+          "raw_text": "READY",
+          "memory": {
+            "gpu_driver_bytes": 31406948352,
+            "torch_allocated_bytes": 69157888,
+            "torch_reserved_bytes": 88080384,
+            "host_rss_bytes": 7108431872,
+            "peak_host_rss_bytes": 7107518464
+          }
+        },
+        {
+          "name": "model_transition_recovery",
+          "ids_equal": true,
+          "memory": {
+            "gpu_driver_bytes": 31442599936,
+            "torch_allocated_bytes": 69157888,
+            "torch_reserved_bytes": 190840832,
+            "host_rss_bytes": 7110844416,
+            "peak_host_rss_bytes": 7109877760
+          }
+        },
+        {
+          "name": "final_offload",
+          "memory": {
+            "gpu_driver_bytes": 1224736768,
+            "torch_allocated_bytes": 67109888,
+            "torch_reserved_bytes": 71303168,
+            "host_rss_bytes": 7110844416,
+            "peak_host_rss_bytes": 7109877760
+          }
+        }
+      ],
+      "retained_torch_delta_bytes": 0
+    }
+  },
+  "lifecycle": {
+    "status": "complete",
+    "transition_model": "/home/jack/models/text_encoders/moss_audio_8b_instruct_bf16.safetensors",
+    "steps": [
+      {
+        "name": "repeat_1",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 19730006016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 188743680,
+          "host_rss_bytes": 6893993984,
+          "peak_host_rss_bytes": 6892949504
+        }
+      },
+      {
+        "name": "repeat_2",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 19730006016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 188743680,
+          "host_rss_bytes": 6895628288,
+          "peak_host_rss_bytes": 6894653440
+        }
+      },
+      {
+        "name": "repeat_3",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 19730006016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 188743680,
+          "host_rss_bytes": 6889590784,
+          "peak_host_rss_bytes": 6895046656
+        }
+      },
+      {
+        "name": "cancel_preprocessing",
+        "propagation_seconds": 0.001244245002453681,
+        "memory": {
+          "gpu_driver_bytes": 19750977536,
+          "torch_allocated_bytes": 70203392,
+          "torch_reserved_bytes": 209715200,
+          "host_rss_bytes": 6890479616,
+          "peak_host_rss_bytes": 6895046656
+        }
+      },
+      {
+        "name": "cancel_prefill",
+        "propagation_seconds": 0.0009024430037243292,
+        "memory": {
+          "gpu_driver_bytes": 19841155072,
+          "torch_allocated_bytes": 143054336,
+          "torch_reserved_bytes": 299892736,
+          "host_rss_bytes": 6891089920,
+          "peak_host_rss_bytes": 6895046656
+        }
+      },
+      {
+        "name": "cancel_decode",
+        "propagation_seconds": 0.0013121459996909834,
+        "memory": {
+          "gpu_driver_bytes": 19730006016,
+          "torch_allocated_bytes": 141919744,
+          "torch_reserved_bytes": 188743680,
+          "host_rss_bytes": 6892363776,
+          "peak_host_rss_bytes": 6895046656
+        }
+      },
+      {
+        "name": "cancellation_recovery",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 19730006016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 188743680,
+          "host_rss_bytes": 6893322240,
+          "peak_host_rss_bytes": 6895046656
+        }
+      },
+      {
+        "name": "offloaded",
+        "memory": {
+          "gpu_driver_bytes": 1224736768,
+          "torch_allocated_bytes": 67109376,
+          "torch_reserved_bytes": 71303168,
+          "host_rss_bytes": 6893322240,
+          "peak_host_rss_bytes": 6895046656
+        }
+      },
+      {
+        "name": "reloaded",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 19730006016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 188743680,
+          "host_rss_bytes": 6892683264,
+          "peak_host_rss_bytes": 6895046656
+        }
+      },
+      {
+        "name": "other_model",
+        "generated_ids": [
+          45578,
+          151645
+        ],
+        "raw_text": "READY",
+        "memory": {
+          "gpu_driver_bytes": 31406948352,
+          "torch_allocated_bytes": 69157888,
+          "torch_reserved_bytes": 88080384,
+          "host_rss_bytes": 7108431872,
+          "peak_host_rss_bytes": 7107518464
+        }
+      },
+      {
+        "name": "model_transition_recovery",
+        "ids_equal": true,
+        "memory": {
+          "gpu_driver_bytes": 31442599936,
+          "torch_allocated_bytes": 69157888,
+          "torch_reserved_bytes": 190840832,
+          "host_rss_bytes": 7110844416,
+          "peak_host_rss_bytes": 7109877760
+        }
+      },
+      {
+        "name": "final_offload",
+        "memory": {
+          "gpu_driver_bytes": 1224736768,
+          "torch_allocated_bytes": 67109888,
+          "torch_reserved_bytes": 71303168,
+          "host_rss_bytes": 7110844416,
+          "peak_host_rss_bytes": 7109877760
+        }
+      }
+    ],
+    "retained_torch_delta_bytes": 0
+  },
+  "source_report_sha256": {
+    "results.json": "612f715160df9931139e3c5605758ad314e7bb7e0938f7dfd9a49bc8e30862a4",
+    "lifecycle.json": "b8bee94dd50fa4e8d2f18ce2d0ace165e7e7a9ad1e1ce97a227745550fc9c722"
+  }
+}

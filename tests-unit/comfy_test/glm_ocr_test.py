@@ -113,8 +113,15 @@ def test_budget_reaches_admission_before_generation(monkeypatch):
                             generate=lambda *a, **kw: events.append('generate') or [1])
     clip = CLIP(no_init=True)
     clip.cond_stage_model = stage
-    clip.patcher = SimpleNamespace(load_device=torch.device('cpu'))
+    patch = object()
+    clip.patcher = SimpleNamespace(load_device=torch.device('cpu'), model_patches_models=lambda: [patch])
     monkeypatch.setattr(comfy.model_management, 'load_models_gpu', lambda models, memory_required: events.append(memory_required))
+    monkeypatch.setattr(comfy.model_management, 'LoadedModel', lambda model: model)
+    def free(required, device, keep_loaded):
+        assert required == 4200 and device == torch.device('cpu')
+        assert keep_loaded == [clip.patcher, patch]
+        events.append('release_idle')
+    monkeypatch.setattr(comfy.model_management, 'free_memory', free)
     monkeypatch.setattr('comfy.ops.use_quantized_matmul', lambda *a: contextlib.nullcontext())
     assert clip.generate({}, max_length=42, do_sample=False) == [1]
     assert events == [4200, 'generate']
@@ -122,7 +129,12 @@ def test_budget_reaches_admission_before_generation(monkeypatch):
     monkeypatch.setattr(comfy.model_management, 'get_free_memory', lambda device: 100)
     with pytest.raises(RuntimeError, match='needs 4200 free bytes'):
         clip.generate({}, max_length=42, do_sample=False)
-    assert events == [4200]  # Admission fails before any generation/cache allocation.
+    assert events == [4200, 'release_idle']  # Still fails before generation/cache allocation.
+    events.clear()
+    memory = iter([100, 5000])
+    monkeypatch.setattr(comfy.model_management, 'get_free_memory', lambda device: next(memory))
+    assert clip.generate({}, max_length=42, do_sample=False) == [1]
+    assert events == [4200, 'release_idle', 'generate']
     del stage.generation_memory_estimation_function
     events.clear()
     clip.generate({}, max_length=42, do_sample=False)

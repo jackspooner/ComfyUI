@@ -502,6 +502,11 @@ class CLIP:
             reserved = 0 if model_management.is_device_cpu(device) else model_management.extra_reserved_memory()
             available = model_management.get_free_memory(device)
             if available < required + reserved:
+                # Dynamic weights can remain resident until an allocation evicts them.
+                keep = [model_management.LoadedModel(p) for p in [self.patcher, *self.patcher.model_patches_models()]]
+                model_management.free_memory(required + reserved, device, keep_loaded=keep)
+                available = model_management.get_free_memory(device)
+            if available < required + reserved:
                 raise RuntimeError(f"Text generation needs {required + reserved} free bytes including reserve; observed {available}. Shorten the input or output budget, or release idle models.")
         else:
             self.load_model(tokens)
@@ -1875,6 +1880,8 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
     clip_target.params = {}
     if len(clip_data) == 1:
         te_model = detect_te_model(clip_data[0])
+        if clip_type == CLIPType.QWEN3_OMNI and te_model != TEModel.QWEN3_OMNI:
+            raise ValueError("Qwen3-Omni requires its converted native package with complete signatures and embedded assets. Run scripts/convert_qwen3_omni.py again.")
         if clip_type == CLIPType.YUE2 and "yue2_tokenizer_json" in clip_data[0]:
             tokenizer_data["yue2_tokenizer_json"] = clip_data[0].pop("yue2_tokenizer_json")
             detect = comfy.text_encoders.hunyuan_video.llama_detect(clip_data[0])
