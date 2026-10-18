@@ -75,7 +75,8 @@
     "skip_reason": "CUDA-only recovery checks in CPU invocation; actual GPU lifecycle tested separately.",
     "compileall": "passed",
     "ruff": "not installed; not run",
-    "setup": "Task worktree --soulx passed twice without modifying tracked files."
+    "setup": "Task worktree --soulx passed twice without modifying tracked files.",
+    "fresh_setup": "Commit 26718ef463f8ff72f828f85c527fbaeb1ad686ef in a fresh linked worktree: setup --soulx twice, tracked files unchanged; focused checks 42 passed / 3 skipped. Same checks pass after main fast-forward."
   },
   "parity": {
     "native-cpu-32step-final": {
@@ -605,7 +606,8 @@
   "guidance": {
     "comfyui_shared_skill": {
       "commit": "e9f8cfa16da4298e8e00b0312e25baebdea552a9",
-      "status": "Integrated /home/jack/skills main; discovery reconciled and doctor passed; no remote configured. Declared docs scope deferred canonical graph maintenance."
+      "status": "Integrated /home/jack/skills main; discovery reconciled and doctor passed; no remote configured. Declared docs scope deferred canonical graph maintenance.",
+      "acceptance_update_commit": "26414341cfc2bcc4f753015c32cb57d423573622"
     },
     "model_runtimes": {
       "commit": "43f3a800cdd4e0740005cfad3bc7bb40cd9940ac",
@@ -622,7 +624,22 @@
       "61de7922-44ae-4256-ba49-a9105dbf2491",
       "22fbb1ae-3a4b-49d4-925c-37c11a84fe30"
     ],
-    "detect_changes": "Exact repo/worktree scope all: 29 changed files, 5 prior indexed symbols, zero reported affected processes. Stale graph lacks new-source coverage; low risk result is not full safety evidence."
+    "detect_changes": "Exact repo/worktree scope all: 29 changed files, 5 prior indexed symbols, zero reported affected processes. Stale graph lacks new-source coverage; low risk result is not full safety evidence.",
+    "fresh_committed_code": {
+      "job": "8bdad565-a5fc-4b1c-abdc-98388b077e66",
+      "commit": "26718ef463f8ff72f828f85c527fbaeb1ad686ef",
+      "status": "complete current authenticated graph, 1316 files / 35961 nodes / 77955 edges; zero embeddings or model requests; owner index_reuse refreshed the task index from this exact committed sibling."
+    },
+    "final_cumulative_review": {
+      "changed_symbols": 184,
+      "affected_processes": 23,
+      "risk_label": "critical (size of added model integration)",
+      "review": "Reviewed complete new source and one-line builtin registration. Reported flows are model loading, tensor/archive readers and selected-device/allocator helpers used by new nodes and parity checker; no existing shared-owner implementation changed. Strict model loads, CPU parity, recovery tests and actual GPU queue cover these paths. Graph process enumeration is bounded and not complete proof of all callers."
+    },
+    "canonical_pending": {
+      "job": "8de43437-f674-4b7d-a7df-58592b2db177",
+      "status": "Owner validation-refused, previous graph preserved. Exact sibling reuse to canonical refused relevant pre-existing source drift (cpp-header/coverage). Ordinary canonical ensure also refused authenticated publication. Retain exact committed task graph; do not exclude unrelated source or force rebuild."
+    }
   },
   "limits": [
     "Short-clip Linux CPU and RTX 5090 coverage only. BF16, other devices, low-VRAM capacity and full songs not accepted.",
@@ -630,5 +647,13 @@
     "One scalar F0 describes a monophonic lead; harmony leakage and separate singer stems need review.",
     "Failed two-step SVC waveform comparison retained; default 32-step parity passes without tolerance changes.",
     "Serving 8188 was not restarted. Isolated candidate stopped and task GPU hold released."
-  ]
+  ],
+  "delivery": {
+    "implementation_commit": "26718ef463f8ff72f828f85c527fbaeb1ad686ef",
+    "branch": "soulx-singer-native",
+    "integration": "Fast-forward into main; focused checks pass; personal/main and task branch pushed. This follow-up only records final verification evidence.",
+    "serving_activation": "Not performed; existing process remains running with its prior imported inventory. Candidate stopped and GPU hold released.",
+    "runtime_guidance_integration": "Pending owner idle-window guard; committed/pushed branch retained.",
+    "cleanup": "Canonical graph publication remains blocked; exact source graph/worktree retained for recovery."
+  }
 }
