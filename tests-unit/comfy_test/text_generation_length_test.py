@@ -91,4 +91,6 @@ def test_reasoning_split_with_template_or_generated_opening(decoded, prompt, exp
                            generate=lambda *args, **kwargs: [],
                            decode=lambda ids: decoded)
     output = TextGenerate.execute(clip, prompt, 512, {'sampling_mode': 'off'}, thinking=False)
-    assert output.result == expected
+    assert output.result[:2] == expected
+    assert output.result[2]
+    assert output.result[3] == ''

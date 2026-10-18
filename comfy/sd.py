@@ -84,6 +84,7 @@ import comfy.text_encoders.qwen3vl
 import comfy.text_encoders.auk
 import comfy.ldm.auk.vae
 import comfy.text_encoders.moss_audio
+import comfy.text_encoders.glm_ocr
 import comfy.text_encoders.minimax
 import comfy.text_encoders.minimax_music
 import comfy.text_encoders.yue2
@@ -336,6 +337,18 @@ class CLIP:
             kwargs["tokenizer_options"] = tokenizer_options
         return self.tokenizer.tokenize_with_weights(text, return_word_ids, **kwargs)
 
+    def tokenize_chat(self, messages, thinking=False):
+        tokenize = getattr(self.tokenizer, "tokenize_chat", None)
+        if tokenize is None:
+            raise ValueError("This tokenizer does not support structured text conversations.")
+        return tokenize(messages, thinking=thinking)
+
+    def get_chat_context_length(self):
+        context = getattr(self.cond_stage_model, "get_chat_context_length", None)
+        if context is None:
+            raise ValueError("This model does not expose a text conversation context limit.")
+        return context()
+
     def add_hooks_to_dict(self, pooled_dict: dict[str]):
         if self.apply_hooks_to_conds:
             pooled_dict["hooks"] = self.apply_hooks_to_conds
@@ -467,10 +480,10 @@ class CLIP:
             sd_clip[k] = sd_tokenizer[k]
         return sd_clip
 
-    def load_model(self, tokens={}):
-        memory_used = 0
+    def load_model(self, tokens={}, memory_required=0):
+        memory_used = memory_required
         if hasattr(self.cond_stage_model, "memory_estimation_function"):
-            memory_used = self.cond_stage_model.memory_estimation_function(tokens, device=self.patcher.load_device)
+            memory_used = max(memory_used, self.cond_stage_model.memory_estimation_function(tokens, device=self.patcher.load_device))
         model_management.load_models_gpu([self.patcher], memory_required=memory_used)
         return self.patcher
 
@@ -480,7 +493,17 @@ class CLIP:
     def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True):
         self.cond_stage_model.reset_clip_options()
 
-        self.load_model(tokens)
+        estimate = getattr(self.cond_stage_model, "generation_memory_estimation_function", None)
+        if estimate is not None:
+            required = estimate(tokens, max_length, device=self.patcher.load_device)
+            self.load_model(tokens, memory_required=required)
+            device = self.patcher.load_device
+            reserved = 0 if model_management.is_device_cpu(device) else model_management.extra_reserved_memory()
+            available = model_management.get_free_memory(device)
+            if available < required + reserved:
+                raise RuntimeError(f"Text generation needs {required + reserved} free bytes including reserve; observed {available}. Shorten the input or output budget, or release idle models.")
+        else:
+            self.load_model(tokens)
         device = self.patcher.load_device
         self.cond_stage_model.set_clip_options({"layer": None})
         self.cond_stage_model.set_clip_options({"execution_device": device})
@@ -1691,7 +1714,8 @@ class TEModel(Enum):
     QWEN3VL_32B = 37
     MING_IMAGE = 38
     MOSS_AUDIO = 39
-    AUK = 40
+    GLM_OCR = 40
+    AUK = 41
 
 
 def detect_te_model(sd):
@@ -1772,6 +1796,12 @@ def detect_te_model(sd):
                       "model.layers.0.self_attn.q_norm.weight": 128, "model.norm.weight": 4096}
     if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in moss_signature.items()):
         return TEModel.MOSS_AUDIO
+    glm_signature = {"model.layers.0.post_self_attn_layernorm.weight": 1536,
+                     "model.layers.0.post_mlp_layernorm.weight": 1536,
+                     "model.layers.0.self_attn.q_proj.weight": 2048,
+                     "visual.downsample.weight": 1536, "model.norm.weight": 1536}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in glm_signature.items()):
+        return TEModel.GLM_OCR
     if "model.layers.0.post_attention_layernorm.weight" in sd:
         weight = sd['model.layers.0.post_attention_layernorm.weight']
         if 'model.layers.0.self_attn.q_norm.weight' in sd:
@@ -1982,6 +2012,10 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
         elif te_model == TEModel.MOSS_AUDIO:
             clip_target.clip = comfy.text_encoders.moss_audio.te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.moss_audio.MossAudioTokenizer
+            tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
+        elif te_model == TEModel.GLM_OCR:
+            clip_target.clip = comfy.text_encoders.glm_ocr.te(dtype_llama=clip_data[0]['model.norm.weight'].dtype)
+            clip_target.tokenizer = comfy.text_encoders.glm_ocr.GlmOCRTokenizer
             tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
         elif te_model == TEModel.QWEN3_4B:
             if clip_type == CLIPType.FLUX or clip_type == CLIPType.FLUX2:

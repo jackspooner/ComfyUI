@@ -91,12 +91,9 @@ class Attention(nn.Module):
 
         if freqs is not None:
             q, k = apply_rope(q, k, freqs)
-        if self.kvheads != self.heads:
-            rep = self.heads // self.kvheads
-            k = k.repeat_interleave(rep, dim=1)
-            v = v.repeat_interleave(rep, dim=1)
         q, k, v = AttentionTensorContainer(q), AttentionTensorContainer(k), AttentionTensorContainer(v)
         out = optimized_attention_masked(q, k, v, self.heads, mask=mask, skip_reshape=True,
+                                         enable_gqa=self.kvheads != self.heads,
                                          preferred_attention=self.comfy_attention, transformer_options=transformer_options)
 
         if "block_index" in transformer_options and "attn1_output_patch" in transformer_patches:
@@ -294,6 +291,10 @@ class SingleStreamDiT(nn.Module):
         img_ids[..., 2] = torch.arange(w, device=x.device, dtype=torch.float32)[None, :]
         return img, img_ids.reshape(1, h * w, 3).repeat(x.shape[0], 1, 1), h, w
 
+    def preprocess_text_embeds(self, context, transformer_options={}):
+        context = self.txtfusion(self._unpack_context(context), mask=None, transformer_options=transformer_options)
+        return self.txtmlp(context)
+
     def _forward(self, x, timesteps, context, attention_mask=None, ref_latents=None, transformer_options={}, **kwargs):
         transformer_options = transformer_options.copy()
         temporal = x.ndim == 5
@@ -302,9 +303,6 @@ class SingleStreamDiT(nn.Module):
             x = x.reshape(b5 * t5, c5, h5, w5)
         bs, _, h_orig, w_orig = x.shape
         patch = self.patch
-
-        # context arrives as (B, seq, txtlayers*txtdim); reshape to (B, txtlayers, seq, txtdim).
-        context = self._unpack_context(context)
 
         img, imgpos, h_, w_ = self.process_img(x)
         img_tokens = img.shape[1]
@@ -338,8 +336,7 @@ class SingleStreamDiT(nn.Module):
             t0 = self.tmlp(timestep_embedding(torch.zeros_like(timesteps), self.tdim).unsqueeze(1).to(img.dtype))
             tvec = torch.cat((tvec, self.tproj(t0)), dim=0)
 
-        context = self.txtfusion(context, mask=None, transformer_options=transformer_options)
-        context = self.txtmlp(context)
+        context = self.preprocess_text_embeds(context, transformer_options=transformer_options)
 
         txtlen = context.shape[1]
         device = context.device
@@ -371,9 +368,8 @@ class SingleStreamDiT(nn.Module):
             transformer_options["block_index"] = i
             combined = block(combined, tvec, freqs, None, timestep_zero_index=timestep_zero_index, transformer_options=transformer_options)
 
-        final = self.last(combined, t)
+        out = self.last(combined[:, txtlen:txtlen + img_tokens], t)
         del combined
-        out = final[:, txtlen:txtlen + img_tokens, :]
         out = rearrange(out, "b (h w) (c ph pw) -> b c (h ph) (w pw)",
                         h=h_, w=w_, ph=patch, pw=patch, c=self.channels)
         out = out[:, :, :h_orig, :w_orig]  # crop padding back off
