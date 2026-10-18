@@ -66,7 +66,9 @@ class BlockFP8Linear(nn.Module):
 
     def decode(self, dtype=torch.bfloat16):
         # This pinned upstream decoder is independent of the native layout.
-        return Fp8Dequantize(None)._dequantize_one(self.weight.to(self.compute_device), self.weight_scale_inv.to(self.compute_device), dtype)
+        # The pinned publisher stores quantization multipliers in this field.
+        scale = self.weight_scale_inv.to(device=self.compute_device, dtype=torch.float32).reciprocal()
+        return Fp8Dequantize(None)._dequantize_one(self.weight.to(self.compute_device), scale, dtype)
 
     def forward(self, inputs):
         return F.linear(inputs, self.decode(inputs.dtype), self.bias)
@@ -142,7 +144,7 @@ def prepare_case(processor, case):
 
 def component_evidence(source, output, integrity, versions):
     report = {'versions': versions, 'source': integrity, 'device': 'cpu',
-              'decoder': 'Transformers Fp8Dequantize' if integrity['source_revision'] == FP8_REVISION else 'ModelOpt NVFP4QTensor.dequantize, fast=False', 'projections': []}
+              'decoder': 'Transformers Fp8Dequantize with pinned publisher inverse-scale normalization' if integrity['source_revision'] == FP8_REVISION else 'ModelOpt NVFP4QTensor.dequantize, fast=False', 'projections': []}
     with ExitStack() as stack:
         get_tensor = SourceTensors(source, stack)
         for index, prefix in enumerate(PROJECTION_SAMPLES):

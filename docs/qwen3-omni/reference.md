@@ -8,6 +8,11 @@ generation; only packed linear weights and indexed expert access are replaced.
 It does not reproduce the publisher's W4A8 execution or FP8 cache. Native inference
 must separately pass acceptance using accelerated operations.
 
+The same harness also supports the pinned published FP8 candidate with an explicit
+publisher inverse-scale normalization and upstream block decoder. See
+[FP8 source and acceptance](eight-bit.md); its environment and precision limits
+differ from the NVFP4 reference described below.
+
 ## Environment and inputs
 
 Use a separate Python 3.12 environment. ModelOpt 0.42.0 rejects Python 3.13;

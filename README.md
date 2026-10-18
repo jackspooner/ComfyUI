@@ -160,7 +160,8 @@ Native packages may mix validated dense and NVFP4 projections; the offline
 converter still targets the pinned source. [Compatibility and upstream assessment](docs/qwen3-omni/upstream-readiness.md)
 records reference blockers, residual precision limits and proposed patch boundaries.
 The experimental FP8 path can preserve the pinned published 128×128 block-scaled
-checkpoint, with BF16 compute/cache and CPU/CUDA component coverage. Full-model
+checkpoint with explicit inverse-scale normalization, BF16 compute/cache and
+CPU/CUDA component coverage. Full-model
 validation is pending. [Eight-bit operation](docs/qwen3-omni/eight-bit.md) records
 source/template pins, conversion, resource requirements and remaining acceptance.
 

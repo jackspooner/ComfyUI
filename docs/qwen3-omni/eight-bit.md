@@ -1,15 +1,17 @@
 # Published FP8 candidate and INT8 scope
 
-Status, 18 October 2026: the published FP8 source is downloading; block-scale
-conversion/loading pass synthetic CPU tests, six CUDA component checks and the
-full planned native meta layout. Full-model inference and lifecycle acceptance are
-pending. The installed NVFP4 artifact and serving service are unchanged.
+Status, 19 October 2026: the published source passed every pinned hash and all
+54,494 tensor shapes/dtypes. Full-model testing caught a source scale convention
+incompatible with the standard HF decoder: multiplication generates token zero,
+while division passes the independent arithmetic smoke. The converter now
+normalizes these pinned multipliers. Corrected full-model and lifecycle acceptance
+are pending. The installed NVFP4 artifact and serving service are unchanged.
 
 The selected source is [marksverdhei/Qwen3-Omni-30B-A3B-FP8](https://huggingface.co/marksverdhei/Qwen3-Omni-30B-A3B-FP8),
 revision `042db39a102171d5994b72ab717fade92e80061a`, based on the Instruct model.
 This route uses existing quantized weights; original BF16/FP16 model execution
-and the 70.52 GB original-weight download are unnecessary. INT8 practical versus
-theory-only scope remains unresolved; no INT8 artifact or execution is claimed.
+and the 70.52 GB original-weight download are unnecessary. BF16 and INT8 coverage
+below is theoretical; no full-model BF16 or INT8 execution is claimed.
 
 ## Pinned source and assets
 
@@ -28,13 +30,13 @@ the inventory. The local template already obtained through Download Manager 2
 was verified and copied into the candidate source directory. Its separate source
 provenance is retained. No remote code or automatic Hub downloads are used.
 
-The native plan occupies 33,551,468,278 bytes including embedded assets, before
+The native plan occupies 33,555,117,814 bytes including embedded assets, before
 its safetensors header and provenance manifest. Reserve at least 75 GB free for
 source plus native output, additional headroom for fixtures and other workloads,
 and inspect current space before starting. A published download size is not a
 VRAM estimate. Preserve existing models and active task data.
 
-## Lossless block FP8 packaging
+## Weight-preserving block FP8 packaging
 
 ```bash
 /path/to/prepared/python scripts/convert_qwen3_omni.py \
@@ -44,9 +46,12 @@ VRAM estimate. Preserve existing models and active task data.
   --destination /absolute/new-qwen3-omni-fp8.safetensors
 ```
 
-This mode preserves the published E4M3 weight bytes and BF16 128×128 block scales.
-It fuses aligned gate/up rows in expert order and renames `weight_scale_inv` to
-native `weight_scale`, without decoding or requantizing. The native Thinker has
+This mode preserves the published E4M3 weight bytes. In this exact source,
+BF16 `weight_scale_inv` holds quantization multipliers: decoded weights are
+`weight / weight_scale_inv`. The converter stores their FP32 reciprocals as native
+128×128 block `weight_scale`, whose usual contract is multiplication. No heuristic
+scale inversion or change to other FP8 formats is used. It fuses aligned gate/up
+rows in expert order without requantizing weights. The native Thinker has
 288 FP8 projections/banks; audio/vision encoders, norms, routers, embeddings and
 output head retain BF16 weights. Dense vision input columns receive only the
 native zero padding. Talker/code2wav are excluded and inventoried.
@@ -60,7 +65,7 @@ per-tensor FP8 and 32-element E8M0 MXFP8 layouts cannot represent these scales.
 Other backends remain unverified until separately exercised.
 
 The writer streams projection/expert groups, checks finite quantized data and
-positive finite scales, embeds local processor/tokenizer/template/config assets,
+positive finite source multipliers, embeds local processor/tokenizer/template/config assets,
 then verifies output checksums and publishes the checkpoint plus manifest without
 overwrite. Originals remain unchanged. An orderly failure removes its temporary
 files. After process death inspect exact owned temporary files and a possible
@@ -71,7 +76,8 @@ state loading. Scalar FP8 scales retain their separate descriptor and validation
 ## Independent validation
 
 The reference keeps upstream Transformers 5.20.0 architecture and dispatch, and
-uses its `Fp8Dequantize` decoder independently of the native layout. FP8 expert
+uses its `Fp8Dequantize` decoder independently of the native layout, after explicit
+FP32 reciprocal normalization of this publisher's source multipliers. FP8 expert
 buffers remain CPU file-backed and only selected matrices move to the requested
 device. Compute/cache are BF16. This avoids materializing the original BF16 model;
 CPU offload can make the reference slow. ModelOpt 0.42.0 remains required only for
@@ -109,7 +115,7 @@ versions, source hashes, tensor/key counts, planned bytes and the unexecuted sta
   GPU's roughly 32 GiB. Streaming/offload can change feasibility, so this is not
   a proof that execution is impossible. Full-model runs remain excluded here.
 - Signed tensor-wise INT8 would use the same unpacked eight-bit weight shapes and
-  FP32 scalar-scale counts as this FP8 plan. This establishes a storage estimate,
+  FP32 scalar-scale counts as the optional original-source scalar FP8 plan. This establishes a storage estimate,
   not a converted INT8 artifact or model-loading/quality acceptance.
 - For nonzero weights under symmetric nearest-rounded INT8, an exact scale `s = max(abs(w))/127` gives
   `abs(w - s*round(w/s)) <= s/2` within the represented range. Finite scale/arithmetic
@@ -138,21 +144,26 @@ CUDA_VISIBLE_DEVICES='' /path/to/prepared/python -m pytest \
   tests-unit/comfy_test/qwen_vl_image_channels_test.py -q
 ```
 
-New checks cover independent FP32-to-FP8 rounding, per-expert scales, all-zero
+New checks cover direct source division versus normalized native decoding,
+independent FP32-to-FP8 rounding, per-expert scales, all-zero
 experts, gate/up order, padding, dense exclusions, missing/invalid native layouts,
 NaN refusal, insufficient-space cleanup and rejection of NVFP4 as an FP8 source.
 Seeded requantization is covered for patched block FP8 weights. The earlier
 accepted NVFP4 tests still pass. Six RTX 5090 component probes match
 the pinned Transformers decoder and BF16 matmul outputs exactly; decode plus
 matmul takes 0.022–0.054 ms in these synthetic shapes. [Retained evidence](results/published-fp8-components.json)
-records shapes and source hashes. Eight real projections from one SHA-256-verified
-source shard also decode identically on CPU/CUDA and produce identical CUDA BF16
-linear outputs. These timings exclude loading/offload and are not full-model
-latency. No full-model, lifecycle or quality result is claimed.
+records shapes and source hashes. Historical real-source probes in that report
+matched the upstream decoder under the wrong multiplicative interpretation; they
+do not establish usable model semantics. The [scale correction record](results/published-fp8-scale-normalization.json)
+retains the failed native/reference smoke, 28 comparisons against a separately
+quantized NVFP4 source and the passing reciprocal reference smoke. This comparison
+supports scale interpretation, not original BF16 quality parity. These timings
+exclude loading/offload and are not full-model latency. No full-model lifecycle
+or full-suite quality acceptance is claimed.
 Other backends remain unverified.
 
-Remaining: finish the pinned published FP8 download and source verification;
-convert to a fresh destination; run independent quantized-reference and all 24
+Remaining: finish corrected packaging to a fresh destination; run the independent
+quantized reference and all 24
 unchanged multimodal fixtures, plus explicit
 resource/lifecycle measurements in owned GPU windows. Failed/contended runs remain
 separate from completed evidence. The existing NVFP4 reference cannot be relabeled

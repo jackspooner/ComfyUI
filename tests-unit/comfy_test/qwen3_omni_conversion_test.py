@@ -10,6 +10,7 @@ import torch
 from comfy.cli_args import args
 args.cpu = True
 import comfy.ops
+from comfy.quant_ops import BlockWiseFP8E4M3Layout
 from comfy.text_encoders.qwen35 import Qwen35VisionPatchMerger
 from comfy.text_encoders.qwen3vl import Qwen3VLDeepstackMerger
 from scripts import convert_qwen3_omni as converter
@@ -193,14 +194,14 @@ def test_insufficient_output_space_does_not_create_partial_files(tmp_path, monke
     assert not list(tmp_path.glob('.*candidate*'))
 
 
-def test_published_block_fp8_preserves_weights_scales_and_dense_vision_padding(tmp_path):
+def test_published_block_fp8_normalizes_inverse_scales_and_preserves_weights(tmp_path):
     generator = torch.Generator().manual_seed(721)
     weights = {}
     for expert in range(2):
         for projection in ('gate_proj', 'up_proj', 'down_proj'):
             prefix = f'thinker.model.layers.0.mlp.experts.{expert}.{projection}'
             weights[prefix + '.weight'] = torch.randint(-12, 13, (128, 256), generator=generator).to(torch.float8_e4m3fn)
-            weights[prefix + '.weight_scale_inv'] = torch.rand(1, 2, generator=generator).bfloat16() + .01
+            weights[prefix + '.weight_scale_inv'] = (torch.rand(1, 2, generator=generator) * 4096 + 1024).bfloat16()
     weights['thinker.visual.blocks.0.mlp.linear_fc2.weight'] = torch.randn(32, 48, dtype=torch.bfloat16, generator=generator)
     save_file(weights, tmp_path / 'weights.safetensors')
     (tmp_path / 'model.safetensors.index.json').write_text(json.dumps({'metadata': {
@@ -217,8 +218,18 @@ def test_published_block_fp8_preserves_weights_scales_and_dense_vision_padding(t
             for suffix, source_suffix in [('weight', 'weight'), ('weight_scale', 'weight_scale_inv')]:
                 expected = torch.cat([weights[f'thinker.model.layers.0.mlp.experts.{expert}.{p}.{source_suffix}']
                                       for p in ('gate_proj', 'up_proj')])
+                if suffix == 'weight_scale':
+                    expected = expected.float().reciprocal()
                 actual = result.get_tensor(target + '.' + suffix)[expert]
                 assert torch.equal(actual.view(torch.uint8), expected.view(torch.uint8))
+            data = result.get_tensor(target + '.weight')[expert]
+            scales = result.get_tensor(target + '.weight_scale')[expert]
+            decoded = BlockWiseFP8E4M3Layout.dequantize(data, BlockWiseFP8E4M3Layout.Params(
+                scale=scales, orig_dtype=torch.bfloat16, orig_shape=tuple(data.shape)))
+            expected = torch.cat([weights[f'thinker.model.layers.0.mlp.experts.{expert}.{p}.weight'].float() /
+                                  weights[f'thinker.model.layers.0.mlp.experts.{expert}.{p}.weight_scale_inv'].float().repeat_interleave(128, 0).repeat_interleave(128, 1)
+                                  for p in ('gate_proj', 'up_proj')]).bfloat16()
+            assert torch.equal(decoded, expected)
         padded = result.get_tensor('visual.blocks.0.mlp.linear_fc2.weight')
         assert padded.shape == (32, 64) and not padded[:, 48:].count_nonzero()
         assert torch.equal(padded[:, :48], weights['thinker.visual.blocks.0.mlp.linear_fc2.weight'])
