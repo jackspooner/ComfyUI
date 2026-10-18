@@ -1,0 +1,37 @@
+SoulX-Singer native ComfyUI adaptation
+
+Soul-AILab/SoulX-Singer, revision 81aeb3ae772c70093c3de74dc23c92d983801ae4,
+Apache License 2.0 (see LICENSE). This adaptation replaces application loading,
+training paths, attention, memory ownership and inference orchestration.
+
+RMVPE: Dream-High/RMVPE, Apache License 2.0. Adapted inference architecture
+from SoulX-Singer's preprocess/tools/f0_extraction.py.
+English G2P predictor: Kyubyong Park and Jongseok Kim, g2p_en 2.1.0,
+Apache License 2.0. Only offline word prediction is adapted; NLTK's downloader,
+POS tagger and application normalization are not imported. CMU dictionary assets
+retain their own license in the separately prepared model directory.
+
+Diffusion architecture/flow matching: Copyright (c) 2023 Amphion.
+Vocos decoder: Copyright (c) 2023 Charactr Inc.
+Roformer architecture: Copyright (c) 2023 Phil Wang.
+The above MIT-derived portions retain the following permission:
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

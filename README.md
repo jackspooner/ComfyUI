@@ -189,6 +189,21 @@ passing full-weight CPU/GPU checks from pending listening and broader resource a
 The local deployment includes these nodes; listening and broader quality acceptance
 remain incomplete. Verify the running inventory when using another installation.
 
+## Native SoulX-Singer in this fork
+
+This fork adds native SoulX-Singer lyric synthesis with continuous F0 or note/score
+conditioning, transcription-free singing voice conversion, RMVPE pitch extraction,
+karaoke separation and dereverberation. It uses ComfyUI operations, selected
+attention, managed loading/offloading and the memory compiler, with standard AUDIO
+inputs/outputs and editable lyric/note timing. Runtime inference is offline.
+See [pinned models, conversion, nodes, examples and acceptance limits](docs/soulx-singer.md).
+Default-step full-weight CPU comparisons and short-clip RTX 5090 queue/lifecycle
+checks pass. The retained song excerpt follows pitch but fails its replacement-lyric
+quality gate; automatic alignment, exact singer identity and subjective singing
+quality require separate review. The examples include the complete reference-song
+path and original-backing mixing. Source/candidate acceptance does not restart
+the serving installation. Use the existing worktree setup command with `--soulx`.
+
 ## Local stable-release maintenance
 
 The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).

@@ -2477,6 +2477,7 @@ async def init_builtin_extra_nodes():
         "nodes_minimax_music.py",
         "nodes_yue2.py",
         "nodes_yingmusic.py",
+        "nodes_soulx_singer.py",
         "nodes_minimax_h3.py",
         "nodes_lt.py",
         "nodes_lt_keyframes.py",
