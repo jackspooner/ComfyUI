@@ -1,0 +1,45 @@
+{
+  "updated_at": "2026-10-18T17:01:19.021647+00:00",
+  "status": "preparation_only_storage_and_int8_scope_pending",
+  "source_repo": "Qwen/Qwen3-Omni-30B-A3B-Instruct",
+  "source_revision": "26291f793822fb6be9555850f06dfe95f2d7e695",
+  "metadata_verified": true,
+  "declared_tensor_keys_match_meta_architecture": true,
+  "tensor_count": 28010,
+  "source_weight_shards_downloaded": 0,
+  "source_weight_payload_verified": false,
+  "source_all_expected_bytes": 70519637090,
+  "source_thinker_expected_bytes": 63438410976,
+  "fp8_planned_projection_modules": 599,
+  "fp8_planned_payload_bytes_without_embedded_assets": 32365008864,
+  "fp8_quantized_weight_bytes": 31074486272,
+  "fp8_retained_dense_bytes": 1290433760,
+  "fp8_full_model_executed": false,
+  "int8_full_model_executed": false,
+  "bf16_fp16_full_model_executed": false,
+  "int8_storage_assumption": "Same unpacked 8-bit weight shapes and one FP32 scale per projection/expert; no INT8 artifact created",
+  "kv_cache_bytes_per_token_bf16_batch1": 98304,
+  "kv_cache_bytes_at_65536_tokens": 6442450944,
+  "storage_free_bytes": 20056137728,
+  "versions": {
+    "torch": "2.14.1+cu130",
+    "transformers": "5.20.0",
+    "comfy-kitchen": "0.2.37",
+    "safetensors": "0.8.0"
+  },
+  "source_files_sha256": {
+    "scripts/convert_qwen3_omni.py": "3423a4b34e4e1083fb97ecc55357470a2f6c098a5092a614a4b0d0a3bb70b455",
+    "scripts/qwen3_omni_checkpoint.py": "883f7c3a2b192463cbb5fafad530164e0fc950c0ea4eb38fde2272bcebf11296",
+    "scripts/qwen3_omni_original_source.json": "637f8019cc2a51105585ceb070015e2831c95671c790c24c2819bc26163498c1"
+  },
+  "metadata_sha256": {
+    "config.json": "eab5093d47807aaf894119506b238b2b1cee70d08456e894fee9a012d88f2e0d",
+    "model.safetensors.index.json": "03ffe9a54efe9007ceb788c2b036f5c589094918c4582add4e92bc17e1cba838",
+    "preprocessor_config.json": "b10e27fd4542cf89ec7145942b87f3e65408d4e9f9d031a29acdd293c15fb3fc"
+  },
+  "fp8_plan_native_meta_layout_valid": true,
+  "fp8_plan_detected_as_omni": true,
+  "embedded_tokenizer_three_string_roundtrip": true,
+  "embedded_assets_bytes": 5389426,
+  "model_weights_loaded_or_executed": false
+}

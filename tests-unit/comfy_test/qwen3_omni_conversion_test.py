@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 from comfy_kitchen.float_utils import from_blocked, swap_nibbles
 import pytest
@@ -116,3 +117,77 @@ def test_dangling_destination_is_preserved(tmp_path):
         converter.convert(tmp_path, destination, 'invalid')
     assert destination.is_symlink()
     assert not (tmp_path / 'missing').exists()
+
+
+def original_fixture(tmp_path):
+    generator = torch.Generator().manual_seed(73)
+    weights = {}
+    for expert in range(2):
+        for projection in ('gate_proj', 'up_proj', 'down_proj'):
+            key = f'thinker.model.layers.0.mlp.experts.{expert}.{projection}.weight'
+            weights[key] = torch.randn(32, 32, dtype=torch.bfloat16, generator=generator) if expert else torch.zeros(32, 32, dtype=torch.bfloat16)
+    weights['thinker.visual.blocks.0.mlp.linear_fc2.weight'] = torch.randn(32, 48, dtype=torch.bfloat16, generator=generator)
+    weights['thinker.model.layers.0.self_attn.q_proj.weight'] = torch.randn(32, 32, dtype=torch.bfloat16, generator=generator)
+    weights['thinker.model.layers.0.mlp.gate.weight'] = torch.randn(2, 32, dtype=torch.bfloat16, generator=generator)
+    weights['thinker.lm_head.weight'] = torch.randn(64, 32, dtype=torch.bfloat16, generator=generator)
+    weights['thinker.model.embed_tokens.weight'] = torch.randn(64, 32, dtype=torch.bfloat16, generator=generator)
+    weights['talker.unused.weight'] = torch.ones(4, dtype=torch.bfloat16)
+    save_file(weights, tmp_path / 'weights.safetensors')
+    (tmp_path / 'model.safetensors.index.json').write_text(json.dumps({'metadata': {
+        'total_size': sum(value.numel() * value.element_size() for value in weights.values())},
+        'weight_map': {key: 'weights.safetensors' for key in weights}}))
+    return weights, inspect_source(tmp_path)[0]
+
+
+def test_original_fp8_streaming_scales_zero_experts_and_padding(tmp_path):
+    weights, records = original_fixture(tmp_path)
+    plan, consumed, excluded = converter.make_plan(records, {}, 2, 'fp8')
+    assert set(consumed) | set(excluded) == set(weights)
+    destination = tmp_path / 'fp8.safetensors'
+    manifest = converter.stream_checkpoint(tmp_path, records, plan, destination, {'source_revision': 'fixture'})
+    assert manifest['output_sha256'] == converter.sha256_file(destination)
+    with safe_open(destination, framework='pt') as native:
+        for expert in range(2):
+            prefix = 'model.layers.0.mlp.experts.gate_up_proj'
+            original = torch.cat([weights[f'thinker.model.layers.0.mlp.experts.{expert}.{projection}.weight']
+                                  for projection in ('gate_proj', 'up_proj')])
+            scale = native.get_tensor(prefix + '.weight_scale')[expert]
+            expected_scale = (original.float().abs().max() / 448).clamp_min(torch.finfo(torch.float32).tiny)
+            torch.testing.assert_close(scale, expected_scale, atol=0, rtol=0)
+            expected = (original.float() / scale).clamp(-448, 448).to(torch.float8_e4m3fn)
+            actual = native.get_tensor(prefix + '.weight')[expert]
+            assert torch.equal(actual.view(torch.uint8), expected.view(torch.uint8))
+            assert torch.isfinite(actual.float()).all()
+        padded = native.get_tensor('visual.blocks.0.mlp.linear_fc2.weight')
+        assert padded.shape == (32, 64)
+        assert torch.count_nonzero(padded[:, 48:].float()) == 0
+        descriptor = json.loads(native.get_tensor('model.layers.0.mlp.experts.gate_up_proj.comfy_quant').numpy().tobytes())
+        assert descriptor == {'format': 'float8_e4m3fn', 'num_experts': 2, 'full_precision_matrix_mult': True}
+        for key in ('thinker.model.layers.0.mlp.gate.weight', 'thinker.lm_head.weight', 'thinker.model.embed_tokens.weight'):
+            assert torch.equal(native.get_tensor(converter.mapped_name(key)), weights[key])
+
+
+def test_fp8_nonfinite_source_does_not_publish(tmp_path):
+    weights, records = original_fixture(tmp_path)
+    weights['thinker.model.layers.0.self_attn.q_proj.weight'][0, 0] = float('nan')
+    save_file(weights, tmp_path / 'weights.safetensors')
+    plan, _, _ = converter.make_plan(records, {}, 2, 'fp8')
+    with pytest.raises(ValueError, match='finite BF16'):
+        converter.stream_checkpoint(tmp_path, records, plan, tmp_path / 'candidate.safetensors', {'source_revision': 'fixture'})
+    assert not list(tmp_path.glob('*candidate*'))
+    assert not list(tmp_path.glob('.*candidate*'))
+
+
+def test_fp8_requires_original_source_not_decoded_nvfp4(tmp_path):
+    with pytest.raises(ValueError, match='pinned original Qwen source'):
+        converter.convert(tmp_path, tmp_path / 'fp8.safetensors', converter.SOURCE_REVISION, 'fp8')
+
+
+def test_insufficient_output_space_does_not_create_partial_files(tmp_path, monkeypatch):
+    _, records = original_fixture(tmp_path)
+    plan, _, _ = converter.make_plan(records, {}, 2, 'fp8')
+    monkeypatch.setattr(converter.shutil, 'disk_usage', lambda path: SimpleNamespace(free=0))
+    with pytest.raises(OSError, match='Insufficient destination space'):
+        converter.stream_checkpoint(tmp_path, records, plan, tmp_path / 'candidate.safetensors', {'source_revision': 'fixture'})
+    assert not list(tmp_path.glob('*candidate*'))
+    assert not list(tmp_path.glob('.*candidate*'))

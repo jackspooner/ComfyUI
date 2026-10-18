@@ -1,4 +1,4 @@
-"""Offline, lossless ModelOpt NVFP4 packaging for the pinned Qwen3-Omni Thinker."""
+"""Offline source-verified NVFP4 packaging or original-weight FP8 conversion for Qwen3-Omni."""
 import argparse
 from contextlib import ExitStack
 import hashlib
@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import resource
+import shutil
 import struct
 import subprocess
 import sys
@@ -18,10 +19,12 @@ from comfy_kitchen.float_utils import from_blocked, swap_nibbles, to_blocked
 from safetensors import safe_open
 import torch
 from torch.nn import functional as F
+from transformers import AutoProcessor, Qwen3OmniMoeConfig
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.convert_moss_audio import copy_payload, read_json
-from scripts.qwen3_omni_checkpoint import SOURCE_MANIFEST, SourceTensors, sha256_file, validate_source
+from scripts.qwen3_omni_checkpoint import ORIGINAL_MANIFEST, ORIGINAL_REVISION, SOURCE_MANIFEST, SOURCE_REVISION, SourceTensors, sha256_file, validate_source
+from comfy.quant_ops import TensorCoreFP8E4M3Layout
 
 
 ASSETS = {'tokenizer_json': 'tokenizer.json', 'qwen3_omni_config_json': 'config.json',
@@ -64,7 +67,9 @@ def blocked_scales(scales):
     return blocked
 
 
-def make_plan(records, assets, num_experts):
+def make_plan(records, assets, num_experts, quantization='nvfp4'):
+    if quantization not in ('nvfp4', 'fp8'):
+        raise ValueError('Choose nvfp4 preservation or fp8 conversion')
     plan, consumed, excluded, expert_prefixes = {}, {}, {}, set()
 
     def add(name, kind, dtype, shape, groups=(), data=None):
@@ -80,8 +85,22 @@ def make_plan(records, assets, num_experts):
     def quantized(prefixes, target):
         rows = sum(records[prefix + '.weight'][2]['shape'][0] for prefix in prefixes[0])
         packed_cols = records[prefixes[0][0] + '.weight'][2]['shape'][1]
-        native_cols = (packed_cols + 15) // 16 * 16
         leading = [len(prefixes)] if len(prefixes) > 1 else []
+        if quantization == 'fp8':
+            columns = (packed_cols + 31) // 32 * 32
+            groups = [[prefix + '.weight' for prefix in group] for group in prefixes]
+            add(target + '.weight', 'fp8', 'F8_E4M3', [*leading, rows, columns], groups)
+            # A source group owns both its quantized weight and scale.
+            plan[target + '.weight']['columns'] = columns
+            add(target + '.weight_scale', 'fp8_scale', 'F32', leading)
+            plan[target + '.weight_scale']['groups'] = groups
+            descriptor = {'format': 'float8_e4m3fn', 'full_precision_matrix_mult': True}
+            if leading:
+                descriptor['num_experts'] = len(prefixes)
+            data = json.dumps(descriptor, separators=(',', ':')).encode()
+            add(target + '.comfy_quant', 'embedded', 'U8', [len(data)], data=data)
+            return
+        native_cols = (packed_cols + 15) // 16 * 16
         add(target + '.weight', 'packed', 'U8', [*leading, rows, native_cols],
             [[prefix + '.weight' for prefix in group] for group in prefixes])
         add(target + '.weight_scale', 'blocked', 'F8_E4M3', [*leading, (rows + 127) // 128 * 128, (native_cols // 8 + 3) // 4 * 4],
@@ -111,7 +130,8 @@ def make_plan(records, assets, num_experts):
             for bank, projections in [('gate_up_proj', ('gate_proj', 'up_proj')), ('down_proj', ('down_proj',))]:
                 groups = [[f'{prefix}.{i}.{projection}' for projection in projections] for i in range(num_experts)]
                 quantized(groups, mapped_name(prefix + '.' + bank))
-        elif entry['dtype'] == 'U8' and key.endswith('.weight'):
+        elif key.endswith('.weight') and (entry['dtype'] == 'U8' or
+                quantization == 'fp8' and len(entry['shape']) == 2 and not key.endswith(('embed_tokens.weight', 'pos_embed.weight', 'lm_head.weight', 'mlp.gate.weight'))):
             quantized([[key.removesuffix('.weight')]], mapped_name(key.removesuffix('.weight')))
         else:
             add(mapped_name(key), 'copy', entry['dtype'], entry['shape'], [[key]])
@@ -125,7 +145,17 @@ def make_plan(records, assets, num_experts):
 def transformed_parts(spec, tensors):
     for group in spec['groups']:
         values = [tensors(key) for key in group]
-        if spec['kind'] == 'global':
+        if spec['kind'] in ('fp8', 'fp8_scale'):
+            value = torch.cat(values, dim=0) if len(values) > 1 else values[0]
+            if value.dtype != torch.bfloat16 or not torch.isfinite(value).all():
+                raise ValueError(f'Original projection must contain finite BF16 weights: {group}')
+            scale = (value.abs().amax().float() / torch.finfo(torch.float8_e4m3fn).max).clamp_min(torch.finfo(torch.float32).tiny)
+            if spec['kind'] == 'fp8_scale':
+                value = scale
+            else:
+                value = F.pad(value, (0, spec['columns'] - value.shape[1]))
+                value, _ = TensorCoreFP8E4M3Layout.quantize(value.float(), scale=scale)
+        elif spec['kind'] == 'global':
             if not torch.isfinite(values[0]).all():
                 raise ValueError(f'Non-finite global scale: {group[0]}')
             for value in values[1:]:
@@ -144,16 +174,21 @@ def stream_checkpoint(source, records, plan, destination, provenance):
     if os.path.lexists(destination) or os.path.lexists(manifest_path):
         raise FileExistsError(f'Destination or manifest already exists: {destination}')
     destination.parent.mkdir(parents=True, exist_ok=True)
+    precision = provenance.get('precision', {'weights': 'ModelOpt NVFP4, lossless layout conversion', 'activations': 'native NVFP4', 'cache': 'bfloat16'})
     header = {'__metadata__': {'format': 'pt', 'model_type': 'qwen3_omni', 'source_revision': provenance['source_revision'],
-                               'weight_precision': 'ModelOpt NVFP4, lossless layout conversion',
-                               'activation_precision': 'native NVFP4', 'kv_cache_precision': 'bfloat16'}}
+                               'weight_precision': precision['weights'],
+                               'activation_precision': precision['activations'], 'kv_cache_precision': precision['cache']}}
     offset = 0
     for key, spec in sorted(plan.items()):
-        length = math.prod(spec['shape']) * {'U8': 1, 'F8_E4M3': 1, 'BF16': 2}[spec['dtype']]
+        length = math.prod(spec['shape']) * {'U8': 1, 'F8_E4M3': 1, 'BF16': 2, 'F32': 4}[spec['dtype']]
         header[key] = dict(dtype=spec['dtype'], shape=spec['shape'], data_offsets=[offset, offset + length])
         offset += length
     encoded = json.dumps(header, separators=(',', ':')).encode()
     encoded += b' ' * (-len(encoded) % 8)
+    required_bytes = 8 + len(encoded) + offset
+    free_bytes = shutil.disk_usage(destination.parent).free
+    if free_bytes < required_bytes:
+        raise OSError(f'Insufficient destination space: weights require {required_bytes} bytes, only {free_bytes} bytes are free. Reserve additional space for the provenance manifest.')
     temp_path = manifest_temp = None
     try:
         with tempfile.NamedTemporaryFile(dir=destination.parent, prefix='.' + destination.name + '.', delete=False) as output, ExitStack() as stack:
@@ -222,28 +257,46 @@ def stream_checkpoint(source, records, plan, destination, provenance):
     return manifest
 
 
-def convert(source, destination, revision):
+def convert(source, destination, revision, quantization='nvfp4'):
     if destination.suffix != '.safetensors':
         raise ValueError('Destination must have the .safetensors extension')
     if os.path.lexists(destination) or os.path.lexists(destination.with_suffix('.manifest.json')):
         raise FileExistsError(destination)
+    if quantization not in ('nvfp4', 'fp8'):
+        raise ValueError('Choose nvfp4 preservation or fp8 conversion')
+    if revision != {'nvfp4': SOURCE_REVISION, 'fp8': ORIGINAL_REVISION}[quantization]:
+        raise ValueError('FP8 conversion requires the pinned original Qwen source; NVFP4 preservation requires the pinned ModelOpt source.')
     records, evidence = validate_source(source, revision)
-    assets = {key: (source / filename).read_bytes() for key, filename in ASSETS.items()}
-    config = read_json(source / 'config.json')['thinker_config']['text_config']
-    plan, mapping, excluded = make_plan(records, assets, config['num_experts'])
+    if quantization == 'fp8':
+        processor = AutoProcessor.from_pretrained(source, local_files_only=True)
+        model_config = Qwen3OmniMoeConfig.from_pretrained(source, local_files_only=True).to_dict()
+        assets = {'tokenizer_json': processor.tokenizer.backend_tokenizer.to_str().encode(),
+                  'qwen3_omni_config_json': json.dumps(model_config).encode(),
+                  'qwen3_omni_processor_json': json.dumps({'image_processor': processor.image_processor.to_dict(),
+                                                         'feature_extractor': processor.feature_extractor.to_dict()}).encode(),
+                  'qwen3_omni_tokenizer_config_json': (source / 'tokenizer_config.json').read_bytes(),
+                  'qwen3_omni_chat_template': processor.chat_template.encode(),
+                  'qwen3_omni_quant_config_json': json.dumps({'quantization': 'float8_e4m3fn', 'activations': 'BF16', 'cache': 'BF16'}).encode()}
+    else:
+        assets = {key: (source / filename).read_bytes() for key, filename in ASSETS.items()}
+        model_config = read_json(source / 'config.json')
+    config = model_config['thinker_config']['text_config']
+    plan, mapping, excluded = make_plan(records, assets, config['num_experts'], quantization)
     root = Path(__file__).resolve().parents[1]
     git = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=root, text=True, capture_output=True)
     dirty = subprocess.run(['git', 'status', '--porcelain', '--', 'scripts/convert_qwen3_omni.py',
-                            'scripts/qwen3_omni_checkpoint.py', 'scripts/qwen3_omni_source.json'], cwd=root, text=True, capture_output=True)
-    provenance = {**evidence, 'source_files': read_json(SOURCE_MANIFEST)['files'],
+                            'scripts/qwen3_omni_checkpoint.py', 'scripts/qwen3_omni_source.json', 'scripts/qwen3_omni_original_source.json'], cwd=root, text=True, capture_output=True)
+    provenance = {**evidence, 'source_files': read_json(ORIGINAL_MANIFEST if quantization == 'fp8' else SOURCE_MANIFEST)['files'],
                   'converter_git_revision': git.stdout.strip() if git.returncode == 0 else None,
                   'converter_sources_dirty': bool(dirty.stdout.strip()) if dirty.returncode == 0 else None,
                   'converter_source_sha256': sha256_file(Path(__file__)),
                   'versions': {name: importlib.metadata.version(name) for name in ('torch', 'transformers', 'comfy-kitchen', 'safetensors')},
                   'source_to_target': mapping, 'excluded_speech_tensors': excluded,
                   'expert_order': list(range(config['num_experts'])), 'gate_up_order': ['gate_proj', 'up_proj'],
-                  'alignment': 'Zero-extend input columns to multiples of 32; preserve original packed values and scales',
-                  'precision': {'weights': 'NVFP4', 'activations': 'NVFP4', 'cache': 'BF16', 'publisher_w4a8_parity': False}}
+                  'alignment': 'Zero-extend input columns to multiples of 32',
+                  'precision': {'weights': 'FP8 E4M3' if quantization == 'fp8' else 'NVFP4',
+                                'activations': 'BF16' if quantization == 'fp8' else 'NVFP4',
+                                'cache': 'BF16', 'publisher_w4a8_parity': False}}
     return stream_checkpoint(source, records, plan, destination, provenance)
 
 
@@ -252,9 +305,10 @@ def main():
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--destination', type=Path, required=True)
     parser.add_argument('--source-revision', required=True)
+    parser.add_argument('--quantization', choices=('nvfp4', 'fp8'), default='nvfp4', help='Preserve ModelOpt NVFP4 or quantize original BF16 projections to FP8 E4M3 with BF16 compute/cache')
     args = parser.parse_args()
     torch.set_num_threads(4)
-    result = convert(args.source.resolve(), args.destination.absolute(), args.source_revision)
+    result = convert(args.source.resolve(), args.destination.absolute(), args.source_revision, args.quantization)
     print(f'Published {args.destination}: {result["output_bytes"]} bytes, sha256 {result["output_sha256"]}')
 
 
