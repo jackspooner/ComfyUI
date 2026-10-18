@@ -1,0 +1,803 @@
+{
+  "last_node_id": 15,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "title": "AuK-Flash transformer",
+      "pos": [
+        30,
+        80
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "auk_flash.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "title": "AuK Qwen conditioning",
+      "pos": [
+        30,
+        250
+      ],
+      "size": [
+        360,
+        150
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "auk_qwen25_omni_3b.safetensors",
+        "auk",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "title": "AuK audio VAE",
+      "pos": [
+        30,
+        440
+      ],
+      "size": [
+        360,
+        100
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            10,
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "auk_audio_vae.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "PrimitiveStringMultiline",
+      "title": "Instruction",
+      "pos": [
+        530,
+        80
+      ],
+      "size": [
+        360,
+        200
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            14
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "Say the following with the same voice: \"Hello there. This is a short audio test.\""
+      ]
+    },
+    {
+      "id": 15,
+      "type": "LoadAudio",
+      "title": "Choose reference audio",
+      "pos": [
+        530,
+        320
+      ],
+      "size": [
+        360,
+        240
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "reference.wav"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "PrimitiveFloat",
+      "title": "Target duration (seconds)",
+      "pos": [
+        1030,
+        80
+      ],
+      "size": [
+        360,
+        100
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "FLOAT",
+          "type": "FLOAT",
+          "links": [
+            15
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveFloat"
+      },
+      "widgets_values": [
+        5.0
+      ]
+    },
+    {
+      "id": 9,
+      "type": "RandomNoise",
+      "title": "Initial noise seed",
+      "pos": [
+        1030,
+        220
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "NOISE",
+          "type": "NOISE",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        42,
+        "fixed"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "KSamplerSelect",
+      "title": "Four-step Euler",
+      "pos": [
+        1030,
+        380
+      ],
+      "size": [
+        360,
+        100
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "ManualSigmas",
+      "title": "Exact AuK-Flash schedule",
+      "pos": [
+        1030,
+        520
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            7
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ManualSigmas"
+      },
+      "widgets_values": [
+        "1.0, 0.9238795042037964, 0.7071067690849304, 0.3826833963394165, 0.0"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "AuKConditioning",
+      "title": "Encode instruction and reference",
+      "pos": [
+        1530,
+        80
+      ],
+      "size": [
+        360,
+        210
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        },
+        {
+          "name": "instruction",
+          "type": "STRING",
+          "link": 14,
+          "widget": {
+            "name": "instruction"
+          }
+        },
+        {
+          "name": "reference_audio",
+          "type": "AUDIO",
+          "link": 12
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AuKConditioning"
+      },
+      "widgets_values": [
+        "",
+        0
+      ]
+    },
+    {
+      "id": 7,
+      "type": "EmptyAuKLatentAudio",
+      "title": "24 kHz \u00b7 50 latent frames/sec",
+      "pos": [
+        1530,
+        330
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "seconds",
+          "type": "FLOAT",
+          "link": 15,
+          "widget": {
+            "name": "seconds"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyAuKLatentAudio"
+      },
+      "widgets_values": [
+        5.0,
+        1
+      ]
+    },
+    {
+      "id": 8,
+      "type": "BasicGuider",
+      "title": "Conditional only \u00b7 no extra CFG",
+      "pos": [
+        2030,
+        80
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "GUIDER",
+          "type": "GUIDER",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BasicGuider"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 12,
+      "type": "SamplerCustomAdvanced",
+      "title": "Generate audio latents",
+      "pos": [
+        2030,
+        240
+      ],
+      "size": [
+        360,
+        220
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 4
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 5
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 6
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 7
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "VAEDecodeAudio",
+      "title": "Decode \u00b7 preserve waveform amplitude",
+      "pos": [
+        2530,
+        80
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 9
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecodeAudio"
+      },
+      "widgets_values": [
+        false
+      ]
+    },
+    {
+      "id": 14,
+      "type": "SaveAudioAdvanced",
+      "title": "Save AuK audio",
+      "pos": [
+        2530,
+        250
+      ],
+      "size": [
+        360,
+        180
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveAudioAdvanced"
+      },
+      "widgets_values": [
+        "audio/auk_reference",
+        "flac"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      1,
+      0,
+      8,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      6,
+      0,
+      8,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      4,
+      9,
+      0,
+      12,
+      0,
+      "NOISE"
+    ],
+    [
+      5,
+      8,
+      0,
+      12,
+      1,
+      "GUIDER"
+    ],
+    [
+      6,
+      10,
+      0,
+      12,
+      2,
+      "SAMPLER"
+    ],
+    [
+      7,
+      11,
+      0,
+      12,
+      3,
+      "SIGMAS"
+    ],
+    [
+      8,
+      7,
+      0,
+      12,
+      4,
+      "LATENT"
+    ],
+    [
+      9,
+      12,
+      0,
+      13,
+      0,
+      "LATENT"
+    ],
+    [
+      10,
+      3,
+      0,
+      13,
+      1,
+      "VAE"
+    ],
+    [
+      11,
+      13,
+      0,
+      14,
+      0,
+      "AUDIO"
+    ],
+    [
+      12,
+      15,
+      0,
+      6,
+      2,
+      "AUDIO"
+    ],
+    [
+      13,
+      3,
+      0,
+      6,
+      3,
+      "VAE"
+    ],
+    [
+      14,
+      4,
+      0,
+      6,
+      1,
+      "STRING"
+    ],
+    [
+      15,
+      5,
+      0,
+      7,
+      0,
+      "FLOAT"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "1 \u00b7 Model Loading",
+      "bounding": [
+        0,
+        0,
+        420,
+        570
+      ],
+      "color": "#35576b",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "title": "2 \u00b7 Inputs",
+      "bounding": [
+        500,
+        0,
+        420,
+        590
+      ],
+      "color": "#4f7350",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "title": "3 \u00b7 Configuration",
+      "bounding": [
+        1000,
+        0,
+        420,
+        670
+      ],
+      "color": "#82673d",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "title": "4 \u00b7 Conditioning",
+      "bounding": [
+        1500,
+        0,
+        420,
+        490
+      ],
+      "color": "#685080",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "title": "5 \u00b7 Sampling",
+      "bounding": [
+        2000,
+        0,
+        420,
+        490
+      ],
+      "color": "#496f79",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "title": "6 \u00b7 Output",
+      "bounding": [
+        2500,
+        0,
+        420,
+        460
+      ],
+      "color": "#754b59",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.5,
+      "offset": [
+        50,
+        50
+      ]
+    }
+  },
+  "version": 0.4
+}

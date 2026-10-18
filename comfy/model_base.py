@@ -86,6 +86,7 @@ import comfy.ldm.depth_anything_3.model
 
 import comfy.model_management
 import comfy.patcher_extension
+import comfy.ldm.auk.model
 import comfy.conds
 import comfy.ops
 from enum import Enum
@@ -3063,4 +3064,27 @@ class CogVideoX(BaseModel):
                 noise = kwargs.get("noise", None)
                 ofs = torch.full((noise.shape[0],), 2.0, device=noise.device, dtype=noise.dtype)
             out['ofs'] = comfy.conds.CONDRegular(ofs)
+        return out
+
+
+class AuK(BaseModel):
+    def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
+        super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.auk.model.AuK)
+        self.memory_usage_factor_conds = ("reference",)
+
+    def extra_conds(self, **kwargs):
+        out = super().extra_conds(**kwargs)
+        context = kwargs.get("cross_attn")
+        if context is not None:
+            context = self.diffusion_model.preprocess_text(context.to(device=kwargs["device"], dtype=self.get_dtype_inference()))
+            out["c_crossattn"] = comfy.conds.CONDRegular(context)
+        mask = kwargs.get("attention_mask")
+        if mask is not None:
+            out["attention_mask"] = comfy.conds.CONDRegular(mask.bool())
+        reference = kwargs.get("auk_reference")
+        if reference is not None:
+            out["reference"] = comfy.conds.CONDRegular(reference)
+            length = kwargs.get("auk_reference_length", reference.shape[-1])
+            mask = torch.arange(reference.shape[-1], device=reference.device)[None, :] < length
+            out["reference_mask"] = comfy.conds.CONDRegular(mask)
         return out
