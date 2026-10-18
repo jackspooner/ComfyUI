@@ -424,3 +424,7 @@ Run broader required checks and report external/runtime limitations. The shared
 discovery after integration; never register task worktrees globally. History is
 explicit data, without model-owned sessions, persistent GPU caches or implicit
 trimming. Setup must not restart services.
+
+### Optional native YingMusic
+
+Use `--yingmusic` with the standard worktree setup command to check preinstalled lyric dependencies and espeak-ng. `docs/yingmusic.md` documents local conversion, native loader/node contracts and acceptance status. Run `python -m pytest tests-unit/comfy_test/yingmusic_test.py -q` with the prepared interpreter; real checkpoint comparisons are a separate explicit check. Extend the authoritative shared ComfyUI/model-runtimes guidance alongside reusable changes.

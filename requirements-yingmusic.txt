@@ -1,0 +1,7 @@
+# Optional native YingMusic lyric preprocessing; neural inference uses ComfyUI.
+phonemizer==3.3.0
+inflect==7.5.0
+pypinyin==0.55.0
+cn2an==0.5.23
+jieba==0.42.1
+onnxruntime>=1.20

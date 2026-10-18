@@ -755,6 +755,8 @@ class VAE:
                 if yue2_vae:
                     config.update(channels=64, c_mults=[1, 2, 4, 8, 16, 32], strides=[2, 2, 4, 4, 5, 6],
                                   sample_latent=False)
+                if metadata is not None and metadata.get("source") == "ASLP-lab/YingMusic-Singer-Plus":
+                    self.crop_input = False
                 self.first_stage_model = AudioOobleckVAE(**config)
                 self.memory_used_encode = lambda shape, dtype: (1000 * shape[2]) * model_management.dtype_size(dtype)
                 self.memory_used_decode = lambda shape, dtype: (1000 * shape[2] * 2048) * model_management.dtype_size(dtype)
