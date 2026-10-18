@@ -8,6 +8,16 @@ This fork adds native audio understanding and transcription with NVIDIA Audio Fl
 
 **The most powerful and modular AI engine for content creation.**
 
+## Native YingMusic Singer Plus in this fork
+
+This fork adds the Singer Plus transformer and melody encoder to ComfyUI's native
+loaders, attention and memory management. **Load Diffusion Model + Load Audio
+Encoder + Load VAE → YingMusic Generate / Edit Singing** accepts voice and melody
+audio references and Chinese/English lyrics. Weight conversion is local and explicit;
+there is no singing inference worker. Optional phonemizer/espeak and Chinese ONNX
+assets are used only for lyric preprocessing. See [setup, conversion and limitations](docs/yingmusic.md).
+This source change is under validation and has not yet been activated in the serving process.
+
 ## Native PaddleOCR in this fork
 
 This fork adds **Load PaddleOCR Models → PaddleOCR** for local PP-OCRv6 medium
