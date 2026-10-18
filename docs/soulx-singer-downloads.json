@@ -1,0 +1,128 @@
+[
+  {
+    "downloadId": "0-CxPFscB-9Ty03llOAiW",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer/resolve/40493ad90286056c7a9095035164434a79daa8c9/config.yaml",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer/config.yaml",
+    "batchId": "L6sxUUjbixZqEO4_e_Axf"
+  },
+  {
+    "downloadId": "dPCUenUwM9J8pV-netgaS",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer/resolve/40493ad90286056c7a9095035164434a79daa8c9/model-svc.pt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer/model-svc.pt",
+    "batchId": "L6sxUUjbixZqEO4_e_Axf"
+  },
+  {
+    "downloadId": "rP22rNZ3pTbO8NXrtkuPl",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer/resolve/40493ad90286056c7a9095035164434a79daa8c9/model.pt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer/model.pt",
+    "batchId": "L6sxUUjbixZqEO4_e_Axf"
+  },
+  {
+    "downloadId": "i4iNK3e1CqqBNbX436Gr5",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/dereverb_mel_band_roformer/dereverb_mel_band_roformer_anvuew.yaml",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/dereverb_mel_band_roformer/dereverb_mel_band_roformer_anvuew.yaml",
+    "batchId": "0j-EdpeV6sd8U2qaypDo0"
+  },
+  {
+    "downloadId": "rcWeiJX2PSaRGRiN5Jfku",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/dereverb_mel_band_roformer/dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/dereverb_mel_band_roformer/dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+    "batchId": "0j-EdpeV6sd8U2qaypDo0"
+  },
+  {
+    "downloadId": "SUKTCv3jb-t_LgQglvQlX",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/mel-band-roformer-karaoke/config_karaoke_becruily.yaml",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/mel-band-roformer-karaoke/config_karaoke_becruily.yaml",
+    "batchId": "bjth9I2cCRv705wyxpenr"
+  },
+  {
+    "downloadId": "Ur9fQm3OShkW3EsfGkmV-",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/mel-band-roformer-karaoke/mel_band_roformer_karaoke_becruily.ckpt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/mel-band-roformer-karaoke/mel_band_roformer_karaoke_becruily.ckpt",
+    "batchId": "bjth9I2cCRv705wyxpenr"
+  },
+  {
+    "downloadId": "WSww1xAMIxF52RaZNOnfm",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/parakeet-tdt-0.6b-v2/parakeet-tdt-0.6b-v2.nemo",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/parakeet-tdt-0.6b-v2/parakeet-tdt-0.6b-v2.nemo",
+    "batchId": "vsdNdC6B_2U42XB9vdYWq"
+  },
+  {
+    "downloadId": "TwReM2XTntkKtyErICnfL",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/rmvpe/rmvpe.pt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/rmvpe/rmvpe.pt",
+    "batchId": "nszPfur5XI2qkkrpnMOzN"
+  },
+  {
+    "downloadId": "dNUshxq4iFJV0Qic6YTV6",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/rosvot/rmvpe/model.pt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/rosvot/rmvpe/model.pt",
+    "batchId": "1ulNc3HCAByjGuTX-bhJm"
+  },
+  {
+    "downloadId": "juXlb3hw8pHM9WhNPTPcp",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/rosvot/rosvot/config.yaml",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/rosvot/rosvot/config.yaml",
+    "batchId": "P4lceGUH6GbDuDzxAe3FK"
+  },
+  {
+    "downloadId": "sH-dUMSgOqmwfWGVf4bPn",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/rosvot/rosvot/model.pt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/rosvot/rosvot/model.pt",
+    "batchId": "P4lceGUH6GbDuDzxAe3FK"
+  },
+  {
+    "downloadId": "eq0gtCVFX0QOrDlBHOoi_",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/rosvot/rwbd/config.yaml",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/rosvot/rwbd/config.yaml",
+    "batchId": "AKYmvZR16QxrAUftpmzVY"
+  },
+  {
+    "downloadId": "zpnbR-hQ7tZlB9oHD78_X",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/rosvot/rwbd/model.pt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/rosvot/rwbd/model.pt",
+    "batchId": "AKYmvZR16QxrAUftpmzVY"
+  },
+  {
+    "downloadId": "L0iyFkGvwZ_ssWgH4wV_b",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/README.md",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/README.md",
+    "batchId": "4Hj-qWZx1_NdMfm7dQd2T"
+  },
+  {
+    "downloadId": "df6AmcCyegPtdl4dHquMS",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/am.mvn",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/am.mvn",
+    "batchId": "4Hj-qWZx1_NdMfm7dQd2T"
+  },
+  {
+    "downloadId": "18LMXPyTEEZSiGw9o7Dav",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/config.yaml",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/config.yaml",
+    "batchId": "4Hj-qWZx1_NdMfm7dQd2T"
+  },
+  {
+    "downloadId": "wMx2GC29HdMZLCDrnyygK",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/configuration.json",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/configuration.json",
+    "batchId": "4Hj-qWZx1_NdMfm7dQd2T"
+  },
+  {
+    "downloadId": "fSY1uBPSXu-pBn49FZbLk",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/model.pt",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/model.pt",
+    "batchId": "4Hj-qWZx1_NdMfm7dQd2T"
+  },
+  {
+    "downloadId": "PBGQm4gJP03S0v78EPjXJ",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/seg_dict",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/seg_dict",
+    "batchId": "4Hj-qWZx1_NdMfm7dQd2T"
+  },
+  {
+    "downloadId": "qHsJ_bEdjtHF7vRMOf4a9",
+    "url": "https://huggingface.co/Soul-AILab/SoulX-Singer-Preprocess/resolve/83dc50289d22a81b1e9998f5b9e111aef7c1fdcd/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/tokens.json",
+    "fullPath": "/home/jack/models/audio-sources/SoulX-Singer-Preprocess/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/tokens.json",
+    "batchId": "4Hj-qWZx1_NdMfm7dQd2T"
+  }
+]

@@ -1,0 +1,222 @@
+{
+  "SoulX-Singer": {
+    "revision": "40493ad90286056c7a9095035164434a79daa8c9",
+    "files": [
+      {
+        "rfilename": "README.md",
+        "blobId": "01bb92657df651231ec6a94153858c9267647b0f",
+        "size": 3994
+      },
+      {
+        "rfilename": "config.yaml",
+        "blobId": "b2964b328783451e6239e78e1e2558fcfe404ffb",
+        "size": 579
+      },
+      {
+        "rfilename": "model-svc.pt",
+        "blobId": "6f43fad5adc8ebfba9d7ce8bc499cd898860ff3c",
+        "size": 2793965154,
+        "lfs": {
+          "sha256": "38e72d9e15be6eef3cc937daaf81421a7b5b546816786530bb9aa346cee5d43c",
+          "size": 2793965154,
+          "pointerSize": 135
+        }
+      },
+      {
+        "rfilename": "model.pt",
+        "blobId": "3f7f942666022187f611fa1c116f47260c36017c",
+        "size": 2818092278,
+        "lfs": {
+          "sha256": "447eaf41f91a6b6659d55e9ec3c9b809221724fb8592aebaec35a23751a5b500",
+          "size": 2818092278,
+          "pointerSize": 135
+        }
+      }
+    ]
+  },
+  "SoulX-Singer-Preprocess": {
+    "revision": "83dc50289d22a81b1e9998f5b9e111aef7c1fdcd",
+    "files": [
+      {
+        "rfilename": "README.md",
+        "blobId": "7b95401dc46245ac339fc25059d4a56d90b4cde5",
+        "size": 31
+      },
+      {
+        "rfilename": "dereverb_mel_band_roformer/dereverb_mel_band_roformer_anvuew.yaml",
+        "blobId": "d7da4df12df55e46c7443f42d421cf93ae17c884",
+        "size": 1846
+      },
+      {
+        "rfilename": "dereverb_mel_band_roformer/dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+        "blobId": "8f21995361b651a6c446cb4e1e7664d94eb42bff",
+        "size": 913107578,
+        "lfs": {
+          "sha256": "9262877b87e9ebb0fb808a456b0a411fa677f5df31c8383c1254af531c078970",
+          "size": 913107578,
+          "pointerSize": 134
+        }
+      },
+      {
+        "rfilename": "mel-band-roformer-karaoke/config_karaoke_becruily.yaml",
+        "blobId": "148b148cd8af9c14c0907fcdc491a95f6c9f06b2",
+        "size": 1724
+      },
+      {
+        "rfilename": "mel-band-roformer-karaoke/mel_band_roformer_karaoke_becruily.ckpt",
+        "blobId": "ceaad63144a44e85b64617f842686673070bf5dc",
+        "size": 1719139254,
+        "lfs": {
+          "sha256": "d3aa262ac01df870b9fc033e9c7b6cad33fe04fc9c148b6c40841326a515a0e0",
+          "size": 1719139254,
+          "pointerSize": 135
+        }
+      },
+      {
+        "rfilename": "parakeet-tdt-0.6b-v2/parakeet-tdt-0.6b-v2.nemo",
+        "blobId": "75eb358e52804fae8d1ab9a1ce0abb5fbe80f0e5",
+        "size": 2472222720,
+        "lfs": {
+          "sha256": "d99e39955c9d3d0350d8fb7c75e40c64a2b2eaeb003883d7c941fd2e8747b28c",
+          "size": 2472222720,
+          "pointerSize": 135
+        }
+      },
+      {
+        "rfilename": "rmvpe/rmvpe.pt",
+        "blobId": "6362f060846875c3b5d7012adea5f97e47305e7e",
+        "size": 181184272,
+        "lfs": {
+          "sha256": "6d62215f4306e3ca278246188607209f09af3dc77ed4232efdd069798c4ec193",
+          "size": 181184272,
+          "pointerSize": 134
+        }
+      },
+      {
+        "rfilename": "rosvot/rmvpe/model.pt",
+        "blobId": "c70b9e1c71c721763a91e200607fb1d17494ae6c",
+        "size": 368492925,
+        "lfs": {
+          "sha256": "19dc1809cf4cdb0a18db93441816bc327e14e5644b72eeaae5220560c6736fe2",
+          "size": 368492925,
+          "pointerSize": 134
+        }
+      },
+      {
+        "rfilename": "rosvot/rosvot/config.yaml",
+        "blobId": "9bb0fcc63854d82cd615350ad09344fb9e792c10",
+        "size": 3189
+      },
+      {
+        "rfilename": "rosvot/rosvot/model.pt",
+        "blobId": "eda325429938ca4c0fb17c92f3c68214cbdb0d6c",
+        "size": 144674420,
+        "lfs": {
+          "sha256": "7501fb5f913d971c2f51bcb3063b930027b03206581820a4d2bfdc394c9c3fcb",
+          "size": 144674420,
+          "pointerSize": 134
+        }
+      },
+      {
+        "rfilename": "rosvot/rwbd/config.yaml",
+        "blobId": "036bfff9d6e88fde1f1e2b1bf232f36df3046deb",
+        "size": 3451
+      },
+      {
+        "rfilename": "rosvot/rwbd/model.pt",
+        "blobId": "242f63d7eceedfd0e024eb487c5f3a05ddfee3df",
+        "size": 119897457,
+        "lfs": {
+          "sha256": "0bc2d42a6d4b7a05436deb937e2deda1c12de49e5687cfda0bdf6a430120dcd2",
+          "size": 119897457,
+          "pointerSize": 134
+        }
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/README.md",
+        "blobId": "cd2aba9454dc6ca1f6da32dcd064105f0e2ba346",
+        "size": 12899
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/am.mvn",
+        "blobId": "681910cd1ab6458b61474cdbf0d1ac5e810f7b0d",
+        "size": 11203
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/asr_example_hotword.wav",
+        "blobId": "05bc876aec49da27914fbfccf3a810c13e1d331f",
+        "size": 253642,
+        "lfs": {
+          "sha256": "51792bc95be33075c1a8abb9afb76ad9f72943e84cd723cc8825b2678799b004",
+          "size": 253642,
+          "pointerSize": 131
+        }
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/config.yaml",
+        "blobId": "14832f39649f00b82ad2fb1afed2cf34428b4299",
+        "size": 3477
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/configuration.json",
+        "blobId": "a746a0d6c82a4c7c6aa2a53e7c0c8e5740395d9e",
+        "size": 478
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/example/asr_example.wav",
+        "blobId": "414823b333ccb88818f3062def680dfa07ab6b36",
+        "size": 144770,
+        "lfs": {
+          "sha256": "2ffa478de2cd570dd54e8762008cd6bbde9871fd79757f1cdbbec7d6b7b49274",
+          "size": 144770,
+          "pointerSize": 131
+        }
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/example/hotword.txt",
+        "blobId": "f8f2fd036361897776eb46b94939e32f28c4a544",
+        "size": 7
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/fig/res.png",
+        "blobId": "468d2f62e31d567ecb098153c74017953f3d3637",
+        "size": 196655,
+        "lfs": {
+          "sha256": "1f59ebc6a86733896b2b84110e2aae5625754382762bf1324e017d89a152c2fb",
+          "size": 196655,
+          "pointerSize": 131
+        }
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/fig/seaco.png",
+        "blobId": "d3607723b65d0e6aed00a0e69e72ceba35dfa711",
+        "size": 170780,
+        "lfs": {
+          "sha256": "6886864eb6bcc6487a17111b5e3353bd72e7c78fda98c27cf47faa35eafbdcaf",
+          "size": 170780,
+          "pointerSize": 131
+        }
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/model.pt",
+        "blobId": "8586bfbfab9a29a26ba4cea7b930f7e92777e2b4",
+        "size": 989763045,
+        "lfs": {
+          "sha256": "3d491689244ec5dfbf9170ef3827c358aa10f1f20e42a7c59e15e688647946d1",
+          "size": 989763045,
+          "pointerSize": 134
+        }
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/seg_dict",
+        "blobId": "fb19e07f2870b09b08226a42d7d5d6d26a3f3a16",
+        "size": 8287834
+      },
+      {
+        "rfilename": "speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch/tokens.json",
+        "blobId": "f8bc9c31ab1ba458aee5423fa24164958153f923",
+        "size": 93676
+      }
+    ]
+  }
+}
