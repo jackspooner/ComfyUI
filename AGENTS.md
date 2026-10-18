@@ -428,3 +428,13 @@ trimming. Setup must not restart services.
 ### Optional native YingMusic
 
 Use `--yingmusic` with the standard worktree setup command to check preinstalled lyric dependencies and espeak-ng. `docs/yingmusic.md` documents local conversion, native loader/node contracts and acceptance status. Run `python -m pytest tests-unit/comfy_test/yingmusic_test.py -q` with the prepared interpreter; real checkpoint comparisons are a separate explicit check. Extend the authoritative shared ComfyUI/model-runtimes guidance alongside reusable changes.
+
+### Optional native SoulX-Singer
+
+Use `--soulx` with the standard setup command to check preinstalled NumPy, SciPy,
+librosa and soundfile without installing packages or loading models. See
+`docs/soulx-singer.md` for the pinned offline converter, native SVS/SVC and
+preprocessing contracts, examples, parity commands and acceptance limits. Run
+`python -m pytest tests-unit/comfy_test/soulx_singer_test.py -q`. Extend the existing
+authoritative `comfyui` and `comfyui-model-runtimes` skills with reusable changes;
+never register this task worktree globally. Setup does not activate the service.
