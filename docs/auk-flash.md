@@ -1,11 +1,11 @@
 # Native AuK-Flash integration
 
-This branch adds native offline AuK MODEL, Qwen-Omni conditioning CLIP and audio VAE
-components. **Development status: not deployed or accepted for production.** CPU
+This fork provides native offline AuK MODEL, Qwen-Omni conditioning CLIP and audio VAE
+components, activated locally on 2026-10-18. CPU
 full-checkpoint comparisons and complete offline conversion pass. Native GPU BF16
 generation, repeatability, cancellation and unload/reload run successfully. Listening,
 edit effectiveness and longer resource tests remain required before release.
-No ComfyUI service restart is part of this change.
+Other installations require a separate idle service rollout and live verification.
 
 ## Sources and requirements
 

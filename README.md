@@ -148,14 +148,15 @@ memory still limit execution. See [token budgets and caption prompting](docs/mos
 Reasoning is separated at `</think>` even when the model omits the opening tag,
 preventing reasoning or duplicate text from leaking into `generated_text`.
 
-## Native AuK-Flash development
+## Native AuK-Flash
 
 This fork adds an offline converter and native MODEL, Qwen-Omni conditioning CLIP
 and audio VAE for [Tencent AuK-Flash](https://huggingface.co/tencent/AuK-Flash), plus
 an optional local prompt helper. It reuses standard loading, Euler sampling and
 audio output. [Setup, examples and verification status](docs/auk-flash.md) distinguish
 passing full-weight CPU/GPU checks from pending listening and broader resource acceptance.
-This integration is under development and has not been deployed.
+The local deployment includes these nodes; listening and broader quality acceptance
+remain incomplete. Verify the running inventory when using another installation.
 
 ## Local stable-release maintenance
 

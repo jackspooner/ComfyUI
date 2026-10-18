@@ -1,6 +1,6 @@
 # AuK-Flash development acceptance
 
-Status: implemented and exercised locally; not deployed. This record does not
+Status: implemented, exercised locally and activated on 2026-10-18. This record does not
 certify listening quality or all memory/backends. Source pins and commands are in
 [the integration guide](auk-flash.md).
 
@@ -94,4 +94,7 @@ The happy-emotion edit was described as neutral in both CPU implementations. Tha
 case establishes execution and comparison coverage, not successful emotion control.
 Listening, speaker preservation, edit effectiveness, longer runs, varied durations,
 forced low-memory pressure and other accelerator backends remain unaccepted.
-No service restart or deployment has occurred.
+The authorized 2026-10-18 rollout activated the native nodes after merging current
+main. Combined checks passed: 111 AuK/loading/MOSS/OCR tests, 11 upstream AuK
+comparisons and 45 text-history/generation tests. One optional MOSS reference
+module was skipped. RouterAudio facade acceptance is recorded separately.
