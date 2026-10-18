@@ -144,17 +144,18 @@ ComfyUI is the AI creation engine for visual professionals who demand control ov
 - The most sophisticated workflows can be exposed through a simple UI thanks to App Mode.
 - It integrates seamlessly into production pipelines with our API endpoints.
 
-## Planned Qwen3-Omni integration
+## Native Qwen3-Omni in this fork
 
-The [Qwen3-Omni project documents](docs/qwen3-omni/README.md) define a planned
-native CLIP integration using the community NVFP4 Instruct checkpoint: text,
-audio and image inputs, including combined inputs, with text output through
-Generate Text. The converter, reference tools and native adapter are implemented
-on the project branch. Component tests and a reconstructed GPU reference exist.
-The single-file package loads with its embedded tokenizer; native precision checks
-match the reference fixture assertions. Lifecycle checks pass; installation remains
-under validation. See the
-[checkpoint findings, command and unresolved gates](docs/qwen3-omni/status.md).
+Load CLIP (`qwen3_omni`) → Generate Text supports text, audio, complete image
+batches and combined inputs to text. The offline converter preserves the selected
+NVFP4 checkpoint's packed weights and embeds inference assets in one file. Native
+RTX 5090 execution, cancellation/offload/model transitions and live queue runs
+are verified. The reconstructed-reference suite has no new assertion failures;
+both paths pass 20/24 cases, retaining checkpoint OCR/silence limitations and
+prompt sensitivity. See [operation and saved workflow](docs/qwen3-omni/usage.md),
+[measurements and live evidence](docs/qwen3-omni/status.md), and
+[conversion/recovery](docs/qwen3-omni/quantization.md). Video, speech output,
+diffusion conditioning and Omni history are outside this integration.
 
 ## Native MOSS-Audio in this fork
 

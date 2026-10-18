@@ -6,8 +6,8 @@ The converter, reconstructed reference and native adapter are implemented. The
 converted artifact loads its own tokenizer and all 599 quantized modules.
 Three-pass accelerated NVFP4 execution completes the frozen 24-case comparison
 with **zero new assertion failures**: native and reference each pass 20/24 cases.
-Installation and live queue acceptance are pending; source delivery alone does
-not establish installation.
+The artifact is installed and live text/audio/image/combined queue acceptance
+passes. Source errors remain documented below.
 
 ## Verified source and package
 
@@ -104,10 +104,55 @@ that checked physical free memory before idle dynamic weights could be evicted;
 the generation owner now asks its existing memory owner to release idle weights
 while preserving the requested model and its patches before refusing admission.
 
-## Remaining release work
+## Installation and live acceptance
 
-Complete boundary/kernel checks, merge concurrent committed main changes, run cumulative
-regressions and graph change analysis, then install and verify through the normal
-ComfyUI queue. Preserve current launch flags and serving dependencies. Activation
-requires an idle maintenance window; queue submissions themselves need not wait
-for an empty queue. Failed or interrupted runs remain outside accepted evidence.
+[Native boundary/kernel checks](results/native-boundaries-kernels.json) pass:
+empty prompt, system override, raw template, explicit one-token/automatic budgets,
+8 kHz stereo, 44.1 kHz stereo, 48 kHz mono and one-sample audio all execute.
+Automatic output stops at EOS. Empty/one-sample cases have no quality assertion;
+the one-sample answer hallucinates a tone. A single-token trace records 2,880
+NVFP4 matmuls using actual SM120 tensor-core kernels, with 1,920 activation
+residual decodes (all 16 padded rows), and no weight matrix decode.
+
+Current committed main through `7597b0fe` is merged, preserving Audio Flamingo
+and YingMusic, including their established loader IDs. The combined regression
+suite passes **182 tests**, with four expected optional/GPU skips; the isolated
+MOSS reference suite passes 14 tests. Graph change analysis is supplemented by
+source review because receiver typing and nested operation factories limit its
+call coverage. The implementation was integrated and pushed at `0af961b6`, then activated
+in an idle window. Serving dependencies and the systemd unit/launch flags are
+unchanged. The running loader advertises `qwen3_omni` and the installed artifact
+under the configured text-encoder root. Installation uses an exclusive hardlink
+to the verified retained candidate, avoiding a second 18.78 GB allocation.
+
+[Live queue evidence](results/live-acceptance.json) verifies these prompt IDs
+and reads/checksums every saved final/raw output:
+
+| Input | Prompt ID | Observation |
+| --- | --- | --- |
+| Text | `78e70a4f-24b0-42f3-adb3-cdfccdcc317e` | `12` |
+| Audio | `a222b571-7f6b-4cbc-a987-1f8edb2b16db` | Main sound is speech |
+| Images | `30b320d6-3bd1-49ba-b9f9-ad881ad0ae39` | Red square, then blue circle |
+| Combined | `c1caff19-095b-41a3-bcc5-d4ef0e973919` | Both shapes/colors and speech |
+
+The combined demo uses an explicit three-line prompt and exactly matches the
+reconstructed reference. An earlier general prompt omitted the images in both
+reference and native output; the reference also called speech silent. The native
+answer contradicted itself about audio. Both failed outputs are retained in the
+live evidence, separately from the unchanged frozen suite. A CPU audit confirms
+exact expanded IDs, FP32 media and positions for both additional prompts. The
+checkpoint is prompt sensitive; clear per-input questions help but do not promise
+accurate perception. The first API submissions used an incorrectly nested dynamic
+selector and failed before inference; corrected API prompts use the string `off`.
+
+The editable **Qwen3-Omni - Text Image Audio.json** workflow is saved in
+`user/default/workflows/`, with two images, audio, a text prompt, final/raw previews
+and saved text outputs. It uses 512 output tokens, sampling/thinking/MTP off and
+no history. Its 12 nodes/seven groups pass the layout checker. The
+[API companion](workflows/demo-api.json) preserves the same connections/settings.
+Demo input media/attribution are in `input/qwen3_omni_demo/`.
+
+[Actual packaged-model overflow evidence](results/expanded-overflow.json) rejects
+65,702 expanded tokens before model loading, although the unexpanded prompt plus
+output would fit. No implicit trimming is performed. See [operation/recovery](usage.md)
+for selection, outputs, precision, budgets, queue ownership and activation rollback.

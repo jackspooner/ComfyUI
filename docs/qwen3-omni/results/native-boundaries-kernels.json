@@ -1,0 +1,493 @@
+{
+  "scope": "Native boundary execution; unasserted empty/one-sample responses are not quality acceptance",
+  "results": {
+    "source_revision": "0ed3aa2b00eeedbb0d38b6d4738f506af759213b",
+    "artifact_sha256": "039c9d4347a4be90ddbc8994909bd9870e610228dd95b336f612bf2936f2fe9b",
+    "manifest_sha256": "e528f128627350c5af52bf17eabbc6eb791c0574aecfcc26237738921a5b4a8d",
+    "cases_sha256": "628784675311c1d6fa011407f5299dbbb718b0347fa00dfc05c2e6a8db982269",
+    "harness_sha256": "15dc677957cb3cc815c7daac27ec81141ae89176ce9abeeb1dfe99d3e1bb67db",
+    "precision": "nvfp4",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "tokens_override": null,
+    "capture_enabled": true,
+    "profile_enabled": true,
+    "source_code_sha256": {
+      "comfy/text_encoders/qwen3_omni.py": "bb5f78d797db45e3ffa37d4b64320090bb828caf483a8e236c54449fceba9c96",
+      "comfy/text_encoders/llama.py": "0ad0bc7385cccba6339eb3c9fdc7aa93da1c9acd207ce99a06a850054b01bbb7",
+      "comfy/ops.py": "65457b8e7eb519fd3f9542e8c55131853d483dd65b6f3ba172cdc354f180f967",
+      "comfy/quant_ops.py": "37f0054dfbd8430524ac2c73dafd25b8ad4eabc490a2b7490eeebde8dffbc749",
+      "comfy/sd.py": "c2a01143637d906e299f9ba89ca8f9d6a5c7ea5b2d1185bdda3b678cadbaa576",
+      "comfy/sd1_clip.py": "9eb20b561ed3746d760087d3407ce5ce527ff772e94ceae36da43264a88d516e",
+      "comfy/model_management.py": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+      "comfy/model_prefetch.py": "21db82f85592362a5a96b31a0746ad463bb8f9a5973c2e6f658684c44ef715fd",
+      "comfy/model_patcher.py": "7edc88d9eae6a88637625d257dc73684cfc012a29446bf88e70d22e3a6be3994"
+    },
+    "git_revision": "f959b52a6b4938d23983d340223fa9d1364651ca",
+    "source_changes": "M  comfy/sd.py\n",
+    "nvfp4_input_passes_override": null,
+    "lifecycle_harness_sha256": "e3eb1f94dda2537757432c2cb51a79426fb7aae4cb7c150dd73df7959881feec",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "transformers": "5.20.0",
+      "comfy-kitchen": "0.2.37",
+      "comfy-aimdo": "0.5.6"
+    },
+    "cache_condition": "Fresh native process; OS file cache uncontrolled and warmed by integrity verification",
+    "cases": [
+      {
+        "id": "profile_raw_single_token",
+        "text": "home",
+        "raw_text": " home",
+        "generated_ids": [
+          2114
+        ],
+        "eos_reached": false,
+        "elapsed_seconds": 16.10007339400181,
+        "peak_torch_gpu_bytes": 69306368,
+        "peak_host_rss_bytes": 7336878080,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19008585728,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 69206016,
+          "host_rss_bytes": 7337721856,
+          "peak_host_rss_bytes": 7336878080
+        },
+        "assertions": [],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 15.24831001200073,
+        "operator_counts": {
+          "comfy_kitchen::quantize_nvfp4": 2880,
+          "void comfy::(anonymous namespace)::quantize_nvfp4_kernel<__nv_bfloat16, __nv_fp4x2_e2m1, __nv_fp8_e4m3, true, true>(__nv_bfloat16 const*, float const*, __nv_fp4x2_e2m1*, __nv_fp8_e4m3*, unsigned long, unsigned long, unsigned long, unsigned long, float)": 2880,
+          "comfy_kitchen::scaled_mm_nvfp4": 2880,
+          "comfy_kitchen::dequantize_nvfp4": 1920,
+          "void comfy::(anonymous namespace)::dequantize_nvfp4_kernel<__nv_fp4x2_e2m1, __nv_bfloat16, __nv_fp8_e4m3, true>(__nv_fp4x2_e2m1 const*, float const*, __nv_fp8_e4m3 const*, __nv_bfloat16*, unsigned long, unsigned long)": 1920
+        }
+      },
+      {
+        "id": "boundary_empty",
+        "text": "It seems like your message might be incomplete. Could you please provide more details or",
+        "raw_text": "It seems like your message might be incomplete. Could you please provide more details or",
+        "generated_ids": [
+          2132,
+          4977,
+          1075,
+          697,
+          1943,
+          2578,
+          387,
+          32143,
+          13,
+          16503,
+          498,
+          4486,
+          3410,
+          803,
+          3565,
+          476
+        ],
+        "eos_reached": false,
+        "elapsed_seconds": 10.19091161400138,
+        "peak_torch_gpu_bytes": 72443904,
+        "peak_host_rss_bytes": 8570380288,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19014877184,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 73400320,
+          "host_rss_bytes": 8570855424,
+          "peak_host_rss_bytes": 8570380288
+        },
+        "assertions": [],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 2.4368090360003407,
+        "decode_tokens_per_second": 1.9348580128071013
+      },
+      {
+        "id": "boundary_system",
+        "text": "ZEBRA",
+        "raw_text": "ZEBRA",
+        "generated_ids": [
+          57,
+          8264,
+          5609,
+          151645
+        ],
+        "eos_reached": true,
+        "elapsed_seconds": 4.753373180996277,
+        "peak_torch_gpu_bytes": 84103168,
+        "peak_host_rss_bytes": 8570380288,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19025362944,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 83886080,
+          "host_rss_bytes": 8571256832,
+          "peak_host_rss_bytes": 8570380288
+        },
+        "assertions": [
+          {
+            "alternatives": [
+              "zebra"
+            ],
+            "passed": true
+          }
+        ],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 3.212965457001701,
+        "decode_tokens_per_second": 1.949513542662496
+      },
+      {
+        "id": "boundary_explicit_one",
+        "text": "OM",
+        "raw_text": "OM",
+        "generated_ids": [
+          1898
+        ],
+        "eos_reached": false,
+        "elapsed_seconds": 2.7175917670028866,
+        "peak_torch_gpu_bytes": 72530432,
+        "peak_host_rss_bytes": 8570380288,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19012780032,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 71303168,
+          "host_rss_bytes": 8571256832,
+          "peak_host_rss_bytes": 8570380288
+        },
+        "assertions": [],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 2.7143949430028442
+      },
+      {
+        "id": "boundary_automatic",
+        "text": "OMEGA",
+        "raw_text": "OMEGA",
+        "generated_ids": [
+          1898,
+          87996,
+          151645
+        ],
+        "eos_reached": true,
+        "elapsed_seconds": 3.7222609870004817,
+        "peak_torch_gpu_bytes": 6513015296,
+        "peak_host_rss_bytes": 8570380288,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 25455230976,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 6513754112,
+          "host_rss_bytes": 8571260928,
+          "peak_host_rss_bytes": 8570380288
+        },
+        "assertions": [
+          {
+            "alternatives": [
+              "omega"
+            ],
+            "passed": true
+          }
+        ],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 2.717987637995975,
+        "decode_tokens_per_second": 1.9949409255689812
+      },
+      {
+        "id": "boundary_raw_template",
+        "text": "12",
+        "raw_text": "12",
+        "generated_ids": [
+          16,
+          17,
+          151645
+        ],
+        "eos_reached": true,
+        "elapsed_seconds": 4.1693634139955975,
+        "peak_torch_gpu_bytes": 77139456,
+        "peak_host_rss_bytes": 8570380288,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19016974336,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 75497472,
+          "host_rss_bytes": 8571260928,
+          "peak_host_rss_bytes": 8570380288
+        },
+        "assertions": [
+          {
+            "alternatives": [
+              "12"
+            ],
+            "passed": true
+          }
+        ],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 3.165332976001082,
+        "decode_tokens_per_second": 1.9949379009367318
+      },
+      {
+        "id": "boundary_audio_8000",
+        "text": "The main sound is speech.",
+        "raw_text": "The main sound is speech.",
+        "generated_ids": [
+          785,
+          1887,
+          5112,
+          374,
+          8806,
+          13,
+          151645
+        ],
+        "eos_reached": true,
+        "elapsed_seconds": 9.755559176999668,
+        "peak_torch_gpu_bytes": 135772160,
+        "peak_host_rss_bytes": 8708390912,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19467862016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 115343360,
+          "host_rss_bytes": 8709836800,
+          "peak_host_rss_bytes": 8708390912
+        },
+        "assertions": [
+          {
+            "alternatives": [
+              "speech",
+              "voice",
+              "speaking",
+              "narrat"
+            ],
+            "passed": true
+          }
+        ],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 6.723961729003349,
+        "decode_tokens_per_second": 1.9804317565018386
+      },
+      {
+        "id": "boundary_audio_44100",
+        "text": "The main sound is speech.",
+        "raw_text": "The main sound is speech.",
+        "generated_ids": [
+          785,
+          1887,
+          5112,
+          374,
+          8806,
+          13,
+          151645
+        ],
+        "eos_reached": true,
+        "elapsed_seconds": 8.528107170997828,
+        "peak_torch_gpu_bytes": 135772160,
+        "peak_host_rss_bytes": 8708390912,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19467862016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 115343360,
+          "host_rss_bytes": 8659550208,
+          "peak_host_rss_bytes": 8708390912
+        },
+        "assertions": [
+          {
+            "alternatives": [
+              "speech",
+              "voice",
+              "speaking",
+              "narrat"
+            ],
+            "passed": true
+          }
+        ],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 5.525018653002917,
+        "decode_tokens_per_second": 1.9991270745015386
+      },
+      {
+        "id": "boundary_audio_48000",
+        "text": "The main sound is speech.",
+        "raw_text": "The main sound is speech.",
+        "generated_ids": [
+          785,
+          1887,
+          5112,
+          374,
+          8806,
+          13,
+          151645
+        ],
+        "eos_reached": true,
+        "elapsed_seconds": 8.485288910000236,
+        "peak_torch_gpu_bytes": 135772160,
+        "peak_host_rss_bytes": 8708390912,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19467862016,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 115343360,
+          "host_rss_bytes": 8667811840,
+          "peak_host_rss_bytes": 8708390912
+        },
+        "assertions": [
+          {
+            "alternatives": [
+              "speech",
+              "voice",
+              "speaking",
+              "narrat"
+            ],
+            "passed": true
+          }
+        ],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 5.4836364580041845,
+        "decode_tokens_per_second": 2.0000542448072145
+      },
+      {
+        "id": "boundary_audio_one_sample",
+        "text": "This audio clip features a single, sustained, low-pitched electronic tone. The",
+        "raw_text": "This audio clip features a single, sustained, low-pitched electronic tone. The",
+        "generated_ids": [
+          1986,
+          7699,
+          12327,
+          4419,
+          264,
+          3175,
+          11,
+          28659,
+          11,
+          3347,
+          2268,
+          92403,
+          14346,
+          16232,
+          13,
+          576
+        ],
+        "eos_reached": false,
+        "elapsed_seconds": 10.325807866000105,
+        "peak_torch_gpu_bytes": 74230272,
+        "peak_host_rss_bytes": 8708390912,
+        "memory_after_generation": {
+          "gpu_driver_bytes": 19425918976,
+          "torch_allocated_bytes": 68179968,
+          "torch_reserved_bytes": 73400320,
+          "host_rss_bytes": 8666857472,
+          "peak_host_rss_bytes": 8708390912
+        },
+        "assertions": [],
+        "fixture_passed": true,
+        "execution_policy": [
+          {
+            "quantized_modules": 599,
+            "fast_modules": 599,
+            "nvfp4_input_passes": [
+              3
+            ]
+          }
+        ],
+        "first_token_seconds": 2.8250965920015005,
+        "decode_tokens_per_second": 2.000244825433084
+      }
+    ],
+    "checkpoint_load_seconds": 0.982509116998699,
+    "status": "complete",
+    "peak_driver_gpu_bytes": 25455230976
+  },
+  "kernel_proof": {
+    "scope": "One raw text token with record_shapes profiling; performance timings are excluded",
+    "trace_bytes": 138884974,
+    "trace_sha256": "0a858fc96b522f55fbd8d30436e38ac4df6a948391a17ce4f9aeb05f78b12135",
+    "nvfp4_matmul_calls": 2880,
+    "nvfp4_activation_quantize_calls": 2880,
+    "nvfp4_dequantize_calls": 1920,
+    "dequantize_first_dimensions": [
+      16
+    ],
+    "weight_matrix_dequantizations": 0,
+    "evidence": "All dequantized matrices have 16 padded activation rows; checkpoint projection output rows are larger. Three matmuls/two residual decodes per projection.",
+    "cuda_gemm_kernels": [
+      {
+        "name": "cutlass3x_sm120_bstensorop_s16864gemm_block_scaled_ue4m3xe2m1_ue4m3xe2m1_f32_f16_f16_128x128x256_1x1x1_0_tnn_align32_o_vs16_bias_f16_relu",
+        "count": 2880
+      }
+    ]
+  },
+  "source_results_sha256": "3b54a40904b2ec7cd6ad74ebddbb2db52716521f88ccb4a2160ad11568949864"
+}
