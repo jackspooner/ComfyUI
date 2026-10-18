@@ -41,7 +41,8 @@ def mapped_name(key):
     if name.startswith('visual.'):
         name = name.replace('visual.merger_list.', 'visual.deepstack_merger_list.')
         if name.startswith(('visual.merger.', 'visual.deepstack_merger_list.')):
-            name = name.replace('.ln_q.', '.norm.').replace('.mlp.0.', '.linear_fc1.').replace('.mlp.2.', '.linear_fc2.')
+            name = name.replace('.ln_q.', '.norm.')
+            name = re.sub(r'\.mlp\.([02])(?=\.|$)', lambda match: '.linear_fc1' if match[1] == '0' else '.linear_fc2', name)
     return name
 
 

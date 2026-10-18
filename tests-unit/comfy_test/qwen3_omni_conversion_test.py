@@ -6,6 +6,11 @@ from safetensors import safe_open
 from safetensors.torch import save_file
 import torch
 
+from comfy.cli_args import args
+args.cpu = True
+import comfy.ops
+from comfy.text_encoders.qwen35 import Qwen35VisionPatchMerger
+from comfy.text_encoders.qwen3vl import Qwen3VLDeepstackMerger
 from scripts import convert_qwen3_omni as converter
 from scripts.qwen3_omni_checkpoint import inspect_source
 
@@ -24,6 +29,16 @@ def fixture_source(tmp_path):
     weights[prefix + '.weight_scale'] = torch.ones(32, 3).to(torch.float8_e4m3fn)
     weights[prefix + '.weight_scale_2'] = torch.tensor(.125, dtype=torch.bfloat16)
     weights['thinker.model.norm.weight'] = torch.arange(32, dtype=torch.bfloat16)
+    for name, norm_size in [('merger', 8), ('merger_list.0', 32)]:
+        prefix = 'thinker.visual.' + name
+        weights[prefix + '.ln_q.weight'] = torch.ones(norm_size, dtype=torch.bfloat16)
+        weights[prefix + '.ln_q.bias'] = torch.zeros(norm_size, dtype=torch.bfloat16)
+        for layer in (0, 2):
+            target = prefix + f'.mlp.{layer}'
+            weights[target + '.weight'] = torch.randint(256, (32, 16), dtype=torch.uint8, generator=generator)
+            weights[target + '.weight_scale'] = torch.ones(32, 2).to(torch.float8_e4m3fn)
+            weights[target + '.weight_scale_2'] = torch.tensor(.125, dtype=torch.bfloat16)
+            weights[target + '.bias'] = torch.zeros(32, dtype=torch.bfloat16)
     weights['talker.unused.weight'] = torch.ones(4, dtype=torch.bfloat16)
     save_file(weights, tmp_path / 'weights.safetensors')
     total = sum(value.numel() * value.element_size() for value in weights.values())
@@ -57,6 +72,13 @@ def test_stream_fused_expert_banks_and_exact_padding(tmp_path):
         assert torch.equal(swap_nibbles(native[:, :24]), original['thinker.visual.blocks.0.mlp.linear_fc2.weight'])
         assert torch.count_nonzero(native[:, 24:]) == 0
         assert result.get_tensor('tokenizer_json').numpy().tobytes() == assets['tokenizer_json']
+        operations = comfy.ops.mixed_precision_ops({}, torch.bfloat16, full_precision_mm=True)
+        for prefix, component in [('visual.merger.', Qwen35VisionPatchMerger),
+                                  ('visual.deepstack_merger_list.0.', Qwen3VLDeepstackMerger)]:
+            native = component(8, 2, 32, dtype=torch.bfloat16, device='cpu', ops=operations)
+            state = {key.removeprefix(prefix): result.get_tensor(key) for key in result.keys() if key.startswith(prefix)}
+            missing, unexpected = native.load_state_dict(state, strict=False)
+            assert not missing and not unexpected
     with pytest.raises(FileExistsError):
         converter.stream_checkpoint(tmp_path, records, plan, path, {})
 

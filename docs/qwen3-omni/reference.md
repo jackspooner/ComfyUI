@@ -107,3 +107,35 @@ requires an independently established GPU window and the existing RuntimeHost
 ownership protocol; the script does not acquire ownership or interrupt queues.
 No component report alone accepts an accelerated production path. Full multimodal
 quality, resource, lifecycle and live queue acceptance remain separate gates.
+
+## Native package acceptance
+
+After conversion and an independently established idle GPU window/hold, use the
+prepared ComfyUI interpreter. Native execution reads only the converted artifact,
+its provenance manifest and the frozen test inputs:
+
+```bash
+/path/to/prepared/python tests-inference/check_qwen3_omni.py \
+  --model /absolute/path/to/candidate.safetensors \
+  --cases /absolute/path/to/fixtures-v2/cases.json \
+  --precision decoded-reference --capture \
+  --output /absolute/path/to/new-native-baseline
+```
+
+`decoded-reference` preserves packed banks and uses the existing operation to
+decode individual projections/indexed experts with BF16 matmul. It is diagnostic
+and cannot satisfy accelerated production acceptance. Establish matching-precision
+numerical behavior first, then repeat with `--precision nvfp4` and compare the same
+fixture assertions, features, routing and logits. The native run checks its fast
+operation policy when capture is enabled; a disabled accelerated path is a failure.
+`--case ID` selects named fixtures and `--tokens N` records an explicit smoke or
+budget override, including zero for automatic capacity. `--profile` writes a trace
+for the first case. Captures/profiling affect timings; measure performance separately.
+The harness uses the same dynamic allocator and native CLIP generation owners as
+serving ComfyUI, without changing the running service, configuration or weights.
+
+Keep failed run directories and reports. Resolve an uncertain process outcome
+before releasing its exact validation hold or retrying with a new destination.
+Do not compare cached logits beyond a divergent generated context as though the
+inputs were still identical. Native model acceptance and live service activation
+are separate requirements.
