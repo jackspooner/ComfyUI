@@ -123,7 +123,9 @@ loading accepts NVFP4 descriptors/scales or dense BF16/FP16/FP32 tensors in the
 same normalized package. Each weight must match the architecture, including fused
 expert banks and padded vision input columns. Packed weights without descriptors,
 orphan scales, mismatched expert counts and invalid packed/scale layouts fail
-before state loading. Other quantization descriptors remain unsupported here.
+before state loading. An experimental FP8 E4M3 descriptor path is covered by
+synthetic tests; its [original-weight conversion and remaining prerequisites](eight-bit.md)
+are separate from the accepted NVFP4 artifact. Other descriptors remain unsupported.
 
 This separation allows mixed dense/NVFP4 native packages without requiring every
 projection to match the selected source's quantization choices. It does not add

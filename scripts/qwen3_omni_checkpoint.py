@@ -13,6 +13,8 @@ from scripts.convert_moss_audio import read_json, unique_object
 
 SOURCE_MANIFEST = Path(__file__).with_name('qwen3_omni_source.json')
 SOURCE_REVISION = '0ed3aa2b00eeedbb0d38b6d4738f506af759213b'
+ORIGINAL_MANIFEST = Path(__file__).with_name('qwen3_omni_original_source.json')
+ORIGINAL_REVISION = '26291f793822fb6be9555850f06dfe95f2d7e695'
 PROJECTION_SAMPLES = ['thinker.model.layers.0.self_attn.q_proj',
                       'thinker.audio_tower.conv_out', 'thinker.audio_tower.layers.0.self_attn.k_proj',
                       'thinker.visual.blocks.0.attn.qkv', 'thinker.visual.merger.mlp.0',
@@ -73,12 +75,12 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
-def expected_layout(source):
+def expected_layout(source, quantized=True):
     config = Qwen3OmniMoeConfig.from_pretrained(source, local_files_only=True)
     with torch.device('meta'):
         model = Qwen3OmniMoeForConditionalGeneration(config)
     shapes = {}
-    quantized = set()
+    quantized_names = set()
     for key, tensor in model.state_dict().items():
         shape = list(tensor.shape)
         if '.experts.' in key and key.endswith(('gate_up_proj', 'down_proj')):
@@ -90,14 +92,16 @@ def expected_layout(source):
                     name = f'{prefix}.{expert}.{projection}.weight'
                     shapes[name] = [rows, shape[2]]
                     if key.startswith('thinker.'):
-                        quantized.add(name)
+                        quantized_names.add(name)
         else:
             shapes[key] = shape
     for name, module in model.named_modules():
         if isinstance(module, torch.nn.Linear) and name.startswith('thinker.') and name != 'thinker.lm_head':
-            quantized.add(name + '.weight')
+            quantized_names.add(name + '.weight')
     layout = {key: ('BF16', shape) for key, shape in shapes.items()}
-    for key in quantized:
+    if not quantized:
+        return layout
+    for key in quantized_names:
         rows, cols = shapes[key]
         prefix = key.removesuffix('.weight')
         layout[key] = ('U8', [rows, cols // 2])
@@ -117,10 +121,10 @@ def validate_layout(records, expected):
 
 
 def validate_source(source, revision):
-    if revision != SOURCE_REVISION:
-        raise ValueError(f'Only the verified source revision {SOURCE_REVISION} is supported')
+    if revision not in (SOURCE_REVISION, ORIGINAL_REVISION):
+        raise ValueError(f'Only the verified source revisions {SOURCE_REVISION} and {ORIGINAL_REVISION} are supported')
     source = source.resolve(strict=True)
-    manifest = read_json(SOURCE_MANIFEST)
+    manifest = read_json(SOURCE_MANIFEST if revision == SOURCE_REVISION else ORIGINAL_MANIFEST)
     for entry in manifest['files']:
         path = source / entry['name']
         if path.resolve().parent != source or not path.is_file():
@@ -128,11 +132,11 @@ def validate_source(source, revision):
         if path.stat().st_size != entry['bytes'] or sha256_file(path) != entry['sha256']:
             raise ValueError(f'Source size/hash differs from pinned revision: {entry["name"]}')
     records, totals = inspect_source(source)
-    validate_layout(records, expected_layout(source))
+    validate_layout(records, expected_layout(source, quantized=revision == SOURCE_REVISION))
     if totals['declared_payload_bytes'] != manifest['declared_payload_bytes'] or totals['actual_payload_bytes'] != manifest['actual_payload_bytes']:
         raise ValueError('Unexpected source payload total; the pinned metadata reconciliation does not apply')
     evidence = {'source_revision': revision, 'verified_files': len(manifest['files']),
                 'verified_tensors': len(records), 'all_shapes_and_dtypes_match': True,
                 'metadata_reconciliation': {**totals, 'correction_bytes': totals['actual_payload_bytes'] - totals['declared_payload_bytes'],
-                                            'reason': 'Pinned publisher index aggregate is stale; every source file hash and every expected tensor matches.'}}
+                                            'reason': 'Pinned publisher index aggregate is stale; every source file hash and every expected tensor matches.' if revision == SOURCE_REVISION else 'Original index payload total matches all verified tensors.'}}
     return records, evidence

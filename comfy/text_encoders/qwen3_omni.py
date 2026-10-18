@@ -408,26 +408,36 @@ class OmniClipModel(sd1_clip.SDClipModel):
         for name, module in self.transformer.named_modules():
             if isinstance(module, comfy.ops.MixedPrecisionOp):
                 required.add(name + '.weight')
-                projections[name] = module
-                if name + '.comfy_quant' in sd:
-                    required.update(name + suffix for suffix in ('.weight_scale', '.weight_scale_2'))
+                descriptor = sd.get(name + '.comfy_quant')
+                if descriptor is not None:
+                    descriptor = json.loads(asset_bytes(descriptor))
+                    if not isinstance(descriptor, dict) or descriptor.get('format') not in ('nvfp4', 'float8_e4m3fn'):
+                        raise ValueError(f'Unsupported Qwen3-Omni projection format: {name}; expected NVFP4, FP8 E4M3 or dense floating weights.')
+                    required.add(name + '.weight_scale')
+                    if descriptor['format'] == 'nvfp4':
+                        required.add(name + '.weight_scale_2')
+                projections[name] = module, descriptor
         missing = sorted(required - set(sd))
         if missing:
             raise ValueError(f'Incomplete Qwen3-Omni artifact: {len(missing)} required tensors missing, including {missing[:8]}. Run the verified converter again.')
-        for name, module in projections.items():
+        for name, (module, descriptor) in projections.items():
             weight = sd[name + '.weight']
             shape = module._orig_shape
-            descriptor = sd.get(name + '.comfy_quant')
             if descriptor is None:
                 if weight.dtype not in (torch.bfloat16, torch.float16, torch.float32) or tuple(weight.shape) != shape:
                     raise ValueError(f'Invalid Qwen3-Omni dense projection: {name}; expected floating weights with shape {shape}. Packed weights require a quantization descriptor.')
                 if any(name + suffix in sd for suffix in ('.weight_scale', '.weight_scale_2')):
                     raise ValueError(f'Qwen3-Omni projection scales without a quantization descriptor: {name}.')
                 continue
-            descriptor = json.loads(asset_bytes(descriptor))
-            if not isinstance(descriptor, dict) or descriptor.get('format') != 'nvfp4':
-                raise ValueError(f'Unsupported Qwen3-Omni projection format: {name}; expected NVFP4 or dense floating weights.')
             leading, rows, columns = shape[:-2], shape[-2], shape[-1]
+            if descriptor['format'] == 'float8_e4m3fn':
+                scale = sd[name + '.weight_scale']
+                if (weight.dtype != torch.float8_e4m3fn or tuple(weight.shape) != shape
+                        or scale.dtype != torch.float32 or tuple(scale.shape) != leading
+                        or descriptor.get('num_experts') != (leading[0] if leading else None)
+                        or name + '.weight_scale_2' in sd):
+                    raise ValueError(f'Invalid Qwen3-Omni FP8 projection layout or scales: {name}.')
+                continue
             blocks, scale = sd[name + '.weight_scale'], sd[name + '.weight_scale_2']
             block_shape = (*leading, (rows + 127) // 128 * 128, (columns // 16 + 3) // 4 * 4)
             if (columns % 32 or weight.dtype != torch.uint8 or tuple(weight.shape) != (*shape[:-1], columns // 2)

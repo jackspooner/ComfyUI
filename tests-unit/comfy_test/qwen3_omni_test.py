@@ -12,7 +12,7 @@ from transformers.models.qwen3_omni_moe.modeling_qwen3_omni_moe import (
 from comfy.cli_args import args
 args.cpu = True
 import comfy.ops
-from comfy.quant_ops import QuantizedTensor, TensorCoreNVFP4Layout
+from comfy.quant_ops import QuantizedTensor, TensorCoreFP8E4M3Layout, TensorCoreNVFP4Layout
 from comfy.text_encoders import qwen3_omni as omni
 
 
@@ -266,3 +266,54 @@ def test_native_package_rejects_invalid_projection_before_loading(tiny_clip, mix
     monkeypatch.setattr(omni.sd1_clip.SDClipModel, 'load_sd', lambda *a: pytest.fail('invalid package reached state loading'))
     with pytest.raises(ValueError, match='Qwen3-Omni'):
         tiny_clip.qwen3_omni.load_sd(mixed_state)
+
+
+@pytest.fixture
+def fp8_state(native_state):
+    for name in ('model.layers.0.self_attn.q_proj', 'model.layers.0.mlp.experts.gate_up_proj'):
+        weight = native_state[name + '.weight']
+        values = weight.unbind() if weight.ndim == 3 else [weight]
+        parts = [TensorCoreFP8E4M3Layout.quantize(value, scale='recalculate') for value in values]
+        native_state[name + '.weight'] = torch.stack([part[0] for part in parts]) if weight.ndim == 3 else parts[0][0]
+        native_state[name + '.weight_scale'] = torch.stack([part[1].scale for part in parts]) if weight.ndim == 3 else parts[0][1].scale
+        descriptor = {'format': 'float8_e4m3fn', 'full_precision_matrix_mult': True}
+        if weight.ndim == 3:
+            descriptor['num_experts'] = weight.shape[0]
+        native_state[name + '.comfy_quant'] = torch.tensor(list(json.dumps(descriptor).encode()), dtype=torch.uint8)
+    return native_state
+
+
+def test_native_fp8_dense_and_expert_projection(tiny_clip, fp8_state):
+    missing, unexpected = tiny_clip.qwen3_omni.load_sd(fp8_state)
+    assert not missing and not unexpected
+    model = tiny_clip.qwen3_omni.transformer.model
+    inputs = torch.randn(2, 32)
+    for name, module, expert in [('model.layers.0.self_attn.q_proj', model.layers[0].self_attn.q_proj, None),
+                                ('model.layers.0.mlp.experts.gate_up_proj', model.layers[0].mlp.experts.gate_up_proj, 1)]:
+        weight, scale = fp8_state[name + '.weight'], fp8_state[name + '.weight_scale']
+        if expert is not None:
+            weight, scale = weight[expert], scale[expert]
+        expected = F.linear(inputs, weight.float() * scale)
+        actual = module(inputs) if expert is None else module.expert_linear(inputs, expert)
+        torch.testing.assert_close(actual, expected, atol=0, rtol=0)
+        assert module.quant_format == 'float8_e4m3fn'
+
+
+@pytest.mark.parametrize('fault', ['weight_shape', 'weight_dtype', 'scale_shape', 'scale_dtype', 'experts', 'extra_scale', 'missing_scale'])
+def test_native_fp8_layout_validation(tiny_clip, fp8_state, fault, monkeypatch):
+    name = 'model.layers.0.mlp.experts.gate_up_proj'
+    if fault in ('weight_shape', 'scale_shape'):
+        key = name + ('.weight' if fault == 'weight_shape' else '.weight_scale')
+        fp8_state[key] = fp8_state[key].unsqueeze(0)
+    elif fault in ('weight_dtype', 'scale_dtype'):
+        key = name + ('.weight' if fault == 'weight_dtype' else '.weight_scale')
+        fp8_state[key] = fp8_state[key].bfloat16()
+    elif fault == 'experts':
+        fp8_state[name + '.comfy_quant'] = torch.tensor(list(json.dumps({'format': 'float8_e4m3fn', 'num_experts': 2}).encode()), dtype=torch.uint8)
+    elif fault == 'extra_scale':
+        fp8_state[name + '.weight_scale_2'] = torch.ones(4)
+    else:
+        del fp8_state[name + '.weight_scale']
+    monkeypatch.setattr(omni.sd1_clip.SDClipModel, 'load_sd', lambda *a: pytest.fail('invalid FP8 package reached state loading'))
+    with pytest.raises(ValueError, match='Qwen3-Omni'):
+        tiny_clip.qwen3_omni.load_sd(fp8_state)
