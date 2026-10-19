@@ -100,10 +100,13 @@ class TextGenerate(io.ComfyNode):
 
         generated_text = clip.decode(generated_ids)
 
-        # The opening tag may be in the chat template; truncated reasoning may have no closing tag.
-        reasoning, separator, text = generated_text.partition("</think>")
-        if not separator and not reasoning.lstrip().startswith("<think>") and not prompt.rstrip().endswith("<think>"):
-            reasoning, text = "", generated_text
+        # </think> ends reasoning; without one, reasoning opened by the output or prompt was cut off by max_length
+        reasoning, sep, text = generated_text.partition("</think>")
+        if not sep and not reasoning.lstrip().startswith("<think>") and not prompt.rstrip().endswith("<think>"):
+            prompt_tokens = next(iter(tokens.values())) if isinstance(tokens, dict) else tokens
+            prompt_ids = [t[0] for t in prompt_tokens[-1] if isinstance(t, tuple) and isinstance(t[0], int)] if prompt_tokens else []
+            if not prompt_ids or not clip.decode(prompt_ids[-4:]).rstrip().endswith("<think>"):
+                reasoning, text = "", generated_text
 
         updated_history = ""
         if messages is None and use_default_template and image is None and video is None and audio is None:
