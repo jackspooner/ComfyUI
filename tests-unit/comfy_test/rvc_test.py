@@ -83,3 +83,22 @@ def test_export_rejects_training_and_other_vocoders():
     checkpoint = {"weight": {}, "config": [0] * 18, "version": "v2", "vocoder": "RefineGAN"}
     with pytest.raises(ValueError, match="HiFi-GAN"):
         voice_config(checkpoint)
+
+
+def test_shared_rmvpe_retains_default_50hz_and_offers_100hz(monkeypatch):
+    from comfy.soulx_singer import pitch
+
+    class Salience(torch.nn.Module):
+        def forward(self, mel):
+            output = mel.new_zeros(mel.shape[0], mel.shape[-1], 360)
+            output[..., 100] = 1
+            return output
+
+    monkeypatch.setattr(pitch, "E2E", lambda **kwargs: Salience())
+    model = pitch.PitchExtractor()
+    model.mel_basis.fill_(.01)
+    waveform = torch.sin(torch.arange(16160, dtype=torch.float32)[None] / 8)
+    default = model(waveform, 16000)
+    full = model(waveform, 16000, frame_step=1)
+    assert full.shape[-1] == 101
+    torch.testing.assert_close(default, full[:, ::2], rtol=0, atol=0)
