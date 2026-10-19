@@ -2,6 +2,16 @@
 
 # ComfyUI
 
+## Native Applio / RVC in this fork
+
+This fork adds **Load Applio / RVC Models → Applio / RVC Voice Convert** for local
+file conversion with trained RVC v1/v2 HiFi-GAN voices, matching ContentVec, shared
+RMVPE and optional FAISS retrieval. Dedicated managed handles reuse ComfyUI's
+patchers, casting, queue and media nodes; Applio's application is not launched.
+See [offline setup, supported exports and limits](docs/applio.md) and
+[acceptance evidence](docs/applio-acceptance.md). Training, realtime capture,
+MRF/RefineGAN and other embedders are outside this path.
+
 ## Native Audio Flamingo 3 in this fork
 
 This fork adds native audio understanding and transcription with NVIDIA Audio Flamingo 3 through Load CLIP and Generate Text. It reuses ComfyUI model/attention/memory management and repackages a local HF snapshot without downloading during execution. See [setup, licensing, inputs and acceptance limits](docs/audio-flamingo.md). CPU reference checks and short-clip RTX 5090 inference, cancellation/reload and RouterAudio acceptance pass; broader resource and quality limits remain unverified.
