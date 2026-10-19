@@ -21,8 +21,11 @@ from comfy.ldm.rvc.model import Synthesizer
 
 
 def digest(path):
+    result = hashlib.sha256()
     with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            result.update(chunk)
+    return result.hexdigest()
 
 
 def convert(source, output, kind, revision, expected_sha256=None):
