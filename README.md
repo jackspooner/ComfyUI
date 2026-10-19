@@ -11,7 +11,9 @@ Dedicated managed handles reuse ComfyUI's
 patchers, casting, queue and media nodes; Applio's application is not launched.
 See [offline setup, supported exports and limits](docs/applio.md) and
 [acceptance evidence](docs/applio-acceptance.md). Training, realtime capture,
-MRF/RefineGAN and other embedders are outside this path.
+MRF/RefineGAN and other embedders are outside this path. The two 40 kHz demo voices
+pass native GPU conversion and cancellation/recovery checks; explicit idle unload
+acceptance remains unrun while unrelated generation occupies the queue.
 
 ## Stable release maintenance in this fork
 
