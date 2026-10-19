@@ -976,7 +976,6 @@ from .quant_ops import (
     QUANT_ALGOS,
     TensorCoreFP8Layout,
     TensorCoreNVFP4Layout,
-    TensorWiseINT8Layout,
     get_layout_class,
 )
 
