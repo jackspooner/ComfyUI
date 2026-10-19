@@ -224,7 +224,9 @@ instead of converting an unrun gate into a success claim.
 
 ## Worked scoping example: Applio
 
-This is an investigation example, not implemented Applio support. Sources checked
+The original scoping investigation led to the [native RVC file-conversion path](applio.md).
+Its [acceptance record](applio-acceptance.md) distinguishes implementation, checkpoint
+comparisons and activation. Sources checked
 19 October 2026: the [HF repository](https://huggingface.co/IAHispano/Applio/tree/main)
 contains application/resource bundles; upstream describes separate
 [voice exports and optional indexes](https://docs.applio.org/getting-started/installing-inference-models/).
@@ -249,9 +251,8 @@ Preserve upstream analysis/synthesis rates, pitch and retrieval controls, segmen
 handling and output amplitude. Test reference agreement, audible conversion,
 unvoiced regions, boundaries, optional-index behavior and memory lifecycle. Keep
 training, realtime capture, upstream UI, unrelated effects and TTS outside the
-first inference scope unless requested. Exact supported variants and node names
-remain design decisions until source inspection and native acceptance establish
-them; launching Applio's CLI would be an external wrapper, not this native port.
+first inference scope unless requested. Supported variants and node names are documented in the native RVC guide;
+launching Applio's CLI would be an external wrapper, not this native port.
 
 ## Existing ports to inspect
 

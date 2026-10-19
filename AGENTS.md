@@ -448,3 +448,14 @@ preprocessing contracts, examples, parity commands and acceptance limits. Run
 `python -m pytest tests-unit/comfy_test/soulx_singer_test.py -q`. Extend the existing
 authoritative `comfyui` and `comfyui-model-runtimes` skills with reusable changes;
 never register this task worktree globally. Setup does not activate the service.
+
+### Optional native Applio / RVC
+
+Use `--applio` with the standard worktree setup command to check preinstalled
+NumPy, SciPy and librosa. Optional FAISS CPU is needed only for retrieval indexes.
+See `docs/applio.md` for offline conversion, dedicated managed voice/ContentVec
+loading, reused RMVPE and normal-queue workflow operation. Run
+`python -m pytest tests-unit/comfy_test/rvc_test.py tests-unit/comfy_test/soulx_singer_test.py -q`.
+`scripts/check_rvc.py` performs pinned upstream CPU component comparisons separately.
+Update the existing shared ComfyUI/model-runtimes guidance for reusable changes;
+setup and validation do not start live workloads or restart services.

@@ -222,7 +222,7 @@ class PitchExtractor(nn.Module):
         self.model = E2E(n_blocks=4, n_gru=1, kernel_size=(2, 2))
         self.register_buffer("mel_basis", torch.empty(128, 513))
 
-    def forward(self, audio, sample_rate, threshold=0.03):
+    def forward(self, audio, sample_rate, threshold=0.03, frame_step=2):
         audio = comfy.audio.resample(audio, sample_rate, 16000)
         contours = []
         # Context overlap bounds activation memory without losing the original 10 ms grid.
@@ -245,5 +245,5 @@ class PitchExtractor(nn.Module):
             f0 = torch.where(salience.amax(-1) > threshold, 10 * 2 ** (average / 1200), 0)
             offset = (start - left) // 160
             count = min(2000, (audio.shape[-1] - start + 159) // 160)
-            contours.append(f0[:, offset:offset + count:2])
+            contours.append(f0[:, offset:offset + count:frame_step])
         return torch.cat(contours, dim=-1)
