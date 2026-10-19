@@ -94,3 +94,15 @@ def test_reasoning_split_with_template_or_generated_opening(decoded, prompt, exp
     assert output.result[:2] == expected
     assert output.result[2]
     assert output.result[3] == ''
+
+
+@pytest.mark.parametrize('template,expected', [('<think>\n', ('', 'unfinished')), ('</think>\n', ('unfinished', ''))])
+def test_reasoning_split_reads_the_tokenized_template_tail(template, expected):
+    tokens = {'qwen': [[(1, 1.0), (2, 1.0)]]}
+    clip = SimpleNamespace(tokenize=lambda *args, **kwargs: tokens,
+                           generate=lambda *args, **kwargs: [3],
+                           decode=lambda ids: 'unfinished' if ids == [3] else template)
+    output = TextGenerate.execute(clip, 'question', 1, {'sampling_mode': 'off'})
+    assert output.result[:2] == expected
+    assert output.result[4] == 'unfinished'
+    assert tokens == {'qwen': [[(1, 1.0), (2, 1.0)]]}

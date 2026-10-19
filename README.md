@@ -2,6 +2,15 @@
 
 # ComfyUI
 
+## Stable release maintenance in this fork
+
+This fork merges upstream stable [v0.42.1](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.42.1)
+while retaining its native model, conversation and memory-recovery changes.
+Upstream adds MOSS-Image, Qwen decode improvements and solid mesh remeshing;
+source support does not establish local checkpoint or quality acceptance.
+Use the release's pinned frontend, templates and Comfy Kitchen alongside a
+compatible GPU runtime. See [maintenance, verification and rollback](docs/stable-release-maintenance.md).
+
 ## Native Audio Flamingo 3 in this fork
 
 This fork adds native audio understanding and transcription with NVIDIA Audio Flamingo 3 through Load CLIP and Generate Text. It reuses ComfyUI model/attention/memory management and repackages a local HF snapshot without downloading during execution. See [setup, licensing, inputs and acceptance limits](docs/audio-flamingo.md). CPU reference checks and short-clip RTX 5090 inference, cancellation/reload and RouterAudio acceptance pass; broader resource and quality limits remain unverified.
