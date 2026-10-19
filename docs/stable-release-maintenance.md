@@ -2,9 +2,9 @@
 
 Deploy published non-draft, non-prerelease tags from the actual configured GitHub
 remote, retaining the fork's local memory-recovery patch. Do not deploy a later
-branch tip or downgrade a checkout containing the stable tag. The 16 October 2026
-candidate is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0),
-release commit `98cc0bf84b7cb1383654c5b402e7612d875d6d22`.
+branch tip or downgrade a checkout containing the stable tag. The 19 October 2026
+release is [v0.42.1](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.42.1),
+release commit `63be2f9b82ad0dac88a7ceaa28a9cf3154125a18`.
 
 Before changing source or packages, save Git revision/diffs, custom-node revisions,
 package inventory/constraints, service configuration, workflows and baseline
@@ -60,3 +60,24 @@ reference/geometry nodes and `GET /default_workflow`; discover node schemas
 and local weights before using them. Existing-model acceptance does not certify
 these new variants or full-size/audio quality. The authoritative general
 `comfyui` skill links the v0.41 operating notes.
+
+
+The v0.42.1 merge requires frontend 1.55.18, workflow templates 0.11.89 and
+Kitchen 0.2.39; embedded docs 0.5.14 and allocator 0.5.6 remain unchanged.
+Qwen deferred DeltaNet/INT8 decoding depends on the matching Kitchen operations.
+Retain the fork's NVFP4/INT8 operation imports and all existing CLIP selectors;
+`moss_image` is a distinct selector from `moss_audio`. Merge the upstream
+unfinished-thinking template fix while preserving history, context and raw-text
+outputs. Decode the tokenized template tail only when needed, accepting an empty
+token sequence instead of failing after a successful generation. Run the Qwen decode, conversation, native encoder/quantization and
+prefetch regressions against candidate dependencies before activation.
+
+Upstream MOSS-Image uses its native diffusion model, Qwen3.5-9B conditioning
+(`CLIPLoader` type `moss_image`) and Flux2-format VAE/latents. Its experimental
+layout node emits centered pixel boxes from Create Bounding Boxes; it performs
+no inference. `RemeshMesh` adds a slower solid graph-cut mode with fill/QEF
+controls. Discover deployed schemas and weights before use. Existing H3 smoke
+acceptance does not verify these new weights or large/complex remeshing.
+The shared general ComfyUI skill owns detailed operating guidance; this release
+adds no MCP service or router profile. Record baseline warnings and failed past
+requests separately from new startup/import/inference regressions.
