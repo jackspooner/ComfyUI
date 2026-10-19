@@ -27,6 +27,8 @@ def main():
     sys.argv = [sys.argv[0], "--cpu"]
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     sys.path.insert(0, str(settings.upstream))
+    from comfy.cli_args import args as comfy_args
+    comfy_args.cpu = True
     from comfy.rvc import runtime
     from rvc.lib.algorithm.synthesizers import Synthesizer
     from transformers import HubertConfig, HubertModel

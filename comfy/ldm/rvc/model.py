@@ -79,19 +79,20 @@ class Encoder(nn.Module):
         self.norm_layers_2 = nn.ModuleList([ChannelNorm(channels, operations) for _ in range(layers)])
 
     def forward(self, x, transformer_options):
-        blocks = [module for stage in zip(self.attn_layers, self.norm_layers_1, self.ffn_layers, self.norm_layers_2) for module in stage]
-        queue = prefetch.make_prefetch_queue(blocks, x.device, transformer_options)
+        stages = list(zip(self.attn_layers, self.norm_layers_1, self.ffn_layers, self.norm_layers_2))
+        queue = prefetch.make_prefetch_queue(stages, x.device, transformer_options)
         with prefetch.malloc_graph_scope(x.device):
-            for attn, norm1, ffn, norm2 in zip(self.attn_layers, self.norm_layers_1, self.ffn_layers, self.norm_layers_2):
+            for stage in stages:
                 mm.throw_exception_if_processing_interrupted()
-                prefetch.prefetch_queue_pop(queue, x.device, attn, x.dtype, malloc_scope="rvc_encoder")
-                residual = x + attn(x)
-                prefetch.prefetch_queue_pop(queue, x.device, norm1, x.dtype, malloc_scope="rvc_encoder")
-                x = norm1(residual)
-                prefetch.prefetch_queue_pop(queue, x.device, ffn, x.dtype, malloc_scope="rvc_encoder")
-                residual = x + ffn(x)
-                prefetch.prefetch_queue_pop(queue, x.device, norm2, x.dtype, malloc_scope="rvc_encoder")
-                x = norm2(residual)
+                prefetch.prefetch_queue_pop(queue, x.device, stage, x.dtype, malloc_scope="rvc_encoder")
+                attn, norm1, ffn, norm2 = stage
+                result = norm1(x + attn(x))
+                result = norm2(result + ffn(result))
+                if torch.is_grad_enabled():
+                    x = result
+                else:
+                    x.copy_(result)
+                del result
             prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope="rvc_encoder")
         return x
 
@@ -159,7 +160,12 @@ class Flow(nn.Module):
             for block in blocks:
                 mm.throw_exception_if_processing_interrupted()
                 prefetch.prefetch_queue_pop(queue, x.device, block, x.dtype, malloc_scope="rvc_flow")
-                x = block(x.flip(1), g)
+                result = block(x.flip(1), g)
+                if torch.is_grad_enabled():
+                    x = result
+                else:
+                    x.copy_(result)
+                del result
             prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope="rvc_flow")
         return x
 
@@ -232,17 +238,17 @@ class Generator(nn.Module):
         with prefetch.malloc_graph_scope(x.device):
             for i, up in enumerate(self.ups):
                 mm.throw_exception_if_processing_interrupted()
-                prefetch.prefetch_queue_pop(queue, x.device, up, x.dtype, malloc_scope="rvc_vocoder")
+                prefetch.prefetch_queue_pop(queue, x.device, up, x.dtype)
                 x = up(F.leaky_relu(x, .1))
                 if source is not None:
-                    prefetch.prefetch_queue_pop(queue, x.device, self.noise_convs[i], x.dtype, malloc_scope="rvc_vocoder")
+                    prefetch.prefetch_queue_pop(queue, x.device, self.noise_convs[i], x.dtype)
                     x = x + self.noise_convs[i](source)
                 result = 0
                 for block in self.resblocks[i * self.num_kernels:(i + 1) * self.num_kernels]:
-                    prefetch.prefetch_queue_pop(queue, x.device, block, x.dtype, malloc_scope="rvc_vocoder")
+                    prefetch.prefetch_queue_pop(queue, x.device, block, x.dtype)
                     result = result + block(x)
                 x = result / self.num_kernels
-            prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope="rvc_vocoder")
+            prefetch.prefetch_queue_pop(queue, x.device, None)
         return self.conv_post(F.leaky_relu(x, .01)).tanh()
 
 

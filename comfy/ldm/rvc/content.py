@@ -46,6 +46,11 @@ class ContentEncoder(nn.Module):
             for block in self.encoder.layers:
                 mm.throw_exception_if_processing_interrupted()
                 prefetch.prefetch_queue_pop(queue, x.device, block, x.dtype, malloc_scope="rvc_content")
-                x = block(x)
+                result = block(x)
+                if torch.is_grad_enabled():
+                    x = result
+                else:
+                    x.copy_(result)
+                del result
             prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope="rvc_content")
         return self.final_proj(x) if version == "v1" else x
