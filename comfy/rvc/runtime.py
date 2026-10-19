@@ -120,11 +120,13 @@ def convert(voice, content, audio, semitones, speaker, protect, rms_mix, seed, p
         if index.d != (256 if version == "v1" else 768):
             raise ValueError("Retrieval index dimension differs from this voice version.")
         vectors = index.reconstruct_n(0, index.ntotal)
-    # Four-second core segments with one-second context bound neural activation memory.
+    # Four-second cores overlap by 200 ms; context keeps analysis edges outside the output.
     padded = np.pad(waveform, (16000, 16320), mode="reflect")
-    outputs = []
-    progress = comfy.utils.ProgressBar((len(waveform) + 63999) // 64000)
-    for start in range(0, len(waveform), 64000):
+    starts = range(0, max(1, len(waveform) - 3200), 60800)
+    result = np.zeros(round(len(waveform) * rate / 16000), dtype=np.float32)
+    weights = np.zeros_like(result)
+    progress = comfy.utils.ProgressBar(len(starts))
+    for start in starts:
         mm.throw_exception_if_processing_interrupted()
         end = min(len(waveform), start + 64000)
         part = torch.from_numpy(padded[start:end + 32320].copy())[None]
@@ -148,9 +150,19 @@ def convert(voice, content, audio, semitones, speaker, protect, rms_mix, seed, p
         f0 = f0.to(device) if use_f0 else None
         pitch = coarse_f0(f0) if use_f0 else None
         converted = model(features.to(device), pitch, f0, torch.tensor([speaker], device=device), generator, options(voice)).float().cpu()[0, 0].numpy()
-        outputs.append(converted[rate:rate + round((end - start) * rate / 16000)])
+        core = converted[rate:rate + round((end - start) * rate / 16000)]
+        offset = round(start * rate / 16000)
+        window = np.ones(len(core), dtype=np.float32)
+        fade = min(rate // 5, len(core))
+        ramp = np.arange(fade, dtype=np.float32) / fade
+        if start:
+            window[:fade] = ramp
+        if end < len(waveform):
+            window[-fade:] = 1 - ramp
+        result[offset:offset + len(core)] += core * window
+        weights[offset:offset + len(core)] += window
         progress.update(1)
-    result = np.concatenate(outputs)
+    result /= np.maximum(weights, 1e-8)
     if rms_mix != 1:
         result = change_rms(waveform, result, rate, rms_mix)
     result = result / max(1., float(np.abs(result).max()) / .99)

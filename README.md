@@ -6,7 +6,8 @@
 
 This fork adds **Load Applio / RVC Models → Applio / RVC Voice Convert** for local
 file conversion with trained RVC v1/v2 HiFi-GAN voices, matching ContentVec, shared
-RMVPE and optional FAISS retrieval. Dedicated managed handles reuse ComfyUI's
+RMVPE and optional FAISS retrieval, with context and overlap blending for segments.
+Dedicated managed handles reuse ComfyUI's
 patchers, casting, queue and media nodes; Applio's application is not launched.
 See [offline setup, supported exports and limits](docs/applio.md) and
 [acceptance evidence](docs/applio-acceptance.md). Training, realtime capture,

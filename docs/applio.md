@@ -99,7 +99,7 @@ the original; smaller values protect more. RMS mix 1 keeps synthesized dynamics;
 0 follows source loudness. Peaks above 0.99 are scaled down. Normal ComfyUI save
 nodes own output encoding and paths.
 
-Four-second cores use one-second reflection context on each side and 20 ms extra
+Four-second cores crossfade over 200 ms, with one-second reflection context on each side and 20 ms extra
 right context to retain the complete core. Output length follows source duration
 at the voice's rate, including the final partial segment. This bounded deterministic
 segmentation differs from Applio's device-dependent long-file split search and
