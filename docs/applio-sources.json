@@ -28,6 +28,22 @@
       "revision": "ad931ef3dc18f2d63ef81ecafddd498a111c8ecd",
       "path": "voices/kikiV1/kikiV1.index",
       "sha256": "5f20e83f2e232f2077fed5a064bc92865899e2330a1ff10f2c54b2bae834c647"
+    },
+    {
+      "local_filename": "config.json",
+      "repository": "IAHispano/Applio",
+      "revision": "e908bdd5bf9f18cede26bbbec724b1a4bc7c2f14",
+      "path": "Resources/embedders/contentvec/config.json",
+      "sha256": "2ddde063b795d38d9051a7215a092fecf4cfe148b54251e38de51d88d356898b",
+      "blobId": "5186a71b15933aca2d9942db95e1aff02642d1f0"
+    },
+    {
+      "local_filename": "LICENSE-RVC.txt",
+      "repository": "licyk/rvc-model",
+      "revision": "ad931ef3dc18f2d63ef81ecafddd498a111c8ecd",
+      "path": "LICENSE-RVC.txt",
+      "sha256": "364d04d646ecb3ffcfc39426eb746f6c24c76e3d8b264ff06b8a91f091530e0c",
+      "blobId": "0fb0f44ba6eee54a81d1ec613d1dc4e1305f64c4"
     }
   ]
 }
