@@ -102,3 +102,27 @@ def test_shared_rmvpe_retains_default_50hz_and_offers_100hz(monkeypatch):
     full = model(waveform, 16000, frame_step=1)
     assert full.shape[-1] == 101
     torch.testing.assert_close(default, full[:, ::2], rtol=0, atol=0)
+
+
+def test_segment_crossfade_preserves_duration_and_avoids_hard_join(monkeypatch):
+    from types import SimpleNamespace
+    from comfy.rvc import runtime
+
+    class Content:
+        def __call__(self, part, version, options):
+            return part.new_zeros(1, (part.shape[-1] - 400) // 320 + 1, 256)
+
+    class Voice:
+        def __call__(self, features, pitch, f0, speaker, generator, options):
+            value = 1 if generator.initial_seed() == 42 else -1
+            return features.new_full((1, 1, features.shape[1] * 400), value)
+
+    voice = SimpleNamespace(metadata={"config": "[40000]", "use_f0": "false", "version": "v1"})
+    content = SimpleNamespace()
+    monkeypatch.setattr(runtime, "activate", lambda component, frames: (Voice() if component is voice else Content(), torch.device("cpu")))
+    monkeypatch.setattr(runtime, "options", lambda component: {})
+    audio = {"waveform": torch.zeros(1, 1, 72000), "sample_rate": 16000}
+    converted = runtime.convert(voice, content, audio, 0, 0, .33, 1., 42)["waveform"]
+    assert converted.shape == (1, 1, 180000)
+    assert torch.isfinite(converted).all()
+    assert torch.diff(converted).abs().max() < .001
