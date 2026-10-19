@@ -204,6 +204,16 @@ quality require separate review. The examples include the complete reference-son
 path and original-backing mixing. Source/candidate acceptance does not restart
 the serving installation. Use the existing worktree setup command with `--soulx`.
 
+## Native model integration development
+
+For model ports and checkpoint conversion, read the
+[native integration guide](docs/native-model-integration.md). It covers component
+selection, standard loaders and dedicated managed handles, offline conversion,
+ComfyUI memory ownership, reference/lifecycle validation and delivery, with links
+to implemented ports. Its Applio example describes scoping only; it adds no Applio
+support. Prepare a development worktree as documented below; GPU acceptance needs
+separately provisioned checkpoints and a compatible runtime.
+
 ## Local stable-release maintenance
 
 The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).

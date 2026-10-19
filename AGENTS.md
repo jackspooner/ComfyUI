@@ -389,6 +389,16 @@
   memory regressions, broken model loading, workflow incompatibility, and noisy
   or misleading user-facing output.
 
+## Native model integration
+
+Before integrating a model or converting a checkpoint for native execution, read
+[docs/native-model-integration.md](docs/native-model-integration.md). It consolidates
+component/loader selection, offline conversion, optimized execution and memory
+ownership, reference/lifecycle acceptance, documentation and activation boundaries.
+Use the existing shared `comfyui` skill for discovery and operating guidance and
+`comfyui-model-runtimes` for native-versus-isolated placement; extend their
+authoritative sources through `shared-agent-skills` when capabilities change.
+
 ## Worktree development
 
 Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_worktree.py` before editing. The configured Python must be >=3.10 with PyTorch, einops and safetensors installed from the ComfyUI deployment's requirements. The check reuses that explicit runtime without copying dependencies, installing packages, loading models or connecting to a service. It is safe to rerun and leaves tracked files unchanged. GPU validation requires a compatible GPU/runtime and separately provisioned model files; unit tests use isolated fixtures.
