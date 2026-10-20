@@ -1,0 +1,26 @@
+{
+  "code_revision": "857b60ad05d37a2cf6d7a89883ec9fc4fc164b45",
+  "weight_revision": "f0b4d4c4411fe08fc2dddbf2d9f33260c27ac4a0",
+  "model_code_sha256": {
+    "models/adapter/discriminators.py": "c763c3ce544203e5dacb09246e701ead4e8c0431536bd851eabbd7019f6370d3",
+    "models/adapter/vocos/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "models/adapter/vocos/adapter.py": "a31996ac4923ff596f81015b2081951d121a112c892b9207104a4e3886ce4625",
+    "models/adapter/vocos/backbone.py": "3d8a5ef4ae7871998c9a5e3cf6c62920f25c778b18e9ffa98f2e61c845c199d8",
+    "models/adapter/vocos/conv.py": "4238c74d0465fe05e3c75ded5e4103635f1dec632e0f94f553f5e8a4f39e12be",
+    "models/adapter/vocos/head.py": "1eeb5149fad0fdecd16251f5de77542571f044bbd48ffc0a66e484583d7f05fd",
+    "models/postnet/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "models/postnet/tfgrid_cws_res.py": "b268d9ddff3cf286de35dedcdad1b47dd7de0b34be52c3e9147b1c4bff455203",
+    "models/unipase.py": "da557ea82568f6c37eeb2933e2d7b386da8b1ad039f24fb4cd9deb2e6a67e8f1",
+    "models/vocoder/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "models/vocoder/discriminators.py": "1042312aae589d5863ab20df978010fea7ce5e059deb4116916783abc2083d3a",
+    "models/vocoder/vocos/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "models/vocoder/vocos/backbone.py": "45ac4a2cceae91f416b97602aa410108122314ae143ccda0166aca48d017d069",
+    "models/vocoder/vocos/conv.py": "50c79d1c4e46e3c0e975f6b19b9d31bb6d64ef55fc77e0a68a6f68f3a50bff3f",
+    "models/vocoder/vocos/head.py": "b171bf6b91ed9f516f51ef6a352be3aae7a68a63877bbb0a0f7fb30bd7312a82",
+    "models/vocoder/vocos/vocoder.py": "dc9c7ba6a14b9bcf4d3c925516dee129c9156d1f490745ae0155693073b2f7eb",
+    "models/wavlm/WavLM.py": "64b34574953eb942b98babf51f2951222cfdbfd4111e135dbdb1196bd6f1c98b",
+    "models/wavlm/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "models/wavlm/feature_extractor_plc.py": "c1ee5e5d8b7bb4883165695031bd49d29ea0a77e5b4d2dfd504a3c9cb223aa9d",
+    "models/wavlm/modules.py": "f2cfb5e75f40baed7ddde3f80f7ebac0b79e9d25515e3d636126f7a17f0639ab"
+  }
+}
