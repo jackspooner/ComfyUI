@@ -48,3 +48,9 @@ compilation in the encoder loop. Its failed history is retained. The corrective
 change captures layer-one features before the repeated scope and reuses stable
 loop buffers, following existing native model patterns; compiler/VRAM flags remain
 enabled. GPU revalidation is required before acceptance.
+
+The corrected buffer run reached Adapter attention, where the installation's INT8
+backend rejected its 1024-wide single head. UniPASE now requests the shared
+`low_precision_attention=False` contract for its FP32 attention, preserving the
+original math without inspecting backend identities or changing global flags.
+The same contract handles PostNet's wider Q/K/V layout. Final GPU rerun required.

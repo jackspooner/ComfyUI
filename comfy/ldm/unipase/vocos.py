@@ -34,7 +34,7 @@ class AttnBlock(nn.Module):
     def forward(self, x):
         y = self.norm(x)
         q, k, v = [AttentionTensorContainer(proj(y).transpose(1, 2)) for proj in (self.q, self.k, self.v)]
-        y = optimized_attention(q, k, v, 1, preferred_attention=self.comfy_attention).transpose(1, 2)
+        y = optimized_attention(q, k, v, 1, preferred_attention=self.comfy_attention, low_precision_attention=False).transpose(1, 2)
         return x + self.proj_out(y)
 
 

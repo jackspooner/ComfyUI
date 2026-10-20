@@ -209,7 +209,7 @@ class GridNetV3Block(nn.Module):
         width = V.shape[-1]
         Q = F.pad(Q, (0, width - Q.shape[-1]))
         K = F.pad(K.transpose(1, 2), (0, width - K.shape[1]))
-        V = optimized_attention(AttentionTensorContainer(Q), AttentionTensorContainer(K), AttentionTensorContainer(V), 1, scale=emb_dim ** (-0.5), preferred_attention=self.comfy_attention)
+        V = optimized_attention(AttentionTensorContainer(Q), AttentionTensorContainer(K), AttentionTensorContainer(V), 1, scale=emb_dim ** (-0.5), preferred_attention=self.comfy_attention, low_precision_attention=False)
         V = V.reshape(old_shape)
         V = V.transpose(1, 2)
         emb_dim = V.shape[1]

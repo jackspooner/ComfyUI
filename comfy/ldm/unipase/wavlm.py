@@ -40,7 +40,7 @@ class Attention(nn.Module):
         a, c = gate.reshape(b, self.heads, t, 2, 4).sum(-1).sigmoid().chunk(2, dim=-1)
         mask = (a * (c * comfy.ops.cast_to_input(self.grep_a, a) - 1) + 2) * bias
         q, k, v = [AttentionTensorContainer(proj(x)) for proj in (self.q_proj, self.k_proj, self.v_proj)]
-        return self.out_proj(optimized_attention(q, k, v, self.heads, mask=mask, preferred_attention=self.comfy_attention))
+        return self.out_proj(optimized_attention(q, k, v, self.heads, mask=mask, preferred_attention=self.comfy_attention, low_precision_attention=False))
 
 
 class Block(nn.Module):
