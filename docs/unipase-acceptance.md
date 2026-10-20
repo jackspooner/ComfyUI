@@ -42,3 +42,9 @@ GPU queue inference, cancellation/reload, explicit cleanup, measured GPU/RAM res
 usage, facade end-to-end delivery and listening acceptance are pending until recorded
 below. No general music enhancement, universal artifact removal, low-VRAM capacity,
 other-accelerator support or complete URGENT hybrid reproduction is claimed.
+
+The first GPU prompt `ecd3fe38-4aa6-4310-84d4-f6a84d5ad711` failed allocation
+compilation in the encoder loop. Its failed history is retained. The corrective
+change captures layer-one features before the repeated scope and reuses stable
+loop buffers, following existing native model patterns; compiler/VRAM flags remain
+enabled. GPU revalidation is required before acceptance.
