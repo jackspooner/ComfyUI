@@ -56,7 +56,9 @@ stitch offsets use the output rate; upstream's short-clip chunk failure and
 input-rate offset bug are not copied. Input/output CPU memory still scales with
 recording length; neural activations are segment-bounded. No persistent tensor
 cache or model-owned residency manager is added. ComfyUI owns cancellation,
-loading, offload and cleanup; PostNet's small native LSTM component loads in full.
+loading, offload and cleanup; PostNet's small native LSTM component loads in full. Attention requests the existing
+full-precision contract: Vocos and PostNet have wide heads outside INT8 attention
+kernel limits; backend selection remains owned by ComfyUI.
 
 ## Verification and recovery
 
