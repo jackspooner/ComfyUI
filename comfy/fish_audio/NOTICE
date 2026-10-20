@@ -1,0 +1,4 @@
+These Fish Audio Materials are licensed under the Fish Audio Community License, Version 1.0. Copyright © 39 AI, INC. All Rights Reserved.
+Built with Fish Audio.
+Native ComfyUI adaptation of fishaudio/fish-speech commit 541566932abbaebcb0a40e562a1f846738383f38: managed operations, execution-local caches, NVFP4 conversion and explicit history.
+Codec architecture also derives from Descript Audio Codec (MIT); see DAC-LICENSE.
