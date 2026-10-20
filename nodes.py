@@ -2479,6 +2479,7 @@ async def init_builtin_extra_nodes():
         "nodes_yingmusic.py",
         "nodes_soulx_singer.py",
         "nodes_rvc.py",
+        "nodes_drama3.py",
         "nodes_unipase.py",
         "nodes_minimax_h3.py",
         "nodes_lt.py",
