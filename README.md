@@ -1,3 +1,15 @@
+## Native Drama 3 in this fork
+
+Built with Fish Audio. This fork adds native Drama 3 speech, speaker references,
+long-form dialogue and explicit saved take histories for whole-take revisions.
+An offline converter packages routed experts as NVFP4 and the remaining weights
+as BF16; ComfyUI owns generation/codec loading and execution-local caches. The
+initial target is a Blackwell CUDA GPU. The RTX 5090 candidate completes speech,
+cloning, revisions and lifecycle checks within memory, but tested dialogue and
+long-form quality failed; serving activation remains unapproved. See [setup and limitations](docs/drama3.md)
+and the [acceptance record](docs/drama3-acceptance.md). Existing upstream capability
+and attribution are described below.
+
 <div align="center">
 
 # ComfyUI

@@ -459,3 +459,12 @@ loading, reused RMVPE and normal-queue workflow operation. Run
 `scripts/check_rvc.py` performs pinned upstream CPU component comparisons separately.
 Update the existing shared ComfyUI/model-runtimes guidance for reusable changes;
 setup and validation do not start live workloads or restart services.
+
+### Native Drama 3
+
+Use the standard worktree setup command. `docs/drama3.md` owns offline FP8-to-NVFP4
+conversion, native node/history contracts, reference verification and acceptance
+limits. Run `python -m pytest tests-unit/comfy_test/drama3_test.py -q`; set
+`DRAMA3_UPSTREAM` to the pinned offline source for independent component checks.
+Keep model files outside Git. Update the authoritative existing ComfyUI and
+model-runtime skills with capability changes; do not register task worktrees.
