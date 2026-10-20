@@ -60,7 +60,12 @@ class Backbone(nn.Module):
             for block in self.convnext:
                 mm.throw_exception_if_processing_interrupted()
                 prefetch.prefetch_queue_pop(queue, x.device, block, x.dtype, malloc_scope="unipase_vocos")
-                x = block(x)
+                result = block(x)
+                if torch.is_grad_enabled():
+                    x = result
+                else:
+                    x.copy_(result)
+                del result
             prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope="unipase_vocos")
         return self.final_layer_norm(x.transpose(1, 2)).transpose(1, 2)
 

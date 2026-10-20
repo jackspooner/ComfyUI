@@ -93,14 +93,22 @@ class DeWavLM(nn.Module):
         if not self.norm_first:
             x = self.encoder.layer_norm(x)
         bias = self.encoder.layers[0].self_attn.position_bias(x)
-        queue = prefetch.make_prefetch_queue(list(self.encoder.layers), x.device, transformer_options)
-        first = None
+        # Layer-one features must outlive the transformer loop. Capture them
+        # before the repeated allocation scope, then reuse its loop buffer.
+        mm.throw_exception_if_processing_interrupted()
+        first = self.encoder.layers[0](x, bias)
+        x = first.clone()
+        layers = list(self.encoder.layers[1:])
+        queue = prefetch.make_prefetch_queue(layers, x.device, transformer_options)
         with prefetch.malloc_graph_scope(x.device):
-            for i, block in enumerate(self.encoder.layers):
+            for block in layers:
                 mm.throw_exception_if_processing_interrupted()
                 prefetch.prefetch_queue_pop(queue, x.device, block, x.dtype, malloc_scope="unipase_wavlm")
-                x = block(x, bias)
-                if i == 0:
-                    first = x
+                result = block(x, bias)
+                if torch.is_grad_enabled():
+                    x = result
+                else:
+                    x.copy_(result)
+                del result
             prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope="unipase_wavlm")
         return F.layer_norm(first, first.shape[1:], eps=1e-6), F.layer_norm(x, x.shape[1:], eps=1e-6)

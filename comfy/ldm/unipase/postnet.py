@@ -57,7 +57,12 @@ class TFGridNet(nn.Module):
             for block in self.blocks:
                 mm.throw_exception_if_processing_interrupted()
                 prefetch.prefetch_queue_pop(queue, batch.device, block, batch.dtype, malloc_scope='unipase_postnet')
-                batch = block(batch)
+                result = block(batch)
+                if torch.is_grad_enabled():
+                    batch = result
+                else:
+                    batch.copy_(result)
+                del result
             prefetch.prefetch_queue_pop(queue, batch.device, None, malloc_scope='unipase_postnet')
         batch = self.deconv(batch)
         batch = self.bs.inverse(batch)
