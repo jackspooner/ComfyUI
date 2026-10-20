@@ -2,6 +2,15 @@
 
 # ComfyUI
 
+## Native UniPASE in this fork
+
+This fork adds **Load UniPASE → UniPASE Speech Restoration** for local generative
+speech enhancement with four managed FP32 networks, ordinary AUDIO inputs/outputs,
+rate preservation and bounded long-recording segments. Provision weights explicitly;
+no runtime downloads occur. See [setup, licensing and use](docs/unipase.md) and
+[acceptance limits](docs/unipase-acceptance.md). Music enhancement and guaranteed
+repair of every synthetic artifact are outside the validated scope.
+
 ## Native Applio / RVC in this fork
 
 This fork adds **Load Applio / RVC Models → Applio / RVC Voice Convert** for local

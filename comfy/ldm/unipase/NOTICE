@@ -1,0 +1,7 @@
+UniPASE by Xiaobin Rong et al. https://github.com/Xiaobin-Rong/unipase
+Source revision 857b60ad05d37a2cf6d7a89883ec9fc4fc164b45 (MIT).
+DeWavLM derives from Microsoft WavLM (MIT); Adapter/Vocos from WavTokenizer
+(MIT), pipeline from Cisco PASE (Apache-2.0), PostNet from ESPnet (Apache-2.0).
+See licenses/ for retained notices. Model card declares Apache-2.0 for weights:
+https://huggingface.co/Xiaobin-Rong/unipase/tree/f0b4d4c4411fe08fc2dddbf2d9f33260c27ac4a0
+Native inference excludes training, downloads and the evaluation-only L24 vocoder.
