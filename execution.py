@@ -704,7 +704,7 @@ class PromptExecutor:
 
     def handle_execution_error(self, prompt_id, prompt, current_outputs, executed, error, ex):
         node_id = error["node_id"]
-        class_type = prompt[node_id]["class_type"]
+        class_type = prompt[node_id]["class_type"] if node_id is not None else None
 
         # First, send back the status to the frontend depending
         # on the exception type
@@ -761,12 +761,11 @@ class PromptExecutor:
                 self.release_model_files(files)
                 manager.evict(files)
 
+    def before_prompt_execution(self):
+        """Extension admission hook, before cache evaluation or node execution."""
+        pass
+
     async def execute_async(self, prompt, prompt_id, extra_data={}, execute_outputs=[]):
-        manager = comfy.model_cache.manager
-        if manager is not None:
-            changed = manager.changed()
-            if changed:
-                self.release_model_files(changed)
         with comfy.model_cache.prompt_scope():
             return await self.execute_prompt_async(prompt, prompt_id, extra_data, execute_outputs)
 
@@ -782,6 +781,9 @@ class PromptExecutor:
             self.server.client_id = None
 
         self.status_messages = []
+        self.success = True
+        self.history_result = {"outputs": {}, "meta": {}}
+        self.server.last_node_id = None
         self.add_message("execution_start", { "prompt_id": prompt_id}, broadcast=False)
 
         self._notify_prompt_lifecycle("start", prompt_id)
@@ -791,6 +793,25 @@ class PromptExecutor:
         comfy.memory_management.set_ram_cache_release_state(ram_release_callback, ram_headroom)
 
         try:
+            try:
+                self.before_prompt_execution()
+                manager = comfy.model_cache.manager
+                if manager is not None:
+                    changed = manager.changed()
+                    if changed:
+                        self.release_model_files(changed)
+            except (comfy.model_management.InterruptProcessingException, Exception) as ex:
+                self.success = False
+                if not isinstance(ex, comfy.model_management.InterruptProcessingException):
+                    logging.exception("Prompt admission failed")
+                self.handle_execution_error(prompt_id, prompt, [], [], {
+                    "node_id": None,
+                    "exception_message": str(ex),
+                    "exception_type": full_type_name(type(ex)),
+                    "traceback": traceback.format_tb(ex.__traceback__),
+                    "current_inputs": {},
+                }, ex)
+                return
             with torch.inference_mode():
                 dynamic_prompt = DynamicPrompt(prompt)
                 reset_progress_state(prompt_id, dynamic_prompt)

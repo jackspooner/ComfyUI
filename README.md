@@ -741,3 +741,20 @@ ComfyUI PyTorch runtime; weights are provisioned separately. See
 [setup, workflow, contracts and limitations](docs/trellis2-mesh-texturing.md).
 This extends the node engine, model loading and media workflows described in the
 [upstream README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
+
+## Local fork: prompt admission
+
+`PromptExecutor.before_prompt_execution(self)` is a synchronous, no-op extension
+hook invoked after interrupt and status initialization, before cache evaluation
+or node execution. Overrides compose the previous hook and raise to refuse work.
+Admission failures and Stop produce prompt-level history events with null node
+identity and empty outputs, run lifecycle cleanup, and allow the next prompt.
+Core owns no service settings or network calls.
+
+Matching [Cutlery-Nodes](https://github.com/jackspooner/Cutlery-Nodes) uses this hook
+for optional RuntimeHost GPU ownership on every queued CUDA-instance prompt,
+including cached, CPU-only and remote-only work. CPU-configured instances bypass
+GPU acquisition. Install both versions before restarting an idle instance; see
+[GPU handoff, memory limits and recovery](https://github.com/jackspooner/Cutlery-Nodes/blob/main/docs/runtime-gpu-handoff.md).
+Run `python -m pytest tests-unit/execution_test/test_prompt_admission.py -q` with
+the prepared runtime; these checks do not start live GPU workloads.
