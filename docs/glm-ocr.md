@@ -133,3 +133,5 @@ supplied and no pixels were enlarged. The production RouterText OCR route remain
 unconfigured; MediaTools/WF5 OCR inference is withheld until literal acceptance
 passes. The approximately 100-crop human-reviewed evaluation, isolated capacity/
 crash tests, detailed allocator peaks and wider device coverage remain unverified.
+
+Complete native GLM-OCR also accepts [version 2 image history](text-conversations.md) with ordered images and exact context accounting. This supplies replay mechanics only; the recognition-quality limits above remain. Raw-template one-shot calls retain their original behavior and do not create snapshots.

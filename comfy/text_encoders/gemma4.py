@@ -1,3 +1,4 @@
+from .chat import chat_segments, encode_chat
 import torch
 import torch.nn as nn
 import comfy.audio
@@ -654,6 +655,11 @@ class Gemma4Transformer(nn.Module):
 
 class Gemma4Base(BaseLlama, BaseGenerate, torch.nn.Module):
     """Common base for all Gemma4 variants: text model + vision."""
+    def image_token_length(self, embed):
+        cfg = self.model.config.vision_config
+        factor = cfg["patch_size"] * cfg["pooling_kernel_size"]
+        return embed["data"].shape[1] * embed["data"].shape[2] // (factor * factor)
+
     def _init_model(self, config, dtype, device, operations):
         self.num_layers = config.num_hidden_layers
         self.model = Gemma4Transformer(config, device=device, dtype=dtype, ops=operations)
@@ -701,7 +707,7 @@ class Gemma4Base(BaseLlama, BaseGenerate, torch.nn.Module):
 
     def preprocess_embed(self, embed, device):
         if embed["type"] == "image":
-            image = embed.pop("data").movedim(-1, 1)  # [B, H, W, C] -> [B, C, H, W]
+            image = embed["data"].movedim(-1, 1)  # [B, H, W, C] -> [B, C, H, W]
             max_soft_tokens = embed.get("max_soft_tokens", None)
             vision_out = self.vision_model(image.to(device, dtype=torch.float32), max_soft_tokens=max_soft_tokens)
             return self.multi_modal_projector(vision_out), None
@@ -740,7 +746,7 @@ class Gemma4UnifiedBase(Gemma4Base):
 
     def preprocess_embed(self, embed, device):
         if embed["type"] == "image":
-            pixels = embed.pop("data").movedim(-1, 1).to(device, dtype=self.dtype)  # [B, H, W, C] -> [B, C, H, W], [0,1]
+            pixels = embed["data"].movedim(-1, 1).to(device, dtype=self.dtype)  # [B, H, W, C] -> [B, C, H, W], [0,1]
             patches, positions = self.vision_model.patchify(pixels)
             vision_out = self.vision_model(patches, positions)
             return self.multi_modal_projector(vision_out), None
@@ -1390,7 +1396,31 @@ def _get_aspect_ratio_preserving_size(height, width, patch_size, max_patches, po
     return target_height, target_width
 
 
+def prepare_chat_image(image, max_soft_tokens=280):
+    samples = image.movedim(-1, 1)
+    h, w = samples.shape[-2:]
+    target_h, target_w = _get_aspect_ratio_preserving_size(h, w, 16, max_soft_tokens * 9, 3)
+    pixels = (samples[0].clamp(0, 1) * 255).to(torch.uint8)
+    if (target_h, target_w) != (h, w):
+        pixels = TVF.resize(pixels, [target_h, target_w], interpolation=TVF.InterpolationMode.BICUBIC, antialias=True)
+    pixels = (pixels.float() * (1.0 / 255.0)).unsqueeze(0).movedim(1, -1)[..., :3]
+    return {"type": "image", "data": pixels, "max_soft_tokens": max_soft_tokens}
+
+
 class Gemma4_Tokenizer():
+    def tokenize_chat(self, messages, thinking=False):
+        messages = [{"role": "model" if m["role"] == "assistant" else m["role"], "content": m["content"]} for m in messages]
+        if thinking:
+            if messages and messages[0]["role"] == "system":
+                messages[0] = {"role": "system", "content": "<|think|>\n" + messages[0]["content"]}
+            else:
+                messages.insert(0, {"role": "system", "content": "<|think|>\n"})
+        suffix = "<|channel>thought\n<channel|>" if self.prime_empty_thought and not thinking else ""
+        segments = chat_segments(messages, "<|turn>{role}\n", "<turn|>\n", "<|turn>model\n" + suffix,
+                                 "<|image>", "<image|>")
+        return encode_chat(segments, lambda text: self.tokenizer(text)["input_ids"],
+                           lambda part: prepare_chat_image(part["data"]), start_tokens=(2,))
+
     tokenizer_json_data = None
     prime_empty_thought = False
 
@@ -1496,20 +1526,9 @@ class Gemma4_Tokenizer():
                 samples = samples[indices]
                 num_frames = len(indices)
 
-            h, w = samples.shape[2], samples.shape[3]
-            patch_size = 16
-            pooling_k = 3
             max_soft_tokens = kwargs.get("max_soft_tokens", 70 if is_video else 280)
-            max_patches = max_soft_tokens * pooling_k * pooling_k
-            target_h, target_w = _get_aspect_ratio_preserving_size(h, w, patch_size, max_patches, pooling_k)
-
             for i in range(num_frames):
-                # rescaling to match reference code
-                s = (samples[i].clamp(0, 1) * 255).to(torch.uint8)  # [C, H, W] uint8
-                if target_h != h or target_w != w:
-                    s = TVF.resize(s, [target_h, target_w], interpolation=TVF.InterpolationMode.BICUBIC, antialias=True)
-                s = s.float() * (1.0 / 255.0)
-                images.append({"pixels": s.unsqueeze(0).movedim(1, -1)[:, :, :, :3], "max_soft_tokens": max_soft_tokens})
+                images.append(prepare_chat_image(samples[i:i + 1].movedim(1, -1), max_soft_tokens))
 
         if text.startswith('<|turn>'):
             skip_template = True
@@ -1566,7 +1585,7 @@ class Gemma4_Tokenizer():
 
         if len(images) > 0:
             img_token_id = 258884 if is_video else 258880
-            img_embeds = [{"type": "image", "data": img["pixels"], "max_soft_tokens": img["max_soft_tokens"]} for img in images]
+            img_embeds = images
             for r in text_tokens:
                 _replace_placeholders(r, img_token_id, img_embeds)
 
@@ -1623,6 +1642,9 @@ class Gemma4SDTokenizer(Gemma4_Tokenizer, sd1_clip.SDTokenizer):
 
 
 class Gemma4Tokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_chat(self, messages, thinking=False):
+        return {self.clip: self.gemma4.tokenize_chat(messages, thinking)}
+
     tokenizer_class = Gemma4SDTokenizer
     def __init__(self, embedding_directory=None, tokenizer_data={}):
         super().__init__(embedding_directory=embedding_directory, tokenizer_data=tokenizer_data, name="gemma4", tokenizer=self.tokenizer_class)

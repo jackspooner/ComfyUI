@@ -1,3 +1,4 @@
+from .chat import qwen_chat
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,7 +15,6 @@ from comfy_kitchen.int8_decode import is_available as int8_decode_is_available
 from comfy.quant_ops import QuantizedTensor
 from comfy.ldm.modules.attention import AttentionTensorContainer, ComfyAttention, optimized_attention_for_device
 from comfy import sd1_clip
-from comfy.text_generation import format_qwen_chat
 import comfy.text_encoders.qwen_vl
 
 from .llama import BaseLlama, BaseGenerate, FixedKV, FixedKVCache, Int8FixedKVCache, Llama2_, MLP, RMSNorm, apply_penalty, apply_rope, penalty_active, precompute_freqs_cis, rope_matrix
@@ -722,6 +722,10 @@ class MTPHead(nn.Module):
 
 # Model Wrapper
 class Qwen35(BaseLlama, BaseGenerate, torch.nn.Module):
+    def image_token_length(self, embed):
+        h, w = comfy.text_encoders.qwen_vl.image_size(*embed["data"].shape[1:3], patch_size=16)
+        return h * w // (32 * 32)
+
     model_type = "qwen35_2b"
 
     def __init__(self, config_dict, dtype, device, operations):
@@ -1032,7 +1036,7 @@ class Qwen35Tokenizer(sd1_clip.SDTokenizer):
 
 class Qwen35ImageTokenizer(sd1_clip.SD1Tokenizer):
     def tokenize_chat(self, messages, thinking=False):
-        return self.tokenize_with_weights(format_qwen_chat(messages, thinking))
+        return {self.clip: qwen_chat(messages, getattr(self, self.clip).tokenizer, thinking)}
 
     def __init__(self, embedding_directory=None, tokenizer_data={}, model_type="qwen35_2b"):
         embedding_size = QWEN35_MODELS.get(model_type, {}).get("hidden_size", 2048)

@@ -1,5 +1,6 @@
 """Native Z.ai GLM-OCR. Architecture follows Transformers' Apache-2.0 GLM-OCR implementation."""
 import math
+from .chat import chat_segments, encode_chat
 from types import SimpleNamespace
 
 import torch
@@ -234,6 +235,10 @@ class TextModel(nn.Module):
 
 
 class GlmOCR(BaseLlama, BaseGenerate, nn.Module):
+    def image_token_length(self, embed):
+        _, _, h, w = image_geometry(*embed['data'].shape[1:3])
+        return h * w // (28 * 28)
+
     def __init__(self, config_dict, dtype, device, operations):
         super().__init__()
         text = {**TEXT_CONFIG, **config_dict.get('text', {})}
@@ -297,6 +302,11 @@ class GlmOCRSDTokenizer(sd1_clip.SDTokenizer):
 
 
 class GlmOCRTokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_chat(self, messages, thinking=False):
+        segments = chat_segments(messages, '<|{role}|>\n', '', '<|assistant|>\n',
+                                 '<|begin_of_image|>', '<|end_of_image|>', prefix='[gMASK]<sop>')
+        return {'glm_ocr': encode_chat(segments, lambda text: self.glm_ocr.tokenizer.encode(text, add_special_tokens=False))}
+
     def __init__(self, embedding_directory=None, tokenizer_data={}):
         super().__init__(embedding_directory=embedding_directory, tokenizer_data=tokenizer_data, name='glm_ocr', tokenizer=GlmOCRSDTokenizer)
 
@@ -325,8 +335,9 @@ class GlmOCRTEModel(sd1_clip.SD1ClipModel):
             if isinstance(token, dict) and token['type'] == 'image':
                 image = token['data']
                 _, _, h, w = image_geometry(image.shape[1], image.shape[2])
-                patches = h * w // (14 * 14)
-                total += patches // 4 - 1
+                image_patches = h * w // (14 * 14)
+                patches = max(patches, image_patches)
+                total += image_patches // 4 - 1
         config = self.glm_ocr.transformer.model.config
         budget = self.glm_ocr.transformer.resolve_max_length(max_length, total)
         if total + budget > config.max_position_embeddings:

@@ -1,3 +1,4 @@
+from .chat import qwen_chat
 import os
 
 import torch
@@ -48,6 +49,10 @@ class Qwen3VLVisionModel(Qwen35VisionModel):
 
 
 class Qwen3VL(BaseLlama, BaseQwen3, BaseGenerate, torch.nn.Module):
+    def image_token_length(self, embed):
+        h, w = comfy.text_encoders.qwen_vl.image_size(*embed["data"].shape[1:3], patch_size=16)
+        return h * w // (32 * 32)
+
     model_type = "qwen3vl_8b"
 
     def __init__(self, config_dict, dtype, device, operations):
@@ -152,6 +157,9 @@ class Qwen3VLSDTokenizer(sd1_clip.SDTokenizer):
 
 
 class Qwen3VLTokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_chat(self, messages, thinking=False):
+        return {self.clip: qwen_chat(messages, getattr(self, self.clip).tokenizer)}
+
     def __init__(self, embedding_directory=None, tokenizer_data={}, model_type="qwen3vl_8b"):
         embedding_size = 2560 if model_type == "qwen3vl_4b" else 4096
         tokenizer = lambda *a, **kw: Qwen3VLSDTokenizer(*a, **kw, embedding_size=embedding_size, embedding_key=model_type)

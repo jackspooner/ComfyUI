@@ -1,3 +1,4 @@
+from .chat import count_chat_tokens
 import torch
 import torch.nn as nn
 from dataclasses import dataclass
@@ -1158,6 +1159,12 @@ def apply_penalty(logits, repetition_penalty, presence_penalty):
 
 
 class BaseGenerate:
+    def count_chat_tokens(self, tokens):
+        return count_chat_tokens(tokens, self.image_token_length)
+
+    def image_token_length(self, embed):
+        raise ValueError("This model does not support images in conversation history.")
+
     def resolve_max_length(self, max_length, input_length):
         if max_length != 0:
             return max_length
@@ -1448,6 +1455,10 @@ class Ovis25_2B(BaseLlama, torch.nn.Module):
         self.dtype = dtype
 
 class Qwen25_7BVLI(BaseLlama, BaseGenerate, torch.nn.Module):
+    def image_token_length(self, embed):
+        h, w = qwen_vl.image_size(*embed["data"].shape[1:3])
+        return h * w // (28 * 28)
+
     def __init__(self, config_dict, dtype, device, operations):
         super().__init__()
         config = Qwen25_7BVLI_Config(**config_dict)
@@ -1519,6 +1530,9 @@ class Gemma3_4B(BaseLlama, BaseGenerate, torch.nn.Module):
         self.dtype = dtype
 
 class Gemma3_4B_Vision(BaseLlama, BaseGenerate, torch.nn.Module):
+    def image_token_length(self, embed):
+        return self.model.config.mm_tokens_per_image * embed["data"].shape[0]
+
     def __init__(self, config_dict, dtype, device, operations):
         super().__init__()
         config = Gemma3_4B_Vision_Config(**config_dict)
@@ -1537,6 +1551,9 @@ class Gemma3_4B_Vision(BaseLlama, BaseGenerate, torch.nn.Module):
         return None, None
 
 class Gemma3_12B(BaseLlama, BaseGenerate, torch.nn.Module):
+    def image_token_length(self, embed):
+        return self.model.config.mm_tokens_per_image * embed["data"].shape[0]
+
     def __init__(self, config_dict, dtype, device, operations):
         super().__init__()
         config = Gemma3_12B_Config(**config_dict)

@@ -123,6 +123,8 @@ class AudioFlamingoTokenizer(sd1_clip.SD1Tokenizer):
                          name="audio_flamingo", tokenizer=AudioFlamingoSDTokenizer)
 
     def tokenize_chat(self, messages, thinking=False):
+        if any(not isinstance(message["content"], str) for message in messages):
+            raise ValueError("Audio Flamingo does not support images in conversation history.")
         if not messages or messages[0]["role"] != "system":
             messages = [{"role": "system", "content": "You are a helpful assistant."}, *messages]
         text = "".join(f'<|im_start|>{message["role"]}\n{message["content"]}<|im_end|>\n' for message in messages)
