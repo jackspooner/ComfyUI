@@ -2434,6 +2434,18 @@ class YingMusic(supported_models_base.BASE):
         return model_base.ModelType.FLOW
 
 
+class MossSoundEffect(supported_models_base.BASE):
+    unet_config = {'audio_model': 'moss_soundeffect'}
+    unet_extra_config = {}
+    latent_format = comfy.latent_formats.MossSoundEffect
+    supported_inference_dtypes = [torch.float32]
+    sampling_settings = {'shift': 5.0, 'multiplier': 1000}
+    memory_usage_factor = 2.0
+
+    def get_model(self, state_dict, prefix='', device=None):
+        return model_base.MossSoundEffect(self, device=device)
+
+
 class MiniMaxMusic3(supported_models_base.BASE):
     unet_config = {
         "audio_model": "minimax_music3",
@@ -2769,6 +2781,7 @@ models = [
     ACEStep,
     ACEStep15,
     MiniMaxMusic3,
+    MossSoundEffect,
     YuE2,
     YingMusic,
     Omnigen2,

@@ -1110,6 +1110,12 @@ class YuE2(LatentFormat):
     temporal_downscale_ratio = 1920
 
 
+class MossSoundEffect(LatentFormat):
+    latent_channels = 128
+    latent_dimensions = 1
+    temporal_downscale_ratio = 960
+
+
 class MiniMaxMusic3(LatentFormat):
     latent_channels = 128
     latent_dimensions = 1

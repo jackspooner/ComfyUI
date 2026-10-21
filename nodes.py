@@ -1018,7 +1018,7 @@ class CLIPLoader:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": { "clip_name": (folder_paths.get_filename_list("text_encoders"), ),
-                              "type": (["stable_diffusion", "stable_cascade", "sd3", "stable_audio", "mochi", "ltxv", "pixart", "cosmos", "lumina2", "wan", "hidream", "chroma", "ace", "omnigen2", "qwen_image", "hunyuan_image", "flux2", "ovis", "longcat_image", "cogvideox", "lens", "pixeldit", "ideogram4", "boogu", "krea2", "joyimage", "mage", "minimax", "yue2", "flux3", "moss_audio", "moss_tts", "audio_flamingo", "auk", "qwen3_omni", "moss_image", "fibo2"], ),
+                              "type": (["stable_diffusion", "stable_cascade", "sd3", "stable_audio", "mochi", "ltxv", "pixart", "cosmos", "lumina2", "wan", "hidream", "chroma", "ace", "omnigen2", "qwen_image", "hunyuan_image", "flux2", "ovis", "longcat_image", "cogvideox", "lens", "pixeldit", "ideogram4", "boogu", "krea2", "joyimage", "mage", "minimax", "yue2", "flux3", "moss_audio", "moss_tts", "moss_soundeffect", "audio_flamingo", "auk", "qwen3_omni", "moss_image", "fibo2"], ),
                               },
                 "optional": {
                               "device": (["default", "cpu"], {"advanced": True}),
@@ -2461,6 +2461,7 @@ async def init_builtin_extra_nodes():
         "nodes_audio.py",
         "nodes_audio_codec.py",
         "nodes_moss_speech.py",
+        "nodes_moss_soundeffect.py",
         "nodes_auk.py",
         "nodes_sd3.py",
         "nodes_gits.py",

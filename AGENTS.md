@@ -469,6 +469,16 @@ limits. Run `python -m pytest tests-unit/comfy_test/drama3_test.py -q`; set
 Keep model files outside Git. Update the authoritative existing ComfyUI and
 model-runtime skills with capability changes; do not register task worktrees.
 
+### Optional native MOSS SoundEffect
+
+Use `--moss-soundeffect` with the standard setup command to check the separately
+provisioned `requirements-moss-soundeffect.txt` prompt dependencies. Setup installs
+nothing. `docs/moss-soundeffect.md` documents pinned offline conversion, native
+MODEL/CLIP/VAE operation and acceptance limits. Run the prepared interpreter with
+`-m pytest tests-unit/comfy_test/moss_soundeffect_test.py -q`; optional source and
+checkpoint fixtures are documented there. Extend the existing shared ComfyUI and
+model-runtime guidance alongside reusable changes. Do not activate the service.
+
 
 ### Native archive model cache
 

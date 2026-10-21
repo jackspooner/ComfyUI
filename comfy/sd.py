@@ -27,6 +27,7 @@ import comfy.ldm.cogvideo.vae
 import comfy.ldm.hunyuan_video.vae
 import comfy.ldm.mmaudio.vae.autoencoder
 import comfy.ldm.audio.vae_sa3
+import comfy.ldm.audio.moss_soundeffect_vae
 import comfy.ldm.minimax_music.dav
 import comfy.pixel_space_convert
 import comfy.weight_adapter
@@ -85,6 +86,7 @@ import comfy.text_encoders.auk
 import comfy.ldm.auk.vae
 import comfy.text_encoders.moss_audio
 import comfy.text_encoders.moss_speech
+import comfy.text_encoders.moss_soundeffect
 import comfy.text_encoders.audio_flamingo
 import comfy.text_encoders.glm_ocr
 import comfy.text_encoders.qwen3_omni
@@ -578,7 +580,20 @@ class VAE:
         self.audio_sample_rate = 44100
 
         if config is None:
-            if "dec_in_proj.weight" in sd and "decoder.model.0.weight_g" in sd:  # MiniMax Music3 DAV
+            if all(key in sd for key in ("quant_conv.weight", "post_quant_conv.weight", "encoder.block.0.weight", "decoder.model.0.weight")) and tuple(sd[key].shape[0] for key in ("quant_conv.weight", "post_quant_conv.weight", "encoder.block.0.weight", "decoder.model.0.weight")) == (256, 128, 128, 2048):
+                self.first_stage_model = comfy.ldm.audio.moss_soundeffect_vae.MossSoundEffectVAE(operations=comfy.ops.disable_weight_init)
+                self.latent_channels = 128
+                self.output_channels = 1
+                self.latent_dim = 1
+                self.audio_sample_rate = 48000
+                self.upscale_ratio = self.downscale_ratio = 960
+                self.crop_input = False
+                self.process_output = lambda audio: audio
+                self.process_input = lambda audio: audio
+                self.working_dtypes = [torch.float32]
+                self.memory_used_encode = lambda shape, dtype: (shape[-1] * 1024 + 256_000_000) * model_management.dtype_size(dtype)
+                self.memory_used_decode = lambda shape, dtype: (shape[-1] * 960 * 512 + 256_000_000) * model_management.dtype_size(dtype)
+            elif "dec_in_proj.weight" in sd and "decoder.model.0.weight_g" in sd:  # MiniMax Music3 DAV
                 self.first_stage_model = comfy.ldm.minimax_music.dav.MiniMaxMusic3DAV(operations=comfy.ops.disable_weight_init)
                 self.latent_channels = 128
                 self.output_channels = 2
@@ -1686,6 +1701,7 @@ class CLIPType(Enum):
     MOSS_IMAGE = 42
     FIBO2 = 43
     MOSS_TTS = 44
+    MOSS_SOUNDEFFECT = 45
 
 
 
@@ -2112,8 +2128,13 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
                 clip_target.clip = comfy.text_encoders.z_image.te(**llama_detect(clip_data))
                 clip_target.tokenizer = comfy.text_encoders.z_image.ZImageTokenizer
         elif te_model == TEModel.QWEN3_2B:
-            clip_target.clip = comfy.text_encoders.ovis.te(**llama_detect(clip_data))
-            clip_target.tokenizer = comfy.text_encoders.ovis.OvisTokenizer
+            if clip_type == CLIPType.MOSS_SOUNDEFFECT:
+                clip_target.clip = comfy.text_encoders.moss_soundeffect.te(**llama_detect(clip_data))
+                clip_target.tokenizer = comfy.text_encoders.moss_soundeffect.MossSoundEffectTokenizer
+                tokenizer_data['tokenizer_json'] = clip_data[0].pop('tokenizer_json')
+            else:
+                clip_target.clip = comfy.text_encoders.ovis.te(**llama_detect(clip_data))
+                clip_target.tokenizer = comfy.text_encoders.ovis.OvisTokenizer
         elif te_model == TEModel.QWEN3_8B:
             if clip_type == CLIPType.IDEOGRAM4:
                 clip_target.clip = comfy.text_encoders.ideogram4.te(**llama_detect(clip_data))

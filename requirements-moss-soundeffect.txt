@@ -1,0 +1,2 @@
+# Optional prompt normalization for native MOSS SoundEffect v2.
+ftfy==6.3.1
