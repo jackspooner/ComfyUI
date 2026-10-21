@@ -123,7 +123,9 @@ replay needs both the JSON and attachments. Saving history belongs to the caller
 Existing single-prompt and media paths remain available. See
 [native text conversations](docs/text-conversations.md) for prerequisites,
 contracts, examples, limits and verification. This source capability requires
-deployment before it appears in a running ComfyUI process.
+deployment before it appears in a running ComfyUI process. The
+[local image-history acceptance record](docs/text-conversations-acceptance.md)
+lists tested checkpoints, restart replay and coverage limits.
 
 ## Fork: Krea 2 inference
 
