@@ -70,6 +70,8 @@ caches; unconfigured fixed caches retain the existing flash decode path. See
 The same guide covers pinned VoiceGenerator BF16 conversion and native speech:
 **Load CLIP (moss_tts) → MOSS VoiceGenerator → Decode Audio Codes → Save Audio**.
 Text and voice descriptions produce discrete codes for the separately loaded codec.
+Offline BF16 conversion also supports pinned base Delay, v1.5 acting and TTSD
+bundles; their native generation adapters remain in development.
 The FP32 MOSS v1 codec has an offline converter and native **Load Audio Codec →
 Encode Audio Codes → Decode Audio Codes** nodes, with integer payloads and
 ComfyUI model/offload ownership. CPU reference and lifecycle checks pass;

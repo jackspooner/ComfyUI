@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert the pinned MOSS-VoiceGenerator BF16 bundle offline, preserving every weight."""
+"""Convert pinned MOSS delay-family BF16 bundles offline, preserving every weight."""
 import argparse
 import hashlib
 import json
@@ -24,33 +24,46 @@ SPECIAL_TOKENS = {'<|endoftext|>': 151643, '<|im_start|>': 151644, '<|im_end|>':
                   '<|audio_assistant_delay_slot|>': 151662}
 TOKENIZER_FILES = ('added_tokens.json', 'tokenizer_config.json', 'special_tokens_map.json',
                    'processor_config.json', 'chat_template.jinja')
+LANGUAGE_8B = dict(LANGUAGE, hidden_size=4096, intermediate_size=12288,
+                   num_hidden_layers=36, num_attention_heads=32)
+SPEECH_32 = {key: value for key, value in dict(SPEECH, n_vq=32).items() if key != 'audio_ch0_vocab_size'}
+ACTING_LANGUAGE = {key: value for key, value in LANGUAGE_8B.items() if key not in ('rope_theta', 'rope_scaling')}
+ACTING_LANGUAGE['rope_parameters'] = {'rope_theta': 1000000, 'rope_type': 'default'}
+VARIANTS = {'voicegenerator': (LANGUAGE, SPEECH), 'delay': (LANGUAGE_8B, SPEECH_32),
+            'acting': (ACTING_LANGUAGE, SPEECH_32), 'ttsd': (LANGUAGE_8B, dict(SPEECH_32, n_vq=16))}
 
 
-def validate_config(config):
-    for actual, required in ((config, SPEECH), (config['language_config'], LANGUAGE)):
+def validate_config(config, variant='voicegenerator'):
+    language, speech = VARIANTS[variant]
+    for actual, required in ((config, speech), (config['language_config'], language)):
         for key, value in required.items():
             if key not in actual or actual[key] != value:
-                raise ValueError(f'Unsupported VoiceGenerator configuration: {key}={actual.get(key)!r}; expected {value!r}')
-    if config['language_config']['layer_types'] != ['full_attention'] * LANGUAGE['num_hidden_layers']:
-        raise ValueError('Unsupported VoiceGenerator attention layer types')
+                raise ValueError(f'Unsupported MOSS {variant} configuration: {key}={actual.get(key)!r}; expected {value!r}')
+    if config['language_config']['layer_types'] != ['full_attention'] * language['num_hidden_layers']:
+        raise ValueError(f'Unsupported MOSS {variant} attention layer types')
 
 
-def expected_shapes():
-    hidden = LANGUAGE['hidden_size']
-    shapes = {'language_model.embed_tokens.weight': [LANGUAGE['vocab_size'], hidden],
-              'language_model.norm.weight': [hidden], 'lm_heads.0.weight': [LANGUAGE['vocab_size'], hidden]}
-    for i in range(SPEECH['n_vq']):
-        shapes[f'emb_ext.{i}.weight'] = [SPEECH['audio_vocab_size'] + 1, hidden]
-        shapes[f'lm_heads.{i + 1}.weight'] = [SPEECH['audio_vocab_size'] + 1, hidden]
-    for i in range(LANGUAGE['num_hidden_layers']):
+def expected_shapes(variant='voicegenerator'):
+    language, speech = VARIANTS[variant]
+    hidden = language['hidden_size']
+    inner = language['intermediate_size']
+    q_width = language['num_attention_heads'] * language['head_dim']
+    kv_width = language['num_key_value_heads'] * language['head_dim']
+    shapes = {'language_model.embed_tokens.weight': [language['vocab_size'], hidden],
+              'language_model.norm.weight': [hidden], 'lm_heads.0.weight': [language['vocab_size'], hidden]}
+    for i in range(speech['n_vq']):
+        shapes[f'emb_ext.{i}.weight'] = [speech['audio_vocab_size'] + 1, hidden]
+        shapes[f'lm_heads.{i + 1}.weight'] = [speech['audio_vocab_size'] + 1, hidden]
+    for i in range(language['num_hidden_layers']):
         prefix = f'language_model.layers.{i}'
-        for name, size in [('q_proj', 2048), ('k_proj', 1024), ('v_proj', 1024), ('o_proj', hidden)]:
+        for name, size in [('q_proj', q_width), ('k_proj', kv_width), ('v_proj', kv_width)]:
             shapes[f'{prefix}.self_attn.{name}.weight'] = [size, hidden]
+        shapes[f'{prefix}.self_attn.o_proj.weight'] = [hidden, q_width]
         for name in ('q_norm', 'k_norm'):
-            shapes[f'{prefix}.self_attn.{name}.weight'] = [128]
+            shapes[f'{prefix}.self_attn.{name}.weight'] = [language['head_dim']]
         for name in ('gate_proj', 'up_proj'):
-            shapes[f'{prefix}.mlp.{name}.weight'] = [6144, hidden]
-        shapes[f'{prefix}.mlp.down_proj.weight'] = [hidden, 6144]
+            shapes[f'{prefix}.mlp.{name}.weight'] = [inner, hidden]
+        shapes[f'{prefix}.mlp.down_proj.weight'] = [hidden, inner]
         for name in ('input_layernorm', 'post_attention_layernorm'):
             shapes[f'{prefix}.{name}.weight'] = [hidden]
     return shapes
@@ -74,25 +87,27 @@ def verify_sources(source, manifest):
     return snapshots
 
 
-def convert(source, destination):
+def convert(source, destination, variant='voicegenerator'):
     source = Path(source).resolve()
     destination = Path(destination)
     if destination.exists() or destination.with_suffix('.manifest.json').exists():
         raise FileExistsError(f'Destination or manifest already exists: {destination}')
-    provenance = read_json(Path(__file__).with_name('moss_speech_voicegenerator.json'))
+    provenance = read_json(Path(__file__).with_name(f'moss_speech_{variant}.json'))
     snapshots = verify_sources(source, provenance)
     config = read_json(source / 'config.json')
-    validate_config(config)
-    records = inspect_shards(source, expected_shapes())
-    if {path for path, _, _ in records.values()} != {source / 'model.safetensors'}:
-        raise ValueError('Pinned VoiceGenerator weights must come from model.safetensors')
+    validate_config(config, variant)
+    records = inspect_shards(source, expected_shapes(variant))
+    if {path for path, _, _ in records.values()} != {source / name for name in provenance['files'] if name.endswith('.safetensors')}:
+        raise ValueError(f'Weight files differ from the pinned MOSS {variant} inventory')
     tokenizer_json = (source / 'tokenizer.json').read_bytes()
     tokenizer = Tokenizer.from_str(tokenizer_json.decode('utf-8'))
     for token, token_id in SPECIAL_TOKENS.items():
         if tokenizer.encode(token, add_special_tokens=False).ids != [token_id]:
             raise ValueError(f'Unexpected special token ID: {token}')
     assets = {name: (source / name).read_text(encoding='utf-8') for name in TOKENIZER_FILES}
-    metadata = dict(format='pt', architecture='moss_tts_delay', variant='voicegenerator', conversion_version='1',
+    if 'generation_config.json' in provenance['files']:
+        assets['generation_config.json'] = (source / 'generation_config.json').read_text(encoding='utf-8')
+    metadata = dict(format='pt', architecture='moss_tts_delay', variant=variant, conversion_version='1',
                     model_id=provenance['model_id'], model_revision=provenance['revision'],
                     source_manifest=json.dumps(provenance, separators=(',', ':')),
                     source_config=(source / 'config.json').read_text(encoding='utf-8'),
@@ -104,8 +119,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--destination', type=Path, required=True)
+    parser.add_argument('--variant', choices=VARIANTS, default='voicegenerator')
     args = parser.parse_args()
-    result = convert(args.source, args.destination)
+    result = convert(args.source, args.destination, args.variant)
     print(f"Verified {result['source_tensors']} tensors ({result['source_bytes']} bytes): {args.destination}")
 
 

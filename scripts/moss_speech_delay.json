@@ -1,0 +1,87 @@
+{
+  "model_id": "OpenMOSS-Team/MOSS-TTS",
+  "revision": "b6b0229853ff63c68fa6aeceb380d8c016f55daf",
+  "license": "Apache-2.0",
+  "files": {
+    "README.md": {
+      "bytes": 34624,
+      "sha256": "4dc69c220b76f1de2a014879f82ee17e0f994d606ce0cbd50a3590feee4ef182"
+    },
+    "__init__.py": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "added_tokens.json": {
+      "bytes": 704,
+      "sha256": "9dfb40d3a3f8654c8af17771d767a494e973b9a33d5c3aeffa1b21f77db8e6d3"
+    },
+    "chat_template.jinja": {
+      "bytes": 352,
+      "sha256": "894e3ace884e212ae34e1f46063686e7ebcc8b2fa0153af4579dfa5685f63184"
+    },
+    "config.json": {
+      "bytes": 2275,
+      "sha256": "214fc997d98f51ab57925a5939afc6280e76044198b664221622e70d098ed06e"
+    },
+    "configuration_moss_tts.py": {
+      "bytes": 5584,
+      "sha256": "257842f2fa90124307408f36d55b74e135ee32b7afacbe30280964f7feb329d1"
+    },
+    "inference_utils.py": {
+      "bytes": 5092,
+      "sha256": "12cdf3260114e44c8cba816782f743779ab621e0ba4047e59a3f3579cfcb0e26"
+    },
+    "merges.txt": {
+      "bytes": 1671853,
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+    },
+    "model-00001-of-00004.safetensors": {
+      "bytes": 4932667368,
+      "sha256": "c1e3c63517c0b6bf1260100c3ea05277ef52b66a8d10ebc6afa50419d27e2e05"
+    },
+    "model-00002-of-00004.safetensors": {
+      "bytes": 4915961640,
+      "sha256": "7c987704ed6fe458ddffdb1cf00a23319a0c059571f9b6f124c908497d49a4f6"
+    },
+    "model-00003-of-00004.safetensors": {
+      "bytes": 4983069760,
+      "sha256": "cfd156bc10bac4a38beeb2c559ac4f420d7ee85ae772a29acbac32479a5ab7fc"
+    },
+    "model-00004-of-00004.safetensors": {
+      "bytes": 2148040304,
+      "sha256": "a591fd0e24a6476a800f2ab1a1cb7b503a0b1e91e322bb81e7b282e7ab13be8e"
+    },
+    "model.safetensors.index.json": {
+      "bytes": 40416,
+      "sha256": "021ef3f74a92ee33fc076dde096d4fa9b7b45c34c9bdbfe730bf79368ac86bb2"
+    },
+    "modeling_moss_tts.py": {
+      "bytes": 25330,
+      "sha256": "360ceee27c67831d820ff5324f8687f4408db1a91aef53683934544879aa90ca"
+    },
+    "processing_moss_tts.py": {
+      "bytes": 34493,
+      "sha256": "db33fdd0a1d8176515a93602296dcfeda93ea8f05548659d471db944a8c2f2c1"
+    },
+    "processor_config.json": {
+      "bytes": 145,
+      "sha256": "6821d4805f10fb8b5cc743c021215097e03f1a25f7c220dfc4fb0d62b5dc97e0"
+    },
+    "special_tokens_map.json": {
+      "bytes": 631,
+      "sha256": "55cbd0665670e196ce105db3f0d787e5eb35bce235fcb2bd50acbdd60c1e39c6"
+    },
+    "tokenizer.json": {
+      "bytes": 11422691,
+      "sha256": "cb3c8fa82993d515469c2800cc455bff4aaa3c4fed9da1f2b0c0668c304f335a"
+    },
+    "tokenizer_config.json": {
+      "bytes": 5501,
+      "sha256": "87b1f37a4a73e4c4b61637a1446763e8bdea274347f0418cd5c68ead488c8ea4"
+    },
+    "vocab.json": {
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  }
+}

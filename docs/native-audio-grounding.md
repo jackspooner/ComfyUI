@@ -37,7 +37,8 @@ The reference environment and source prerequisites are documented in
 from [OpenMOSS-Team/MOSS-VoiceGenerator](https://huggingface.co/OpenMOSS-Team/MOSS-VoiceGenerator/tree/97521ec2b6f3ec5026ac1f5751f8fc302d82c2d4),
 an Apache-2.0 model with a Qwen3-1.7B backbone and 16 audio heads. The source bundle
 must match the committed `scripts/moss_speech_voicegenerator.json` manifest;
-this first converter does not accept other MOSS models or revisions. It uses
+the default variant accepts only this VoiceGenerator revision. Explicit variants
+for three other pinned delay-family bundles are described below. It uses
 the prepared ComfyUI Python environment and local files only. Source Python
 files are hashed for provenance and never imported or executed.
 
@@ -71,7 +72,42 @@ model nor uses the GPU. On hash/config failure, restore the exact pinned files
 through the managed download workflow. On interrupted conversion, inspect the
 named output and manifest before retrying; a published output requires a fresh
 destination. This artifact is the BF16 storage baseline for the native VoiceGenerator loader
-below. INT8/ConvRot artifacts and other MOSS generator variants are not yet supported.
+below. INT8/ConvRot artifacts are not yet supported.
+
+## Other delay-family conversion variants
+
+The same converter accepts `--variant delay`, `--variant acting`, or
+`--variant ttsd`. Each requires its own committed `scripts/moss_speech_<variant>.json`
+manifest and complete local bundle. No source Python is executed and no files
+are downloaded. Native generation adapters for these three variants are still
+pending; the VoiceGenerator loader does not accept their converted weights.
+
+| Variant | Immutable model revision | Inventory / extra output space |
+| --- | --- | --- |
+| `delay` | OpenMOSS-Team/MOSS-TTS `b6b0229853ff63c68fa6aeceb380d8c016f55daf` | 463 tensors, about 17.0 GB |
+| `acting` | laion/moss-tts-v1.5-8b-voice-acting `aabb7b609c2b56e5cfa8e8641eb1d8ce9e3d1997` | 463 tensors, about 17.0 GB |
+| `ttsd` | OpenMOSS-Team/MOSS-TTSD-v1.0 `c7cd852d87aff71cab5bd2b9b05509cedc0ef1ba` | 431 tensors, about 16.7 GB |
+
+```sh
+python -m scripts.convert_moss_speech --variant delay --source /absolute/MOSS-TTS --destination /absolute/moss_delay_bf16.safetensors
+python -m scripts.convert_moss_speech --variant acting --source /absolute/moss-tts-v1.5-8b-voice-acting --destination /absolute/moss_acting_bf16.safetensors
+python -m scripts.convert_moss_speech --variant ttsd --source /absolute/MOSS-TTSD-v1.0 --destination /absolute/moss_ttsd_bf16.safetensors
+```
+
+These preserve the 36-layer, 4096-wide Qwen backbone with 32 audio books for
+Delay/acting or 16 for TTSD, plus independent text embeddings/heads. Acting's
+Transformers 5 `rope_parameters` and the other bundles' original RoPE fields
+are validated separately. Original generation-config data, when present, joins
+the embedded tokenizer assets; it does not silently alter runtime defaults.
+The converter checks the exact single-file/sharded weight set, all shapes/dtypes,
+source hashes and every emitted payload using the same transaction as VoiceGenerator.
+Use fresh destinations on retry; retain originals and both conversion outputs.
+
+The selected complete base bundle's generation body now matches VoiceGenerator
+apart from sampling defaults. The older research-only base source used a joint
+audio-head draw; do not use that older source as this bundle's parity oracle.
+VoiceGenerator, base Delay, acting and TTSD retain distinct prompt/control policies
+and acceptance records even where their neural math or sampling loop is shared.
 
 ## Native VoiceGenerator
 

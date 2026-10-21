@@ -109,6 +109,38 @@ def test_unknown_attention_config_is_rejected():
         converter.validate_config(config)
 
 
+@pytest.mark.parametrize('variant,count,heads', [('delay', 463, 32), ('acting', 463, 32), ('ttsd', 431, 16)])
+def test_large_variant_inventory_and_config(variant, count, heads):
+    shapes = converter.expected_shapes(variant)
+    assert len(shapes) == count
+    assert shapes['language_model.layers.35.self_attn.q_proj.weight'] == [4096, 4096]
+    assert shapes['language_model.layers.35.self_attn.k_proj.weight'] == [1024, 4096]
+    assert shapes['language_model.layers.35.mlp.down_proj.weight'] == [4096, 12288]
+    assert shapes[f'lm_heads.{heads}.weight'] == [1025, 4096]
+    assert f'lm_heads.{heads + 1}.weight' not in shapes
+    language, speech = converter.VARIANTS[variant]
+    config = dict(speech, language_config=dict(language, layer_types=['full_attention'] * 36))
+    converter.validate_config(config, variant)
+    config['n_vq'] = 8
+    with pytest.raises(ValueError, match='n_vq'):
+        converter.validate_config(config, variant)
+
+
+@pytest.mark.parametrize('variant,variable', [('delay', 'MOSS_DELAY_SOURCE'), ('acting', 'MOSS_ACTING_SOURCE'), ('ttsd', 'MOSS_TTSD_SOURCE')])
+def test_pinned_variant_headers_and_tokenizer(variant, variable):
+    source = os.environ.get(variable)
+    if not source:
+        pytest.skip(f'Requires {variable} pinned bundle')
+    source = Path(source)
+    converter.validate_config(writer.read_json(source / 'config.json'), variant)
+    records = writer.inspect_shards(source, converter.expected_shapes(variant))
+    manifest = writer.read_json(Path(converter.__file__).with_name(f'moss_speech_{variant}.json'))
+    assert {path.name for path, _, _ in records.values()} == {name for name in manifest['files'] if name.endswith('.safetensors')}
+    tokenizer = Tokenizer.from_file(str(source / 'tokenizer.json'))
+    for token, token_id in converter.SPECIAL_TOKENS.items():
+        assert tokenizer.encode(token, add_special_tokens=False).ids == [token_id]
+
+
 def test_refuse_existing_output_before_reading_source(tmp_path):
     output = tmp_path / 'converted.safetensors'
     output.write_bytes(b'preserve')

@@ -1,0 +1,83 @@
+{
+  "model_id": "laion/moss-tts-v1.5-8b-voice-acting",
+  "revision": "aabb7b609c2b56e5cfa8e8641eb1d8ce9e3d1997",
+  "license": "Apache-2.0",
+  "files": {
+    "GENERATION_SETTINGS.md": {
+      "bytes": 2233,
+      "sha256": "9c24323fdd01f296862c179e1714dbfa0ed3e9a0064ffebb668f6bc2765d4687"
+    },
+    "README.md": {
+      "bytes": 7702,
+      "sha256": "a66276945f19ffe042b1f9c7b5d55cd054a8f1faffa3dd65962c744ad22882f3"
+    },
+    "__init__.py": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "added_tokens.json": {
+      "bytes": 704,
+      "sha256": "9dfb40d3a3f8654c8af17771d767a494e973b9a33d5c3aeffa1b21f77db8e6d3"
+    },
+    "chat_template.jinja": {
+      "bytes": 352,
+      "sha256": "894e3ace884e212ae34e1f46063686e7ebcc8b2fa0153af4579dfa5685f63184"
+    },
+    "config.json": {
+      "bytes": 2500,
+      "sha256": "71a77d859875618b12336f4234bf066d035b4f33e97000e0227b960c95b93f1d"
+    },
+    "configuration_moss_tts.py": {
+      "bytes": 5584,
+      "sha256": "257842f2fa90124307408f36d55b74e135ee32b7afacbe30280964f7feb329d1"
+    },
+    "generation_config.json": {
+      "bytes": 69,
+      "sha256": "959c6128a9742174f2440d18429588b4b9dd72bdba8544ba96db4f19f221f087"
+    },
+    "inference_utils.py": {
+      "bytes": 5092,
+      "sha256": "12cdf3260114e44c8cba816782f743779ab621e0ba4047e59a3f3579cfcb0e26"
+    },
+    "merges.txt": {
+      "bytes": 1671853,
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+    },
+    "model.safetensors": {
+      "bytes": 16979739480,
+      "sha256": "3f6fde86a603471e333348193f72ec36b6749947242c1d0969f958f772cf13c1"
+    },
+    "modeling_moss_tts.py": {
+      "bytes": 25330,
+      "sha256": "360ceee27c67831d820ff5324f8687f4408db1a91aef53683934544879aa90ca"
+    },
+    "processing_moss_tts.py": {
+      "bytes": 35531,
+      "sha256": "e591ff156e8fadcae34db5613a2221fab7ec5d814bfc0ec001e8ec4ef2782425"
+    },
+    "processor_config.json": {
+      "bytes": 200,
+      "sha256": "2002693f7a5283b6bcdea76958ef3c092dc46f75df4a76ba6edbdf63b36433eb"
+    },
+    "special_tokens_map.json": {
+      "bytes": 631,
+      "sha256": "55cbd0665670e196ce105db3f0d787e5eb35bce235fcb2bd50acbdd60c1e39c6"
+    },
+    "tokenizer.json": {
+      "bytes": 11422691,
+      "sha256": "cb3c8fa82993d515469c2800cc455bff4aaa3c4fed9da1f2b0c0668c304f335a"
+    },
+    "tokenizer_config.json": {
+      "bytes": 5501,
+      "sha256": "87b1f37a4a73e4c4b61637a1446763e8bdea274347f0418cd5c68ead488c8ea4"
+    },
+    "tts_robust_normalizer_single_script.py": {
+      "bytes": 14544,
+      "sha256": "b7c1fab4fd7bdc8c779df99f6af310fd8cd0746b759db684bf147e0c182b3183"
+    },
+    "vocab.json": {
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  }
+}
