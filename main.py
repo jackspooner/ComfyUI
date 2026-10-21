@@ -15,6 +15,10 @@ import importlib.util
 import shutil
 import importlib.metadata
 import folder_paths
+import comfy.model_cache
+import comfy.storage
+import sqlite3
+from comfy.model_cache.store import ModelCache, CacheError, load_config
 import time
 from comfy.cli_args import enables_dynamic_vram
 from app import governance
@@ -355,7 +359,7 @@ def prompt_worker(q, server_instance, asset_manager):
 
     while True:
         try:
-            timeout = 1000.0
+            timeout = 60.0 if comfy.model_cache.manager is not None else 1000.0
             if need_gc:
                 timeout = max(gc_collect_interval - (current_time - last_gc_collect), 0.0)
 
@@ -401,6 +405,11 @@ def prompt_worker(q, server_instance, asset_manager):
                     logging.info(f"Prompt executed in {execution_time}", extra={'color': 'green'})
                 else:
                     logging.info("Prompt executed in {:.2f} seconds".format(execution_time), extra={'color': 'green'})
+
+            try:
+                e.maintain_model_cache()
+            except (CacheError, OSError, sqlite3.Error):
+                logging.exception("Model cache maintenance failed; cached files retained for recovery")
 
             flags = q.get_flags()
             free_memory = flags.get("free_memory", False)
@@ -574,6 +583,13 @@ def start_comfyui(asyncio_loop=None):
     Starts the ComfyUI server using the provided asyncio event loop or creates a new one.
     Returns the event loop, server instance, and a function to start the server asynchronously.
     """
+    if args.model_cache_config:
+        config = load_config(args.model_cache_config)
+        os.makedirs(config["cache_root"], mode=0o700, exist_ok=True)
+        if comfy.storage.fast_storage(config["cache_root"]) is not True:
+            raise ValueError("Model cache must be on storage detected as fast NVMe.")
+        comfy.model_cache.manager = ModelCache(config)
+
     if args.temp_directory:
         temp_dir = os.path.join(os.path.abspath(args.temp_directory), "temp")
         logging.info(f"Setting temp directory to: {temp_dir}")

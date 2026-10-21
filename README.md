@@ -1,3 +1,22 @@
+## Native archive model cache in this fork
+
+This fork adds an opt-in Linux NVMe cache for safetensors models stored in a
+ComfyUI-shaped archive on a slower drive. Archive models appear as `archive/...`
+in existing selectors. The loader stages a verified complete copy before use;
+execution tracks reuse and releases affected cached results after 30 minutes of
+inactivity. SQLite recovery preserves complete copies across restarts, and
+capacity/free-space limits protect the NVMe. A local CLI queues prefetch, pin,
+unpin and eviction requests and reports status.
+
+Enable with `--model-cache-config /absolute/path/config.yaml`; see
+[configuration, operation and limitations](docs/model-cache.md) and
+[the example configuration](model_cache.example.yaml). It runs inside ComfyUI,
+without an additional daemon or systemd unit. Cleanup occurs while ComfyUI runs
+and on its next start after downtime. The feature is implemented and tested with
+isolated CPU fixtures; it is not enabled in the serving installation by this change.
+Custom loaders bypassing the common resolver and weight loader, background model
+loads, GGUF and multi-file repositories are outside verified support.
+
 ## Native Fibo 2.0 backport
 
 This fork backports upstream [Fibo 2.0 support](https://github.com/Comfy-Org/ComfyUI/pull/17240)

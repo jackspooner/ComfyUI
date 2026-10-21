@@ -1,4 +1,6 @@
 import copy
+import gc
+import comfy.model_cache
 import heapq
 import inspect
 import logging
@@ -437,6 +439,20 @@ def _is_intermediate_output(dynprompt, node_id):
 
 
 async def execute(server: "ExecutionServer", dynprompt, caches, current_item, extra_data, executed, prompt_id, execution_list, pending_subgraph_results, pending_async_nodes, ui_outputs, asset_manager: AssetManager):
+    if comfy.model_cache.manager is None:
+        return await execute_node(server, dynprompt, caches, current_item, extra_data, executed, prompt_id, execution_list, pending_subgraph_results, pending_async_nodes, ui_outputs, asset_manager)
+    progress = comfy.utils.ProgressBar(100, node_id=current_item)
+    with comfy.model_cache.node_scope(current_item, lambda done, total: progress.update_absolute(int(done * 100 / max(total, 1)))) as files:
+        for cache in caches.all:
+            comfy.model_cache.use(cache.get_model_files(current_item))
+        try:
+            return await execute_node(server, dynprompt, caches, current_item, extra_data, executed, prompt_id, execution_list, pending_subgraph_results, pending_async_nodes, ui_outputs, asset_manager)
+        finally:
+            for cache in caches.all:
+                cache.set_model_files(current_item, files)
+
+
+async def execute_node(server: "ExecutionServer", dynprompt, caches, current_item, extra_data, executed, prompt_id, execution_list, pending_subgraph_results, pending_async_nodes, ui_outputs, asset_manager: AssetManager):
     unique_id = current_item
     real_node_id = dynprompt.get_real_node_id(unique_id)
     display_node_id = dynprompt.get_display_node_id(unique_id)
@@ -730,11 +746,30 @@ class PromptExecutor:
     def execute(self, prompt, prompt_id, extra_data={}, execute_outputs=[]):
         asyncio.run(self.execute_async(prompt, prompt_id, extra_data, execute_outputs))
 
+    def release_model_files(self, files):
+        for cache in self.caches.all:
+            cache.evict_model_files(files)
+        gc.collect()
+        comfy.model_management.cleanup_models_gc()
+
+    def maintain_model_cache(self):
+        manager = comfy.model_cache.manager
+        if manager is not None:
+            manager.commands()
+            files = manager.expired()
+            if files:
+                self.release_model_files(files)
+                manager.evict(files)
+
     def before_prompt_execution(self):
         """Extension admission hook, before cache evaluation or node execution."""
         pass
 
     async def execute_async(self, prompt, prompt_id, extra_data={}, execute_outputs=[]):
+        with comfy.model_cache.prompt_scope():
+            return await self.execute_prompt_async(prompt, prompt_id, extra_data, execute_outputs)
+
+    async def execute_prompt_async(self, prompt, prompt_id, extra_data={}, execute_outputs=[]):
         set_preview_method(extra_data.get("preview_method"))
 
         nodes.interrupt_processing(False)
@@ -760,6 +795,11 @@ class PromptExecutor:
         try:
             try:
                 self.before_prompt_execution()
+                manager = comfy.model_cache.manager
+                if manager is not None:
+                    changed = manager.changed()
+                    if changed:
+                        self.release_model_files(changed)
             except (comfy.model_management.InterruptProcessingException, Exception) as ex:
                 self.success = False
                 if not isinstance(ex, comfy.model_management.InterruptProcessingException):

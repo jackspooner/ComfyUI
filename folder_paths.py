@@ -6,6 +6,8 @@ from typing import Literal, List
 from collections.abc import Collection
 
 from comfy.cli_args import args
+import comfy.model_cache
+from comfy.model_cache.store import CATEGORIES as CACHE_CATEGORIES, EXTENSIONS as CACHE_EXTENSIONS, source_path, check_archive
 
 supported_pt_extensions: set[str] = {'.ckpt', '.pt', '.pt2', '.bin', '.pth', '.safetensors', '.pkl', '.sft'}
 
@@ -458,6 +460,8 @@ def get_full_path(folder_name: str, filename: str) -> str | None:
     if folder_name not in folder_names_and_paths:
         return None
     folders = folder_names_and_paths[folder_name]
+    if comfy.model_cache.manager is not None and filename.startswith("archive/"):
+        return comfy.model_cache.resolve(source_path(comfy.model_cache.manager.config, folder_name, filename[len("archive/"):]))
     filename = os.path.relpath(os.path.join("/", filename), "/")
     for x in folders[0]:
         full_path = os.path.join(x, filename)
@@ -526,7 +530,19 @@ def get_filename_list(folder_name: str) -> list[str]:
         global filename_list_cache
         filename_list_cache[folder_name] = out
     cache_helper.set(folder_name, out)
-    return list(out[0])
+    result = list(out[0])
+    manager = comfy.model_cache.manager
+    if manager is not None and folder_name in CACHE_CATEGORIES:
+        root = check_archive(manager.config) / folder_name
+        files, _ = recursive_search(str(root))
+        for name in filter_files_extensions(files, CACHE_EXTENSIONS):
+            # Resolve here too so symlinks cannot appear as supported archive models.
+            source_path(manager.config, folder_name, name)
+            archive_name = "archive/" + name
+            if archive_name in result:
+                raise ValueError(f"Local model conflicts with reserved archive namespace: {archive_name}")
+            result.append(archive_name)
+    return sorted(result)
 
 def get_save_image_path(filename_prefix: str, output_dir: str, image_width=0, image_height=0) -> tuple[str, str, int, str, str]:
     def map_filename(filename: str) -> tuple[int, str]:
