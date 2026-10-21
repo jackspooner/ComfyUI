@@ -250,6 +250,62 @@ generation step and between codec operations. Follow the recorded prompt ID
 after uncertain submission; do not regenerate to recover output. No deployment,
 download, remote inference, Local Transformer or SoundEffect v2 support is implied.
 
+## Native Local Transformer
+
+The pinned `OpenMOSS-Team/MOSS-TTS-Local-Transformer` revision
+`12aa734e4f11a7b3fdf4eb0ad2aa2029675ffc2e` has a separate offline converter:
+
+```sh
+python -m scripts.convert_moss_local --source /absolute/MOSS-TTS-Local-Transformer --destination /absolute/moss_local_bf16.safetensors
+```
+
+It validates the complete committed `scripts/moss_speech_local.json` inventory,
+configuration, 556 BF16 tensors and embedded tokenizer. All 6,121,212,928 source
+payload bytes are preserved and independently reread; allow about 6.13 GB extra
+disk space. The original global decoder embedding is unused by the pinned model:
+it is preserved as `unused_global_embedding.weight` in the artifact/manifest but
+not allocated by the native model. Its separately learned text embedding is used.
+The same no-overwrite, source-mutation and interrupted-output recovery rules as
+other MOSS converters apply. Originals and symlinks remain unchanged.
+
+Load this artifact with `CLIPLoader` type `moss_tts`, then use the existing
+`MossSpeechGenerate` and separate MOSS v1 codec graph. Use text temperature 1.5,
+top-p 1, top-k 50; audio temperature 1, top-p 0.95, top-k 50 and repetition
+penalty 1.1. The generic node retains Delay defaults, so set these explicitly.
+The same prompt controls, normalized references and explicit continuation input
+are supported. Local reference and generated codes are synchronous 32-book rows;
+they must never pass through delay-pattern unpacking. Generation starts with an
+assistant audio-start row; continuation includes its prefix codes and trims only
+after full-context codec decoding. Additional reference slots remain executable,
+but the pinned processor only accepts one, so multi-reference parity is unverified.
+Reduced-codebook generation is not exposed by this baseline.
+
+The global Qwen decoder uses its ordinary time cache. The four-layer local decoder
+uses native attention without rotary positions and a separate cache recreated for
+each outer frame. Cached codebook logits match full-prefix FP32 reference logits;
+no cache persists across calls. Greedy sampling skips warpers as upstream does;
+stochastic penalties apply per channel and batch item before temperature, followed
+by Transformers-style tied top-k and ascending top-p filtering. Cancellation is
+checked both per frame and per codebook. Automatic budgets still reserve global
+KV space; use a bounded `max_length` for first runs.
+
+CPU tests cover the actual checkpoint header inventory, lossless mapping, prompt
+and continuation matrices, private RNG sampling, batched stop/budget/cancellation,
+and tiny global cached/local full-prefix and cached logits. Run the pinned
+Transformers 5.0 worker overlay without changing shared dependencies:
+
+```sh
+PYTHONPATH=/absolute/Cutlery-MOSS/.venv/transformers5 MOSS_LOCAL_SOURCE=/absolute/MOSS-TTS-Local-Transformer HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 /absolute/prepared/python -m pytest tests-unit/comfy_test/moss_local_test.py tests-unit/comfy_test/llama_attention_test.py -q
+```
+
+The upstream Local source is incompatible with shared Transformers 5.20 without
+API changes; the reference fixture needs the pinned overlay. Native runtime has
+no Transformers execution dependency. Full-weight logits, BF16 head-normalization
+error, GPU generation/performance, lifecycle, listening quality and serving
+activation remain pending. Initial isolated GPU startup was refused because the
+installed coordination plugin requires newer committed core admission hooks;
+no job was submitted and the failed candidate exited.
+
 ## MOSS v1 codec baseline
 
 The native math in `comfy/ldm/audio/moss_audio_tokenizer.py` is adapted from the
@@ -353,8 +409,7 @@ constrained-memory and audible quality acceptance remain open.
 
 ## Remaining integrations
 
-These are shared prerequisites for the remaining native MOSS Local Transformer,
-SoundEffect v2, LocateAnything, Qwen3-ASR, Qwen3 ForcedAligner and Fish S2-Pro
+These are shared prerequisites for the remaining native MOSS SoundEffect v2, LocateAnything, Qwen3-ASR, Qwen3 ForcedAligner and Fish S2-Pro
 integrations. Their remaining loaders/codecs and generation/alignment nodes,
 quality comparisons and live workflows are **not implemented or accepted by this
 change**. Existing worker/runtime paths remain unchanged. Integer speech codes

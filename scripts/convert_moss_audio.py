@@ -142,7 +142,7 @@ def file_identity(path):
     return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
 
 
-def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_stats=None):
+def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_stats=None, name_mapping=None):
     destination = Path(destination)
     manifest_path = destination.with_suffix('.manifest.json')
     if destination.exists() or manifest_path.exists():
@@ -154,9 +154,10 @@ def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_
             raise ValueError(f'Source changed before conversion: {path}')
     destination.parent.mkdir(parents=True, exist_ok=True)
     header = {'__metadata__': metadata}
+    names = {key: mapped_name(key) for key in records} if name_mapping is None else name_mapping
     offset = 0
     for key, (_, _, entry) in sorted(records.items()):
-        name = mapped_name(key)
+        name = names[key]
         if name in header or name == 'tokenizer_json':
             raise ValueError(f"Mapped tensor collision: {name}")
         length = entry['data_offsets'][1] - entry['data_offsets'][0]
@@ -191,7 +192,7 @@ def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_
         # Re-read every completed output payload, independently of the copy operation.
         with temp_path.open('rb') as output:
             for key in records:
-                start, end = header[mapped_name(key)]['data_offsets']
+                start, end = header[names[key]]['data_offsets']
                 output.seek(8 + len(encoded) + start)
                 digest = hashlib.sha256()
                 remaining = end - start
@@ -207,7 +208,7 @@ def stream_checkpoint(records, tokenizer_json, destination, metadata, *, source_
             if file_identity(path) != identity:
                 raise ValueError(f'Source changed during conversion: {path}')
         manifest = dict(metadata=metadata, source_tensors=len(records), source_bytes=offset,
-                        tensors={key: dict(destination=mapped_name(key), sha256=hashes[key],
+                        tensors={key: dict(destination=names[key], sha256=hashes[key],
                                            source_file=records[key][0].name, shape=records[key][2]['shape'], dtype=records[key][2]['dtype']) for key in sorted(records)})
         if tokenizer_json is not None:
             manifest['tokenizer_sha256'] = hashlib.sha256(tokenizer_json).hexdigest()

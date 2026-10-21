@@ -126,3 +126,14 @@ def test_preference_has_no_extra_checkpoint_weights():
     state = module.state_dict()
     assert not any('comfy_attention' in name for name in state)
     make_attention().load_state_dict(state, strict=True)
+
+
+@pytest.mark.parametrize('kv_heads', [2, 4])
+def test_no_rotary_matches_identity_rotation(kv_heads):
+    module = make_attention(kv_heads)
+    hidden = torch.randn(2, 5, 32)
+    mask = torch.full((5, 5), float('-inf')).triu(1)
+    identity = (torch.ones(1, 1, 5, 8), torch.zeros(1, 1, 5, 4), torch.zeros(1, 1, 5, 4))
+    expected, _ = module(hidden, mask, identity, attention_pytorch)
+    actual, _ = module(hidden, mask, None, attention_pytorch)
+    torch.testing.assert_close(actual, expected, atol=0, rtol=0)
