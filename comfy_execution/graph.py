@@ -2,6 +2,7 @@ from typing import Type, Literal
 
 import nodes
 import asyncio
+import comfy.model_cache
 import inspect
 from comfy_execution.graph_utils import is_link, ExecutionBlocker
 from comfy.comfy_types.node_typing import ComfyNodeABC, InputTypeDict, InputTypeOptions
@@ -247,6 +248,8 @@ class ExecutionList(TopologicalSort):
         value = self.execution_cache[to_node_id].get(from_node_id)
         if value is None:
             return None
+        if comfy.model_cache.manager is not None:
+            comfy.model_cache.use(self.output_cache.get_model_files(from_node_id))
         #Write back to the main cache on touch.
         self.output_cache.set_local(from_node_id, value)
         return value
