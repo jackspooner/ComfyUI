@@ -52,18 +52,6 @@ class OmniConfig(Qwen3VL_8BConfig):
     stop_tokens: list = field(default_factory=lambda: [151645])
 
 
-class TextAttention(Attention):
-    def __init__(self, config, device=None, dtype=None, ops=None):
-        super().__init__(config, device=device, dtype=dtype, ops=ops)
-        self.comfy_attention = ComfyAttention()
-
-    def forward(self, hidden_states, attention_mask=None, freqs_cis=None, optimized_attention=None, past_key_value=None):
-        def attend(q, k, v, heads, **kwargs):
-            return attention(AttentionTensorContainer(q), AttentionTensorContainer(k), AttentionTensorContainer(v),
-                             heads, preferred_attention=self.comfy_attention, **kwargs)
-        return super().forward(hidden_states, attention_mask, freqs_cis, attend, past_key_value)
-
-
 class Experts(nn.Module):
     def __init__(self, config, device, dtype, operations):
         super().__init__()
@@ -94,7 +82,7 @@ class SparseMLP(nn.Module):
 class TextBlock(TransformerBlock):
     def __init__(self, config, device=None, dtype=None, operations=None):
         nn.Module.__init__(self)
-        self.self_attn = TextAttention(config, device=device, dtype=dtype, ops=operations)
+        self.self_attn = Attention(config, device=device, dtype=dtype, ops=operations)
         self.mlp = SparseMLP(config, device, dtype, operations)
         self.input_layernorm = operations.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, device=device, dtype=dtype)
         self.post_attention_layernorm = operations.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, device=device, dtype=dtype)
