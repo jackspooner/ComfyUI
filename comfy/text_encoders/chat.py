@@ -39,10 +39,12 @@ def qwen_chat(messages, tokenizer, thinking=None):
 
 
 def count_chat_tokens(tokens, image_length=None):
-    if len(tokens) != 1:
-        raise ValueError("Conversation token accounting requires one generative tokenizer stream.")
+    if isinstance(tokens, dict):
+        if len(tokens) != 1:
+            raise ValueError("Conversation token accounting requires one generative tokenizer stream.")
+        tokens = next(iter(tokens.values()))
     count = 0
-    for row in next(iter(tokens.values())):
+    for row in tokens:
         for token, *_ in row:
             if isinstance(token, int):
                 count += 1

@@ -11,7 +11,7 @@ from safetensors.torch import save_file
 from comfy.cli_args import args
 args.cpu = True
 import folder_paths
-from comfy.text_generation import read_history, write_history, select_context
+from comfy.text_generation import read_history, write_history, select_context, count_text_tokens
 from comfy.text_encoders.chat import count_chat_tokens
 from comfy.ops import manual_cast
 from comfy import model_management
@@ -32,6 +32,19 @@ from comfy.text_encoders.glm_ocr import GlmOCR, GlmOCRTokenizer, process_image
 from comfy.text_encoders.qwen3_omni import Qwen3OmniTokenizer
 from comfy_extras.nodes_textgen import TextGenerate, TextGenerateLTX2Prompt
 from comfy_extras import text_history_images as attachments
+
+
+def test_gemma3_direct_token_stream_counts_text_and_images():
+    # Complete standalone Gemma3 uses its SDTokenizer directly, without a stream-key wrapper.
+    tokenizer = Gemma3_Tokenizer()
+    tokenizer.tokenizer = SimpleNamespace(tokenizer=CaptureTokenizer())
+    text = tokenizer.tokenize_chat([{"role": "user", "content": "Describe"}])
+    assert count_text_tokens(text) == sum(map(len, text))
+    tokens = tokenizer.tokenize_chat([{"role": "user", "content": [{"type": "image", "data": torch.zeros(1, 64, 48, 3)}]}])
+    transformer = SimpleNamespace(image_token_length=lambda image: 256)
+    transformer.count_chat_tokens = lambda value: BaseGenerate.count_chat_tokens(transformer, value)
+    model = SimpleNamespace(transformer=transformer)
+    assert SDClipModel.count_chat_tokens(model, tokens) == sum(map(len, tokens)) + 255
 
 
 @pytest.fixture
