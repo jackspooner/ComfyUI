@@ -1,0 +1,42 @@
+[
+  {
+    "rate": 16000,
+    "channels": 1,
+    "samples": 1,
+    "frames": 2,
+    "reference_features_equal": true,
+    "features_sha256": "bc25b33a6eb3426cf4fc8de70bbc7f517437b49dacf1eba904f919e6e82e6769"
+  },
+  {
+    "rate": 16000,
+    "channels": 2,
+    "samples": 199,
+    "frames": 2,
+    "reference_features_equal": true,
+    "features_sha256": "19b718939e0a1dcc0a45c4ff7a4b245e0a79248e9e2d0b5edebfed91a9529eed"
+  },
+  {
+    "rate": 8000,
+    "channels": 1,
+    "samples": 8001,
+    "frames": 101,
+    "reference_features_equal": true,
+    "features_sha256": "03e02ca634cc5363ae9a5b7a2d38c7f6e372ce8e747234bdbf307484f91a0b9b"
+  },
+  {
+    "rate": 44100,
+    "channels": 2,
+    "samples": 44101,
+    "frames": 101,
+    "reference_features_equal": true,
+    "features_sha256": "eae94716b21016eb9e1de0f97a204975e327293cdc0f02ba42c04b35db733edb"
+  },
+  {
+    "rate": 48000,
+    "channels": 2,
+    "samples": 48001,
+    "frames": 101,
+    "reference_features_equal": true,
+    "features_sha256": "05f3c31fc8d1975c0ebba95bb4093c760287c172997083f1500fd2740f6efc6e"
+  }
+]

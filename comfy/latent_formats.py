@@ -1174,3 +1174,10 @@ class CogVideoX1_5(CogVideoX):
     """
     def __init__(self):
         self.scale_factor = 0.7
+
+
+class AuK(LatentFormat):
+    latent_channels = 64
+    latent_dimensions = 1
+    spacial_downscale_ratio = 1
+    temporal_downscale_ratio = 480

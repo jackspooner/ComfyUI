@@ -1,0 +1,608 @@
+{
+  "last_node_id": 8,
+  "last_link_id": 10,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "SoulXSingerLoader",
+      "title": "Load SoulX SVC and Content Encoder",
+      "pos": [
+        30,
+        80
+      ],
+      "size": [
+        420,
+        212
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "singer_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "singer_name"
+          }
+        },
+        {
+          "name": "vocoder_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "vocoder_name"
+          }
+        },
+        {
+          "name": "precision",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "precision"
+          }
+        },
+        {
+          "name": "whisper_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "whisper_name"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SOULX_SINGER",
+          "type": "SOULX_SINGER",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SoulXSingerLoader"
+      },
+      "widgets_values": [
+        "soulx_singer_svc.safetensors",
+        "soulx_singer_svc_vocos.safetensors",
+        "float32",
+        "soulx_singer_whisper_base.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "SoulXAudioModelLoader",
+      "title": "Load CPU Pitch Model",
+      "pos": [
+        30,
+        332
+      ],
+      "size": [
+        420,
+        150
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "model_name"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SOULX_AUDIO_MODEL",
+          "type": "SOULX_AUDIO_MODEL",
+          "links": [
+            1,
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SoulXAudioModelLoader"
+      },
+      "widgets_values": [
+        "soulx_singer_rmvpe.safetensors"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "LoadAudio",
+      "title": "Singer Identity Reference",
+      "pos": [
+        590,
+        80
+      ],
+      "size": [
+        420,
+        150
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "audio"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            2,
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "soulx-en-prompt.mp3"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "LoadAudio",
+      "title": "Source Singing to Convert",
+      "pos": [
+        590,
+        270
+      ],
+      "size": [
+        420,
+        150
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "audio"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            4,
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "soulx-en-target.mp3"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "SoulXExtractPitch",
+      "title": "Reference Continuous Pitch",
+      "pos": [
+        1150,
+        80
+      ],
+      "size": [
+        420,
+        150
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pitch_model",
+          "type": "SOULX_AUDIO_MODEL",
+          "link": 1
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 2
+        },
+        {
+          "name": "voicing_threshold",
+          "type": "FLOAT",
+          "link": null,
+          "widget": {
+            "name": "voicing_threshold"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pitch_json",
+          "type": "STRING",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SoulXExtractPitch"
+      },
+      "widgets_values": [
+        0.03
+      ]
+    },
+    {
+      "id": 6,
+      "type": "SoulXExtractPitch",
+      "title": "Source Continuous Pitch",
+      "pos": [
+        1150,
+        270
+      ],
+      "size": [
+        420,
+        150
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pitch_model",
+          "type": "SOULX_AUDIO_MODEL",
+          "link": 3
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 4
+        },
+        {
+          "name": "voicing_threshold",
+          "type": "FLOAT",
+          "link": null,
+          "widget": {
+            "name": "voicing_threshold"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pitch_json",
+          "type": "STRING",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SoulXExtractPitch"
+      },
+      "widgets_values": [
+        0.03
+      ]
+    },
+    {
+      "id": 7,
+      "type": "SoulXVoiceConvert",
+      "title": "Convert Voice, Retain Source Words",
+      "pos": [
+        1710,
+        80
+      ],
+      "size": [
+        420,
+        296
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "singer",
+          "type": "SOULX_SINGER",
+          "link": 5
+        },
+        {
+          "name": "reference_audio",
+          "type": "AUDIO",
+          "link": 6
+        },
+        {
+          "name": "source_audio",
+          "type": "AUDIO",
+          "link": 7
+        },
+        {
+          "name": "reference_pitch",
+          "type": "STRING",
+          "link": 8,
+          "widget": {
+            "name": "reference_pitch"
+          }
+        },
+        {
+          "name": "source_pitch",
+          "type": "STRING",
+          "link": 9,
+          "widget": {
+            "name": "source_pitch"
+          }
+        },
+        {
+          "name": "pitch_shift",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "pitch_shift"
+          }
+        },
+        {
+          "name": "steps",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "steps"
+          }
+        },
+        {
+          "name": "guidance",
+          "type": "FLOAT",
+          "link": null,
+          "widget": {
+            "name": "guidance"
+          }
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "seed"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SoulXVoiceConvert"
+      },
+      "widgets_values": [
+        "",
+        "",
+        0,
+        32,
+        3.0,
+        421,
+        "fixed"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "SaveAudio",
+      "title": "Save Converted Vocal",
+      "pos": [
+        2270,
+        80
+      ],
+      "size": [
+        420,
+        150
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 10
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "filename_prefix"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveAudio"
+      },
+      "widgets_values": [
+        "audio/SoulX-Singer/voice-conversion"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      4,
+      0,
+      5,
+      0,
+      "SOULX_AUDIO_MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      5,
+      1,
+      "AUDIO"
+    ],
+    [
+      3,
+      4,
+      0,
+      6,
+      0,
+      "SOULX_AUDIO_MODEL"
+    ],
+    [
+      4,
+      3,
+      0,
+      6,
+      1,
+      "AUDIO"
+    ],
+    [
+      5,
+      1,
+      0,
+      7,
+      0,
+      "SOULX_SINGER"
+    ],
+    [
+      6,
+      2,
+      0,
+      7,
+      1,
+      "AUDIO"
+    ],
+    [
+      7,
+      3,
+      0,
+      7,
+      2,
+      "AUDIO"
+    ],
+    [
+      8,
+      5,
+      0,
+      7,
+      3,
+      "STRING"
+    ],
+    [
+      9,
+      6,
+      0,
+      7,
+      4,
+      "STRING"
+    ],
+    [
+      10,
+      7,
+      0,
+      8,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. Model Loading",
+      "bounding": [
+        0,
+        0,
+        480,
+        512
+      ],
+      "color": "#536887",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. Inputs",
+      "bounding": [
+        560,
+        0,
+        480,
+        450
+      ],
+      "color": "#3d715f",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. Pitch Extraction",
+      "bounding": [
+        1120,
+        0,
+        480,
+        450
+      ],
+      "color": "#3f827c",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. Voice Conversion Controls",
+      "bounding": [
+        1680,
+        0,
+        480,
+        406
+      ],
+      "color": "#72548e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5. Output",
+      "bounding": [
+        2240,
+        0,
+        480,
+        260
+      ],
+      "color": "#a05b63",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.5,
+      "offset": [
+        60,
+        80
+      ]
+    }
+  },
+  "version": 0.4
+}

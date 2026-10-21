@@ -1,0 +1,5 @@
+# Local installation environments and separately owned/disabled custom nodes.
+/.venvs/
+/node-sources/
+/node_packages/
+/custom_nodes-disabled/

@@ -1,0 +1,39 @@
+{
+  "source_revision": "0ed3aa2b00eeedbb0d38b6d4738f506af759213b",
+  "versions": {
+    "torch": "2.14.1",
+    "transformers": "5.20.0",
+    "nvidia-modelopt": "0.42.0"
+  },
+  "source_files_sha256": {
+    "config.json": "03500d1d3c000e05abb05c89208d5da9ad637e7ce51552ab8ae20a03043c4a0e",
+    "hf_quant_config.json": "46cefc6f0c2ff48097693f9cb29ffec56ae4912d02a137fe80cb9ebfadc108c7",
+    "model.safetensors.index.json": "170ea60bf1b6564f9325f27a8497d993f9aeeabe3ce46c5400eb47ae67eb475b"
+  },
+  "probes": [
+    {
+      "probe": "source_modelopt_config",
+      "exception": "ValueError",
+      "message": "Unknown quantization type, got modelopt - supported types are: ['awq', 'bitsandbytes_4bit', 'bitsandbytes_8bit', 'gptq', 'aqlm', 'quanto', 'quark', 'fouroversix', 'fp_quant', 'eetq', 'higgs', 'hqq', 'compressed-tensors', 'fbgemm_fp8', 'torchao', 'bitnet', 'vptq', 'spqr', 'fp8', 'gguf', 'nvfp4', 'mxfp8', 'auto-round', 'mxfp4', 'metal', 'sinq', 'gemma']"
+    },
+    {
+      "probe": "prequantized_nvfp4_environment",
+      "exception": "ValueError",
+      "message": "Loading pre-quantized NVFP4 checkpoints is not supported yet."
+    }
+  ],
+  "model_executed": false,
+  "publisher_parity_established": false,
+  "auxiliary_suffix_counts": {
+    "weight_scale": 18935,
+    "weight_scale_2": 18935,
+    "scale": 16,
+    "gamma": 2,
+    "alpha": 29,
+    "beta": 29
+  },
+  "execution_source_sha256": {
+    "quantizers/auto.py": "03506c1ed2867a86ee3acbaaf7e3297aee2d5be63e265066229302562d4dd1b8",
+    "quantizers/quantizer_nvfp4.py": "fdda3f8ef9cce72c109f2d8666b68c0ae98c1d74a46b7611cac03212583370fc"
+  }
+}

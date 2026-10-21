@@ -96,7 +96,7 @@ class VAEEncodeAudio(IO.ComfyNode):
     encode = execute  # TODO: remove
 
 
-def vae_decode_audio(vae, samples, tile=None, overlap=None):
+def vae_decode_audio(vae, samples, tile=None, overlap=None, normalize=True):
     latent = samples["samples"]
     if latent.is_nested:
         latent = latent.unbind()[-1]
@@ -106,9 +106,10 @@ def vae_decode_audio(vae, samples, tile=None, overlap=None):
     else:
         audio = vae.decode(latent).movedim(-1, 1)
 
-    std = torch.std(audio, dim=[1, 2], keepdim=True) * 5.0
-    std[std < 1.0] = 1.0
-    audio /= std
+    if normalize:
+        std = torch.std(audio, dim=[1, 2], keepdim=True) * 5.0
+        std[std < 1.0] = 1.0
+        audio /= std
     vae_sample_rate = getattr(vae, "audio_sample_rate_output", getattr(vae, "audio_sample_rate", 44100))
     return {"waveform": audio, "sample_rate": vae_sample_rate if "sample_rate" not in samples else samples["sample_rate"]}
 
@@ -124,13 +125,14 @@ class VAEDecodeAudio(IO.ComfyNode):
             inputs=[
                 IO.Latent.Input("samples"),
                 IO.Vae.Input("vae"),
+                IO.Boolean.Input("normalize", default=True, optional=True, tooltip="Reduce loud output. Disable to preserve the VAE waveform amplitude, including AuK-Flash."),
             ],
             outputs=[IO.Audio.Output()],
         )
 
     @classmethod
-    def execute(cls, vae, samples) -> IO.NodeOutput:
-        return IO.NodeOutput(vae_decode_audio(vae, samples))
+    def execute(cls, vae, samples, normalize=True) -> IO.NodeOutput:
+        return IO.NodeOutput(vae_decode_audio(vae, samples, normalize=normalize))
 
     decode = execute  # TODO: remove
 

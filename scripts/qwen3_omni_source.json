@@ -1,0 +1,83 @@
+{
+  "repo": "shunyang90/Qwen3-Omni-30B-A3B-Instruct-NVFP4",
+  "revision": "0ed3aa2b00eeedbb0d38b6d4738f506af759213b",
+  "files": [
+    {
+      "name": "README.md",
+      "bytes": 3334,
+      "sha256": "4f61e07d10b29552b05c0fa9719c5e5fbf4c656bdce688ea60fe0da1dfa56baa"
+    },
+    {
+      "name": "chat_template.jinja",
+      "bytes": 6519,
+      "sha256": "45777d2e798aae1d1ce6844e69edcb23fc0c710009554711c78efab9044da2c8"
+    },
+    {
+      "name": "config.json",
+      "bytes": 17308,
+      "sha256": "03500d1d3c000e05abb05c89208d5da9ad637e7ce51552ab8ae20a03043c4a0e"
+    },
+    {
+      "name": "hf_quant_config.json",
+      "bytes": 2570,
+      "sha256": "46cefc6f0c2ff48097693f9cb29ffec56ae4912d02a137fe80cb9ebfadc108c7"
+    },
+    {
+      "name": "model-00001-of-00007.safetensors",
+      "bytes": 4295306332,
+      "sha256": "2c4496127047f13ce428cd36e69166dd0f49e9f1a5e61b74b900cc63ac06acd7"
+    },
+    {
+      "name": "model-00002-of-00007.safetensors",
+      "bytes": 4296398884,
+      "sha256": "a1c55bcc98c571afd731d9e0c167bac755075681d714bb1c1579f8564cbaaccf"
+    },
+    {
+      "name": "model-00003-of-00007.safetensors",
+      "bytes": 4296404020,
+      "sha256": "8dff8d0297e38d6292aedf540e1f042527825ac7614f5ed31d98554d30d2f273"
+    },
+    {
+      "name": "model-00004-of-00007.safetensors",
+      "bytes": 4296403644,
+      "sha256": "df22ba52a8ad246efcbdf52218d8f9d404592d896c05a5655be89ea17e38e85a"
+    },
+    {
+      "name": "model-00005-of-00007.safetensors",
+      "bytes": 4295495904,
+      "sha256": "47d0b047c8b489a16f8e72ba78f71450a0a6c4a22534c6d2e4001db89d91fe18"
+    },
+    {
+      "name": "model-00006-of-00007.safetensors",
+      "bytes": 4295396744,
+      "sha256": "3afb1ac2ddef98a5467903625a5fe805de1e19b2cee15c3b9bd4394f8eebd4e2"
+    },
+    {
+      "name": "model-00007-of-00007.safetensors",
+      "bytes": 83971720,
+      "sha256": "651bfe612523149bcb7937a892f59340725809125c8510e579af59af5b050b7e"
+    },
+    {
+      "name": "model.safetensors.index.json",
+      "bytes": 6705882,
+      "sha256": "170ea60bf1b6564f9325f27a8497d993f9aeeabe3ce46c5400eb47ae67eb475b"
+    },
+    {
+      "name": "processor_config.json",
+      "bytes": 2575,
+      "sha256": "d231acc407d4ec626dabd6e4608769c270f84e6db1aa2dd6e52c8989395b7c7a"
+    },
+    {
+      "name": "tokenizer.json",
+      "bytes": 11424429,
+      "sha256": "b34e316e4a3886855d9af88d0713da9a41dc8e00359c890ac022df6c6a1101a3"
+    },
+    {
+      "name": "tokenizer_config.json",
+      "bytes": 7344,
+      "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670"
+    }
+  ],
+  "declared_payload_bytes": 25850817744,
+  "actual_payload_bytes": 25850816336
+}

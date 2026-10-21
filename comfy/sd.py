@@ -81,8 +81,13 @@ import comfy.text_encoders.ace15
 import comfy.text_encoders.longcat_image
 import comfy.text_encoders.qwen35
 import comfy.text_encoders.qwen3vl
+import comfy.text_encoders.auk
+import comfy.ldm.auk.vae
 import comfy.text_encoders.moss_audio
 import comfy.text_encoders.moss_speech
+import comfy.text_encoders.audio_flamingo
+import comfy.text_encoders.glm_ocr
+import comfy.text_encoders.qwen3_omni
 import comfy.text_encoders.minimax
 import comfy.text_encoders.minimax_music
 import comfy.text_encoders.yue2
@@ -95,6 +100,8 @@ import comfy.text_encoders.cogvideo
 import comfy.text_encoders.sa3
 import comfy.text_encoders.gpt_oss
 import comfy.text_encoders.joyimage
+import comfy.text_encoders.moss_image
+import comfy.text_encoders.fibo2
 
 import comfy.model_patcher
 import comfy.lora
@@ -335,6 +342,18 @@ class CLIP:
             kwargs["tokenizer_options"] = tokenizer_options
         return self.tokenizer.tokenize_with_weights(text, return_word_ids, **kwargs)
 
+    def tokenize_chat(self, messages, thinking=False):
+        tokenize = getattr(self.tokenizer, "tokenize_chat", None)
+        if tokenize is None:
+            raise ValueError("This tokenizer does not support structured text conversations.")
+        return tokenize(messages, thinking=thinking)
+
+    def get_chat_context_length(self):
+        context = getattr(self.cond_stage_model, "get_chat_context_length", None)
+        if context is None:
+            raise ValueError("This model does not expose a text conversation context limit.")
+        return context()
+
     def add_hooks_to_dict(self, pooled_dict: dict[str]):
         if self.apply_hooks_to_conds:
             pooled_dict["hooks"] = self.apply_hooks_to_conds
@@ -466,10 +485,10 @@ class CLIP:
             sd_clip[k] = sd_tokenizer[k]
         return sd_clip
 
-    def load_model(self, tokens={}):
-        memory_used = 0
+    def load_model(self, tokens={}, memory_required=0):
+        memory_used = memory_required
         if hasattr(self.cond_stage_model, "memory_estimation_function"):
-            memory_used = self.cond_stage_model.memory_estimation_function(tokens, device=self.patcher.load_device)
+            memory_used = max(memory_used, self.cond_stage_model.memory_estimation_function(tokens, device=self.patcher.load_device))
         model_management.load_models_gpu([self.patcher], memory_required=memory_used)
         return self.patcher
 
@@ -479,7 +498,22 @@ class CLIP:
     def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True):
         self.cond_stage_model.reset_clip_options()
 
-        self.load_model(tokens)
+        estimate = getattr(self.cond_stage_model, "generation_memory_estimation_function", None)
+        if estimate is not None:
+            required = estimate(tokens, max_length, device=self.patcher.load_device)
+            self.load_model(tokens, memory_required=required)
+            device = self.patcher.load_device
+            reserved = 0 if model_management.is_device_cpu(device) else model_management.extra_reserved_memory()
+            available = model_management.get_free_memory(device)
+            if available < required + reserved:
+                # Dynamic weights can remain resident until an allocation evicts them.
+                keep = [model_management.LoadedModel(p) for p in [self.patcher, *self.patcher.model_patches_models()]]
+                model_management.free_memory(required + reserved, device, keep_loaded=keep)
+                available = model_management.get_free_memory(device)
+            if available < required + reserved:
+                raise RuntimeError(f"Text generation needs {required + reserved} free bytes including reserve; observed {available}. Shorten the input or output budget, or release idle models.")
+        else:
+            self.load_model(tokens)
         device = self.patcher.load_device
         self.cond_stage_model.set_clip_options({"layer": None})
         self.cond_stage_model.set_clip_options({"execution_device": device})
@@ -745,6 +779,8 @@ class VAE:
                 if yue2_vae:
                     config.update(channels=64, c_mults=[1, 2, 4, 8, 16, 32], strides=[2, 2, 4, 4, 5, 6],
                                   sample_latent=False)
+                if metadata is not None and metadata.get("source") == "ASLP-lab/YingMusic-Singer-Plus":
+                    self.crop_input = False
                 self.first_stage_model = AudioOobleckVAE(**config)
                 self.memory_used_encode = lambda shape, dtype: (1000 * shape[2]) * model_management.dtype_size(dtype)
                 self.memory_used_decode = lambda shape, dtype: (1000 * shape[2] * 2048) * model_management.dtype_size(dtype)
@@ -1018,6 +1054,20 @@ class VAE:
                 self.working_dtypes = [torch.float32]
                 self.disable_offload = True
                 self.extra_1d_channel = 16
+            elif all(key in sd for key in ("global_mean", "global_log_std", "audio_encoder.generator.0.layer.weight", "resblocks.17.convs1.2.weight")):
+                self.first_stage_model = comfy.ldm.auk.vae.AuKVAE()
+                self.crop_input = False
+                self.latent_channels = 64
+                self.output_channels = 1
+                self.upscale_ratio = 480
+                self.downscale_ratio = 480
+                self.latent_dim = 1
+                self.audio_sample_rate = 24000
+                self.process_output = lambda audio: audio
+                self.process_input = lambda audio: audio.mean(dim=1, keepdim=True)
+                self.working_dtypes = [torch.float32]
+                self.memory_used_encode = lambda shape, dtype: shape[2] * 2000 * model_management.dtype_size(dtype)
+                self.memory_used_decode = lambda shape, dtype: shape[2] * 480 * 2000 * model_management.dtype_size(dtype)
             elif "decoder.layers.3.transformers.0.pre_norm.alpha" in sd:  # Stable Audio 3 VAE
                 if "decoder.layers.3.transformers.11.self_attn.to_out.weight" in sd:
                     config = {"channels": 256, "transformer_depths": 12, "sinusoidal_blocks": 8,
@@ -1630,7 +1680,12 @@ class CLIPType(Enum):
     YUE2 = 36
     FLUX3 = 37
     MOSS_AUDIO = 38
-    MOSS_TTS = 39
+    AUK = 39
+    AUDIO_FLAMINGO = 40
+    QWEN3_OMNI = 41
+    MOSS_IMAGE = 42
+    FIBO2 = 43
+    MOSS_TTS = 44
 
 
 
@@ -1690,7 +1745,11 @@ class TEModel(Enum):
     QWEN3VL_32B = 37
     MING_IMAGE = 38
     MOSS_AUDIO = 39
-    MOSS_VOICEGENERATOR = 40
+    GLM_OCR = 40
+    AUK = 41
+    AUDIO_FLAMINGO = 42
+    QWEN3_OMNI = 43
+    MOSS_VOICEGENERATOR = 44
 
 
 def detect_te_model(sd):
@@ -1740,6 +1799,15 @@ def detect_te_model(sd):
     # Must precede the Qwen2.5-7B k_proj.bias=512 check (GPT-OSS also has 8*64=512).
     if "layers.0.self_attn.sinks" in sd and "layers.0.mlp.experts.gate_up_proj.weight" in sd:
         return TEModel.GPT_OSS_20B
+    auk_signature = {"audio_tower.conv1.weight": 1280, "audio_tower.proj.weight": 2048,
+                     "layer_weights": 36, "layer_scale": 1, "model.norm.weight": 2048}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in auk_signature.items()):
+        return TEModel.AUK
+    flamingo_signature = {"audio_tower.conv1.weight": 1280, "audio_tower.embed_positions.weight": 1500,
+                          "multi_modal_projector.linear_1.weight": 3584, "model.embed_tokens.weight": 151672,
+                          "model.layers.27.self_attn.q_proj.weight": 3584, "model.lm_head.weight": 151672}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in flamingo_signature.items()):
+        return TEModel.AUDIO_FLAMINGO
     if 'model.layers.0.self_attn.k_proj.bias' in sd:
         weight = sd['model.layers.0.self_attn.k_proj.bias']
         if weight.shape[0] == 256:
@@ -1774,6 +1842,19 @@ def detect_te_model(sd):
         if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in signature.items()):
             return TEModel.MOSS_VOICEGENERATOR
         raise ValueError('Unsupported MOSS speech checkpoint; this loader currently supports converted VoiceGenerator')
+    glm_signature = {"model.layers.0.post_self_attn_layernorm.weight": 1536,
+                     "model.layers.0.post_mlp_layernorm.weight": 1536,
+                     "model.layers.0.self_attn.q_proj.weight": 2048,
+                     "visual.downsample.weight": 1536, "model.norm.weight": 1536}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in glm_signature.items()):
+        return TEModel.GLM_OCR
+    omni_signature = {'audio_tower.conv_out.weight': 1280, 'visual.merger.linear_fc2.weight': 2048,
+                      'visual.deepstack_merger_list.0.norm.weight': 4608,
+                      'model.layers.47.self_attn.q_norm.weight': 128, 'model.norm.weight': 2048,
+                      'model.layers.0.mlp.experts.gate_up_proj.weight': 128}
+    if (all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in omni_signature.items())
+            and all(key in sd for key in comfy.text_encoders.qwen3_omni.ASSET_KEYS)):
+        return TEModel.QWEN3_OMNI
     if "model.layers.0.post_attention_layernorm.weight" in sd:
         weight = sd['model.layers.0.post_attention_layernorm.weight']
         if 'model.layers.0.self_attn.q_norm.weight' in sd:
@@ -1837,6 +1918,8 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
     clip_target.params = {}
     if len(clip_data) == 1:
         te_model = detect_te_model(clip_data[0])
+        if clip_type == CLIPType.QWEN3_OMNI and te_model != TEModel.QWEN3_OMNI:
+            raise ValueError("Qwen3-Omni requires its converted native package with complete signatures and embedded assets. Run scripts/convert_qwen3_omni.py again.")
         if clip_type == CLIPType.YUE2 and "yue2_tokenizer_json" in clip_data[0]:
             tokenizer_data["yue2_tokenizer_json"] = clip_data[0].pop("yue2_tokenizer_json")
             detect = comfy.text_encoders.hunyuan_video.llama_detect(clip_data[0])
@@ -1976,6 +2059,15 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.clip = comfy.text_encoders.gpt_oss.lens_te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.gpt_oss.LensTokenizer
             tokenizer_data["tokenizer_json"] = clip_data[0].get("tokenizer_json", None)
+        elif te_model == TEModel.AUK:
+            clip_target.clip = comfy.text_encoders.auk.te(**llama_detect(clip_data))
+            clip_target.tokenizer = comfy.text_encoders.auk.AuKTokenizer
+            for key in ("tokenizer_json", "auk_config_json"):
+                tokenizer_data[key] = clip_data[0].pop(key)
+        elif te_model == TEModel.AUDIO_FLAMINGO:
+            clip_target.clip = comfy.text_encoders.audio_flamingo.te(**llama_detect(clip_data))
+            clip_target.tokenizer = comfy.text_encoders.audio_flamingo.AudioFlamingoTokenizer
+            tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
         elif te_model == TEModel.MOSS_AUDIO:
             clip_target.clip = comfy.text_encoders.moss_audio.te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.moss_audio.MossAudioTokenizer
@@ -1984,6 +2076,17 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.clip = comfy.text_encoders.moss_speech.te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.moss_speech.MossSpeechTokenizer
             tokenizer_data['tokenizer_json'] = clip_data[0].pop('tokenizer_json', None)
+        elif te_model == TEModel.GLM_OCR:
+            clip_target.clip = comfy.text_encoders.glm_ocr.te(dtype_llama=clip_data[0]['model.norm.weight'].dtype)
+            clip_target.tokenizer = comfy.text_encoders.glm_ocr.GlmOCRTokenizer
+            tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
+        elif te_model == TEModel.QWEN3_OMNI:
+            tokenizer_data.update({key: clip_data[0].pop(key) for key in comfy.text_encoders.qwen3_omni.ASSET_KEYS})
+            model_config = json.loads(comfy.text_encoders.qwen3_omni.asset_bytes(tokenizer_data['qwen3_omni_config_json']))
+            processor_config = json.loads(comfy.text_encoders.qwen3_omni.asset_bytes(tokenizer_data['qwen3_omni_processor_json']))
+            config = {'thinker_config': model_config['thinker_config'], 'processor_config': processor_config}
+            clip_target.clip = comfy.text_encoders.qwen3_omni.te(config, **llama_detect(clip_data))
+            clip_target.tokenizer = comfy.text_encoders.qwen3_omni.Qwen3OmniTokenizer
         elif te_model == TEModel.QWEN3_4B:
             if clip_type == CLIPType.FLUX or clip_type == CLIPType.FLUX2:
                 clip_target.clip = comfy.text_encoders.flux.klein_te(**llama_detect(clip_data), model_type="qwen3_4b")
@@ -2006,9 +2109,13 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.tokenizer = comfy.text_encoders.jina_clip_2.JinaClip2TokenizerWrapper
         elif te_model in (TEModel.QWEN35_08B, TEModel.QWEN35_2B, TEModel.QWEN35_4B, TEModel.QWEN35_9B, TEModel.QWEN35_27B):
             clip_data[0] = comfy.utils.state_dict_prefix_replace(clip_data[0], {"model.language_model.": "model.", "model.visual.": "visual.", "lm_head.": "model.lm_head."})
-            qwen35_type = {TEModel.QWEN35_08B: "qwen35_08b", TEModel.QWEN35_2B: "qwen35_2b", TEModel.QWEN35_4B: "qwen35_4b", TEModel.QWEN35_9B: "qwen35_9b", TEModel.QWEN35_27B: "qwen35_27b"}[te_model]
-            clip_target.clip = comfy.text_encoders.qwen35.te(**llama_detect(clip_data), model_type=qwen35_type, mtp="mtp.fc.weight" in clip_data[0])
-            clip_target.tokenizer = comfy.text_encoders.qwen35.tokenizer(model_type=qwen35_type)
+            if clip_type == CLIPType.MOSS_IMAGE and te_model == TEModel.QWEN35_9B:  # MOSS-Image: stock Qwen3.5-9B, last hidden state, open think block.
+                clip_target.clip = comfy.text_encoders.moss_image.te(**llama_detect(clip_data), mtp="mtp.fc.weight" in clip_data[0])
+                clip_target.tokenizer = comfy.text_encoders.moss_image.MOSSImageTokenizer
+            else:
+                qwen35_type = {TEModel.QWEN35_08B: "qwen35_08b", TEModel.QWEN35_2B: "qwen35_2b", TEModel.QWEN35_4B: "qwen35_4b", TEModel.QWEN35_9B: "qwen35_9b", TEModel.QWEN35_27B: "qwen35_27b"}[te_model]
+                clip_target.clip = comfy.text_encoders.qwen35.te(**llama_detect(clip_data), model_type=qwen35_type, mtp="mtp.fc.weight" in clip_data[0])
+                clip_target.tokenizer = comfy.text_encoders.qwen35.tokenizer(model_type=qwen35_type)
         elif te_model in (TEModel.QWEN3VL_4B, TEModel.QWEN3VL_8B):
             if clip_type == CLIPType.IDEOGRAM4 and te_model == TEModel.QWEN3VL_8B:  # Ideogram4 reuses the full Qwen3-VL-8B (13-layer tap for conditioning + multimodal generate).
                 clip_data[0] = comfy.utils.state_dict_prefix_replace(clip_data[0], {"model.language_model.": "model.", "model.visual.": "visual.", "lm_head.": "model.lm_head."})
@@ -2026,6 +2133,10 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
                 clip_data[0] = comfy.utils.state_dict_prefix_replace(clip_data[0], {"model.language_model.": "model.", "model.visual.": "visual.", "lm_head.": "model.lm_head."})
                 clip_target.clip = comfy.text_encoders.flux.flux3_te(**llama_detect(clip_data))
                 clip_target.tokenizer = comfy.text_encoders.flux.Flux3Tokenizer
+            elif clip_type == CLIPType.FIBO2 and te_model == TEModel.QWEN3VL_4B:  # Fibo 2.0: full Qwen3-VL-4B, 15-layer tap -> six 7680 bundles.
+                clip_data[0] = comfy.utils.state_dict_prefix_replace(clip_data[0], {"model.language_model.": "model.", "model.visual.": "visual.", "lm_head.": "model.lm_head."})
+                clip_target.clip = comfy.text_encoders.fibo2.te(**llama_detect(clip_data))
+                clip_target.tokenizer = comfy.text_encoders.fibo2.Fibo2Tokenizer
             elif clip_type == CLIPType.MAGE and te_model == TEModel.QWEN3VL_4B:  # Mage-Flow: full Qwen3-VL-4B, last hidden state, Qwen-Image-style templates.
                 clip_data[0] = comfy.utils.state_dict_prefix_replace(clip_data[0], {"model.language_model.": "model.", "model.visual.": "visual.", "lm_head.": "model.lm_head."})
                 clip_target.clip = comfy.text_encoders.mage_flow.te(**llama_detect(clip_data))
