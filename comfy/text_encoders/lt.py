@@ -1,3 +1,4 @@
+from .chat import chat_segments, encode_chat
 from comfy import sd1_clip
 import os
 from transformers import T5TokenizerFast
@@ -23,7 +24,23 @@ def ltxv_te(*args, **kwargs):
     return comfy.text_encoders.genmo.mochi_te(*args, **kwargs)
 
 
+def prepare_gemma3_image(image):
+    samples = image.movedim(-1, 1)
+    scale = math.sqrt(896 * 896 / (samples.shape[3] * samples.shape[2]))
+    width, height = round(samples.shape[3] * scale), round(samples.shape[2] * scale)
+    return comfy.utils.common_upscale(samples, width, height, "area", "disabled").movedim(1, -1)[..., :3]
+
+
 class Gemma3_Tokenizer():
+    def tokenize_chat(self, messages, thinking=False):
+        messages = [{"role": "model" if m["role"] == "assistant" else m["role"], "content": m["content"]} for m in messages]
+        if not messages or messages[0]["role"] != "system":
+            messages = [{"role": "system", "content": "You are a helpful assistant."}, *messages]
+        segments = chat_segments(messages, "<start_of_turn>{role}\n", "<end_of_turn>\n",
+                                 "<start_of_turn>model\n", "\n\n<start_of_image>", "<end_of_image>\n\n")
+        return encode_chat(segments, lambda text: self.tokenizer.tokenizer.encode(text, add_bos=False, add_eos=False),
+                           lambda part: {"type": "image", "data": prepare_gemma3_image(part["data"])}, start_tokens=(2,))
+
     def state_dict(self):
         return {"spiece_model": self.tokenizer.serialize_model()}
 
@@ -34,15 +51,7 @@ class Gemma3_Tokenizer():
         if image is None:
             images = []
         else:
-            samples = image.movedim(-1, 1)
-            total = int(896 * 896)
-
-            scale_by = math.sqrt(total / (samples.shape[3] * samples.shape[2]))
-            width = round(samples.shape[3] * scale_by)
-            height = round(samples.shape[2] * scale_by)
-
-            s = comfy.utils.common_upscale(samples, width, height, "area", "disabled").movedim(1, -1)
-            images = [s[:, :, :, :3]]
+            images = [prepare_gemma3_image(image)]
 
         if text.startswith('<start_of_turn>'):
             skip_template = True
@@ -79,6 +88,9 @@ class Gemma3_12BTokenizer(Gemma3_Tokenizer, sd1_clip.SDTokenizer):
 
 
 class LTXAVGemmaTokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_chat(self, messages, thinking=False):
+        return {self.clip: self.gemma3_12b.tokenize_chat(messages, thinking)}
+
     def __init__(self, embedding_directory=None, tokenizer_data={}):
         super().__init__(embedding_directory=embedding_directory, tokenizer_data=tokenizer_data, name="gemma3_12b", tokenizer=Gemma3_12BTokenizer)
 

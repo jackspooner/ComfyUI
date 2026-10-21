@@ -1,4 +1,5 @@
 """Native Qwen3-Omni Thinker; architecture follows Qwen/Transformers (Apache-2.0)."""
+from .chat import qwen_chat
 from dataclasses import dataclass, field, fields
 import json
 import math
@@ -351,6 +352,13 @@ def audio_features(audio, config):
 
 
 class Qwen3Omni(BaseLlama, BaseGenerate, nn.Module):
+    def image_token_length(self, embed):
+        cfg = self.processor_config['image_processor']
+        patch, merge = cfg['patch_size'], cfg['merge_size']
+        h, w = smart_resize(*embed['data'].shape[1:3], factor=patch * merge,
+                            min_pixels=cfg['size']['shortest_edge'], max_pixels=cfg['size']['longest_edge'])
+        return h * w // (patch * merge) ** 2
+
     def __init__(self, config_dict, dtype, device, operations):
         super().__init__()
         source = config_dict['thinker_config']
@@ -474,6 +482,9 @@ class OmniSDTokenizer(sd1_clip.SDTokenizer):
 
 
 class Qwen3OmniTokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_chat(self, messages, thinking=False):
+        return {'qwen3_omni': qwen_chat(messages, self.qwen3_omni.tokenizer)}
+
     def __init__(self, embedding_directory=None, tokenizer_data={}):
         super().__init__(embedding_directory=embedding_directory, tokenizer_data=tokenizer_data,
                          name='qwen3_omni', tokenizer=OmniSDTokenizer)

@@ -34,8 +34,8 @@ it can reserve a substantially larger KV cache even when EOS arrives early.
 Expanded media plus output must fit 65,536 tokens. Overflow is refused before
 loading/generation workspace allocation. There is no silent media truncation.
 System-prompt override, sampling controls and raw-template selection use the
-existing node behavior. Omni has no implemented conversation-history or thinking
-mode; keep those controls disabled. Video, speech output and diffusion
+existing node behavior. Omni supports explicit text/image history through the shared version 2 contract.
+It has no switchable thinking mode; keep that control disabled. Video, speech output and diffusion
 conditioning are outside this integration.
 
 Generate Text output 0 is the final text, output 1 is separated thinking, and
@@ -66,3 +66,5 @@ revision/runtime and verify an existing workflow, retaining the artifact and
 diagnostics. Offline conversion interruption/retry is documented in
 [quantization](quantization.md#offline-converter); validation commands and isolated
 GPU-window ownership are in [reference](reference.md).
+
+Text/image conversations use [versioned native history](../text-conversations.md), including automatic first-turn snapshots. Audio/video history remains unsupported; single-prompt audio and combined inputs retain their existing path.
