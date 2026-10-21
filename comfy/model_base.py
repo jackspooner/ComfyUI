@@ -23,6 +23,7 @@ import logging
 import comfy.ldm.lightricks.av_model
 import comfy.ldm.minimax.model
 import comfy.ldm.minimax_music.dit
+import comfy.ldm.audio.moss_soundeffect
 import comfy.ldm.yue2.model
 import comfy.ldm.yingmusic.model
 import comfy.nested_tensor
@@ -2639,6 +2640,11 @@ class YingMusic(BaseModel):
         )
         out["c_crossattn"] = comfy.conds.CONDRegular(context)
         return out
+
+
+class MossSoundEffect(BaseModel):
+    def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
+        super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.audio.moss_soundeffect.MossSoundEffect)
 
 
 class MiniMaxMusic3(BaseModel):

@@ -32,6 +32,12 @@ Transformer, using synchronous 32-book audio, the shared MOSS v1 codec, referenc
 and continuation. Pinned CPU comparisons and short RTX 5090 generation/lifecycle
 checks pass; broader quality and serving acceptance remain pending. See [conversion, explicit sampling defaults and limits](docs/native-audio-grounding.md#native-local-transformer).
 
+This fork also includes a native MOSS SoundEffect v2 candidate with offline
+checkpoint conversion, a Wan-based continuous flow model, Qwen3 conditioning and
+a 48 kHz mono DAC VAE. CPU component/checkpoint comparisons and isolated RTX 5090
+generation/lifecycle checks pass. Output quality is mixed, and it is not deployed.
+See [setup, workflow and acceptance limits](docs/moss-soundeffect.md).
+
 ## Native Drama 3 in this fork
 
 Built with Fish Audio. This fork adds native Drama 3 speech, speaker references,

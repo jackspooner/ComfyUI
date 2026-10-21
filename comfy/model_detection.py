@@ -747,6 +747,11 @@ def detect_unet_config(state_dict, key_prefix, metadata=None):
         dit_config["vid_out_norm"] = True
         return dit_config
 
+    soundeffect_signature = {'patch_embedding.weight': 1536, 'head.head.weight': 128, 'text_embedding.0.weight': 1536,
+                            'blocks.29.ffn.0.weight': 8960, 'time_embedding.0.weight': 1536, 'head.modulation': 1}
+    if all(key_prefix + key in state_dict and state_dict[key_prefix + key].ndim > 0 and state_dict[key_prefix + key].shape[0] == size for key, size in soundeffect_signature.items()) and state_dict[key_prefix + 'patch_embedding.weight'].ndim == 3:
+        return {'audio_model': 'moss_soundeffect'}
+
     if '{}head.modulation'.format(key_prefix) in state_dict_keys:  # Wan 2.1
         dit_config = {}
         dit_config["image_model"] = "wan2.1"
