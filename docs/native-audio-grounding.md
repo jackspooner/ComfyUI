@@ -300,11 +300,23 @@ PYTHONPATH=/absolute/Cutlery-MOSS/.venv/transformers5 MOSS_LOCAL_SOURCE=/absolut
 
 The upstream Local source is incompatible with shared Transformers 5.20 without
 API changes; the reference fixture needs the pinned overlay. Native runtime has
-no Transformers execution dependency. Full-weight logits, BF16 head-normalization
-error, GPU generation/performance, lifecycle, listening quality and serving
-activation remain pending. Initial isolated GPU startup was refused because the
-installed coordination plugin requires newer committed core admission hooks;
-no job was submitted and the failed candidate exited.
+no Transformers execution dependency. Actual checkpoint local-decoder/projection
+checks also pass: FP32 cached hidden/logit maximum error is 1.46e-5/4.30e-5.
+BF16 differs by up to 0.03125/0.2109375 on that fixture, with all five top choices
+unchanged; this is not full global-model parity. Set `MOSS_LOCAL_WEIGHTS` to the
+converted file to run those optional component checks.
+
+After merging matching committed prompt-admission hooks, isolated RTX 5090 native
+cold/warm, reference continuation, active cancellation, recovery and unload/reload
+passed. The cold run produced 4.48 seconds in 39.3 seconds; warm generation took
+3.0 seconds. Independent Whisper transcription matched both the cold sentence
+and continuation suffix. Outputs are finite 24 kHz mono. One warm FLAC reached
+full scale; audible quality, speaker similarity, amplitude behavior across seeds,
+long-form, constrained memory and other-device acceptance remain unverified.
+Torch allocator peaks exclude aimdo allocations and are not complete peak VRAM
+measurements. Serving routes/processes remain unchanged. An earlier startup was
+refused before job submission because installed coordination hooks required the
+newer core; never disable coordination to bypass such a mismatch.
 
 ## MOSS v1 codec baseline
 
