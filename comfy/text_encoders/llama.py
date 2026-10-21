@@ -688,7 +688,8 @@ class Attention(nn.Module):
         if self.k_norm is not None:
             xk = self.k_norm(xk)
 
-        xq, xk = apply_rope(xq, xk, freqs_cis=freqs_cis)
+        if freqs_cis is not None:
+            xq, xk = apply_rope(xq, xk, freqs_cis=freqs_cis)
 
         fixed_cache = past_key_value if isinstance(past_key_value, FixedKV) else None
         if fixed_cache is not None:

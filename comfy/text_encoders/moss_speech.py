@@ -6,6 +6,7 @@ import comfy.audio
 from comfy import sd1_clip
 from comfy.audio_codec import AudioCodes, AudioCodeSegment, MOSS_V1
 from .moss_tts_delay import MossTTSDelay, AUDIO_PAD
+from .moss_tts_local import MossTTSLocal
 from .moss_text_normalization import normalize_tts_text
 
 
@@ -46,6 +47,8 @@ def encode_speech_reference(codec, audio):
 
 
 class MossSpeechTokenizer:
+    delayed = True
+
     def __init__(self, embedding_directory=None, tokenizer_data={}):
         self.tokenizer_json = tokenizer_data.get('tokenizer_json')
         if self.tokenizer_json is None:
@@ -69,7 +72,7 @@ class MossSpeechTokenizer:
                 continue
             for item in reference_codes(reference, self.codebooks):
                 codes.append(item)
-                slots = '<|audio_user_slot|>' * (len(item) + self.codebooks - 1) if len(item) else ''
+                slots = '<|audio_user_slot|>' * (len(item) + (self.codebooks - 1 if self.delayed else 0)) if len(item) else ''
                 labels.append(f'[S{speaker}]:\n<|audio_start|>{slots}<|audio_end|>')
                 speaker += 1
         prompt = voice_prompt(text, instruction, language, '\n'.join(labels) if references is not None else None,
@@ -86,6 +89,8 @@ class MossSpeechTokenizer:
             starts.append(len(ids))
             codes.append(prefix)
             ids.extend([151656] * len(prefix))
+        elif not self.delayed:
+            ids.append(151652)
         result = {'moss_delay': [[(token, 1.0, i + 1) if return_word_ids else (token, 1.0) for i, token in enumerate(ids)]]}
         if codes:
             result['moss_references'] = list(zip(starts, codes))
@@ -118,9 +123,16 @@ def undelay_segments(delayed):
     return segments
 
 
+class MossLocalTokenizer(MossSpeechTokenizer):
+    delayed = False
+
+
 class MossSpeechClipModel(sd1_clip.SDClipModel):
+    model_class = MossTTSDelay
+    delayed = True
+
     def __init__(self, device='cpu', dtype=None, model_options={}, speech_config=None):
-        super().__init__(device=device, dtype=dtype, textmodel_json_config=speech_config or {}, model_class=MossTTSDelay,
+        super().__init__(device=device, dtype=dtype, textmodel_json_config=speech_config or {}, model_class=self.model_class,
                          special_tokens={'pad': 151643}, layer_norm_hidden_state=False,
                          enable_attention_masks=True, model_options=model_options)
         self.can_assign_sd = False
@@ -143,7 +155,7 @@ class MossSpeechClipModel(sd1_clip.SDClipModel):
         work = batch * (prefix * config.hidden_size * 48 * size + config.num_attention_heads * prefix**2 * 8 + config.vocab_size * 8)
         return kv + work + batch * capacity * (self.transformer.codebooks + 1) * 8
 
-    def generate_audio_codes(self, tokens, max_length=1000, seed=0, **sampling):
+    def prepare_inputs(self, tokens):
         rows = [[token[0] for token in row] for row in tokens['moss_delay']]
         length = max(map(len, rows))
         ids = torch.full((len(rows), length, self.transformer.codebooks + 1), AUDIO_PAD, device=self.execution_device, dtype=torch.int64)
@@ -155,8 +167,13 @@ class MossSpeechClipModel(sd1_clip.SDClipModel):
         for start, codes in tokens.get('moss_references', ()):
             codes = codes.to(device=ids.device)
             for q in range(self.transformer.codebooks):
-                count = max(0, min(len(codes), length - start - q))
-                ids[0, start + q:start + q + count, q + 1] = codes[:count, q]
+                offset = start + (q if self.delayed else 0)
+                count = max(0, min(len(codes), length - offset))
+                ids[0, offset:offset + count, q + 1] = codes[:count, q]
+        return ids, mask
+
+    def generate_audio_codes(self, tokens, max_length=1000, seed=0, **sampling):
+        ids, mask = self.prepare_inputs(tokens)
         generated = self.transformer.generate_delay(ids, mask, self.generation_length(tokens, max_length), seed, **sampling)
         segments = []
         for prefix_length, assistant in generated:
@@ -168,12 +185,50 @@ class MossSpeechClipModel(sd1_clip.SDClipModel):
         return AudioCodes(MOSS_V1, tuple(segments))
 
 
-def te(dtype_llama=None, llama_quantization_metadata=None, speech_config=None):
+class MossLocalClipModel(MossSpeechClipModel):
+    model_class = MossTTSLocal
+    delayed = False
+
+    def audio_generation_memory(self, tokens, max_length):
+        config = self.transformer.local_transformer.config
+        size = self.transformer.dtype.itemsize
+        batch = len(tokens['moss_delay'])
+        cache = batch * (self.transformer.codebooks + 1) * config.num_hidden_layers * 4 * config.num_key_value_heads * config.head_dim * size
+        work = batch * config.hidden_size * 48 * size
+        return super().audio_generation_memory(tokens, max_length) + cache + work
+
+    def load_sd(self, sd):
+        # Preserved in the conversion for accounting, unused by the pinned model.
+        sd = sd.copy()
+        sd.pop('unused_global_embedding.weight')
+        return super().load_sd(sd)
+
+    def generate_audio_codes(self, tokens, max_length=1000, seed=0, **sampling):
+        ids, mask = self.prepare_inputs(tokens)
+        generated = self.transformer.generate_local(ids, mask, self.generation_length(tokens, max_length), seed, **sampling)
+        segments = []
+        for prefix_length, assistant in generated:
+            codes = assistant[:, 1:]
+            valid = (codes != AUDIO_PAD).any(dim=1).tolist()
+            start = None
+            first = True
+            for i, active in enumerate([*valid, False]):
+                if active and start is None:
+                    start = i
+                elif not active and start is not None:
+                    segment = codes[start:i].T.unsqueeze(0).contiguous().clone()
+                    segments.append(AudioCodeSegment(segment, (i - start,), decode_skip_frames=(min(prefix_length, i - start),) if first else None))
+                    start = None
+                    first = False
+        return AudioCodes(MOSS_V1, tuple(segments))
+
+
+def te(dtype_llama=None, llama_quantization_metadata=None, speech_config=None, local=False):
     class MossSpeechTEModel(sd1_clip.SD1ClipModel):
         def __init__(self, device='cpu', dtype=None, model_options={}):
             if llama_quantization_metadata is not None:
                 model_options = {**model_options, 'quantization_metadata': llama_quantization_metadata}
-            super().__init__(device=device, dtype=dtype_llama or dtype, name='moss_delay', clip_model=MossSpeechClipModel,
+            super().__init__(device=device, dtype=dtype_llama or dtype, name='moss_delay', clip_model=MossLocalClipModel if local else MossSpeechClipModel,
                              model_options=model_options, speech_config=speech_config)
 
         def audio_generation_memory(self, tokens, max_length):
