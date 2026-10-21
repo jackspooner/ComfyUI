@@ -1,3 +1,11 @@
+## Native Fibo 2.0 backport
+
+This fork backports upstream [Fibo 2.0 support](https://github.com/Comfy-Org/ComfyUI/pull/17240)
+onto its v0.42.1 base. Load the diffusion model, Qwen3-VL 4B with CLIP type
+`fibo2`, and Flux2 VAE, then use **TextEncodeFibo2** and the normal sampler.
+Edit Turbo uses four steps and CFG 1; Dev also supports text-to-image.
+See [model files, workflow, verification and limits](docs/fibo2.md).
+
 ## Native Drama 3 in this fork
 
 Built with Fish Audio. This fork adds native Drama 3 speech, speaker references,
