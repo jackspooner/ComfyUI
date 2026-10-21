@@ -150,3 +150,13 @@ def test_async_loader_resources_survive_pending_execution(managed, monkeypatch):
 def test_background_weight_loading_rejected(managed):
     with pytest.raises(store.CacheError,match='EXECUTION_REQUIRED'):
         load_torch_file(managed.archive / 'diffusion_models/model.safetensors')
+
+
+def test_admission_precedes_model_cache_invalidation(managed, monkeypatch):
+    executor = PromptExecutor(Server(), cache_type=CacheType.CLASSIC, cache_args={'ram': 0, 'ram_inactive': 0})
+    events = []
+    monkeypatch.setattr(executor, 'before_prompt_execution', lambda: events.append('admitted'))
+    monkeypatch.setattr(managed, 'changed', lambda: events.append('cache-check') or set())
+    executor.execute(prompt(), 'admission-order', execute_outputs=['2'])
+    assert executor.success
+    assert events == ['admitted', 'cache-check']
