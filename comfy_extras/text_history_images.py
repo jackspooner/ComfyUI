@@ -24,7 +24,7 @@ def image_id(image):
 def attachment_path(identifier):
     if not re.fullmatch(r"[0-9a-f]{64}", identifier):
         raise ValueError("Invalid text history image_id; expected a SHA-256 attachment ID.")
-    root = folder_paths.get_system_user_directory("text_history")
+    root = os.path.join(folder_paths.get_system_user_directory(), "text_history")
     path = os.path.join(root, "images", identifier + ".safetensors")
     if not folder_paths.is_within_directory(root, path):
         raise ValueError("Text history image path escapes its attachment directory.")

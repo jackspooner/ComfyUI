@@ -56,6 +56,11 @@ def storage(tmp_path, monkeypatch):
     return inputs
 
 
+def test_attachment_directory_uses_configured_system_user(storage):
+    expected = storage.parent / 'user' / '__system' / 'text_history' / 'images' / ('a' * 64 + '.safetensors')
+    assert attachments.attachment_path('a' * 64) == str(expected)
+
+
 class Clip:
     def __init__(self, fail=False):
         self.tokenizer = Qwen35ImageTokenizer()
