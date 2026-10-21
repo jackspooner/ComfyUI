@@ -38,7 +38,7 @@ is scaled/cropped to the output size; multiple images use individual trained
 sizes. Reference count, resolution and prompt length increase memory/time.
 
 Discover `/object_info/TextEncodeFibo2` and the loader schemas on the selected
-service before submitting. Autogrow API inputs are flattened (`image_1`, etc.);
+service before submitting. Autogrow API inputs are flattened (`images.image_1`, etc.);
 editor graphs and API prompts differ. Save editable workflows in the installation's
 user workflow library. Submit once through `/prompt`, follow the returned ID in
 queue/history, and inspect saved output. On uncertain submission, inspect that ID
@@ -66,4 +66,33 @@ Pillow's built-in font; training's additional fallback fonts are not included.
 
 The weights are BRIA AI's CC BY-NC 4.0 release; commercial use requires its
 separate agreement. Preserve upstream attribution and the published license.
-Local activation/inference results will be recorded below after verification.
+
+## Local acceptance — 21 October 2026
+
+Integrated and activated the backport on the RTX 5090 with the existing
+Torch 2.14.1+cu130, Kitchen 0.2.39 and ComfyUI runtime. All 1,837 previous node
+registrations remained; TextEncodeFibo2 was added. No dependency/unit changes.
+All 634 Edit Turbo checkpoint keys/shapes match meta-device model construction.
+Focused CPU suite: 34 passed; broader loader/history/text regressions: 147 passed,
+3 optional reference tests skipped. The integrated focused suite also passed.
+
+Normal-queue BF16 editing changed a red-ball fixture to blue while retaining its
+beige background and shadow; both outputs were inspected:
+
+- 512 square, 4 steps, CFG 1, Euler/simple, seed 321:
+  `478f7bd6-5228-49e4-9bcb-ba277be45b52`, 45.46 s including cold loading.
+- After an idle `/free` unload request, repeated at default trained size
+  (1024 square), seed 322:
+  `fe85a11e-02ae-48c7-b3c8-12cb5535314b`, 16.48 s. Loader nodes reexecuted;
+  the allocator reported zero rogues and the coordinated GPU hold was released.
+
+Saved editable workflow: `user/default/workflows/Fibo 2.0 Edit Turbo BF16.json`,
+with matching `api/Fibo 2.0 Edit Turbo BF16.api.json`; replace the fixture image
+and edit instruction before use. Geometry/link checks passed. The first harness
+submission used an unprefixed reference socket and failed before encoding;
+corrected API input is `images.image_1`. This was a test-graph error.
+
+These are bounded editing/reload smoke checks. Full upstream numerical parity,
+cancellation/recovery, multi-reference quality, Dev, quantized weights and other
+devices remain unverified. The existing Breeze-TTS cache_position documentation
+log is unrelated to this integration. No broad edit-quality guarantee is implied.
