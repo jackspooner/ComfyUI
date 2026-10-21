@@ -131,7 +131,8 @@ the production OCR route remains unconfigured. See the linked acceptance limits.
 This fork also adds text/image conversation history and exact context budgets
 to the existing **Load CLIP → Generate Text** path for native Qwen3.5/Qwen3.8 and
 MOSS, plus complete Qwen-VL/Omni, Gemma3/4 and GLM-OCR image paths.
-Templated image turns snapshot exact pixels into local immutable safetensors;
+Templated image turns snapshot exact pixels into local immutable safetensors under
+the configured system-user `text_history/images` directory;
 replay needs both the JSON and attachments. Saving history belongs to the caller.
 Existing single-prompt and media paths remain available. See
 [native text conversations](docs/text-conversations.md) for prerequisites,

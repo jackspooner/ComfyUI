@@ -90,7 +90,8 @@ RGB. IMAGE sockets preserve their exact supplied tensor pixels, shape and dtype.
 Model-specific resizing/normalization happens only after resolution.
 
 On successful generation, snapshots are published as safetensors in the configured
-system-user directory's `text_history/images/` folder. IDs hash dtype, shape and
+system-user directory's `text_history/images/` folder (normally
+`user/__system/text_history/images/`). IDs hash dtype, shape and
 pixel bytes. Atomic publication deduplicates identical snapshots. Returned histories
 use IDs only; they do not depend on the original uploads. Copy the JSON **and all
 referenced safetensors** together when backing up or migrating. Retention is explicit:
