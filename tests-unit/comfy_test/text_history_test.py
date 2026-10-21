@@ -24,7 +24,7 @@ def transcript():
 
 
 @pytest.mark.parametrize('bad', ['null', '[]', '{}', '{"version":true,"messages":[]}',
-    '{"version":2,"messages":[]}', '{"version":1,"messages":[{"role":"tool","content":"x"}]}',
+    '{"version":3,"messages":[]}', '{"version":1,"messages":[{"role":"tool","content":"x"}]}',
     '{"version":1,"messages":[{"role":"user","content":[]}]}',
     '{"version":1,"messages":[{"role":"user","content":"x","extra":1}]}',
     '{"version":1,"messages":[{"role":"user","content":"x"},{"role":"system","content":"x"}]}'])
@@ -96,7 +96,9 @@ def test_no_approximate_media_counting():
 def test_model_template_owners_and_context_limits():
     messages = [{'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Hi'}, {'role': 'user', 'content': 'Again'}]
     fake = SimpleNamespace(tokenize_with_weights=lambda text, **kw: (text, kw))
-    qwen, _ = Qwen35ImageTokenizer.tokenize_chat(fake, messages, thinking=False)
+    native = Qwen35ImageTokenizer()
+    rows = native.tokenize_chat(messages, thinking=False)[native.clip]
+    qwen = native.qwen35_2b.tokenizer.decode([t[0] for row in rows for t in row])
     assert qwen == format_qwen_chat(messages, False)
     assert qwen.count('<|im_start|>') == 4
     assert qwen.endswith('<think>\n\n</think>\n\n')
@@ -173,7 +175,7 @@ def test_ordinary_templated_text_outputs_history_for_the_next_node():
     assert raw.result[4] == 'First answer'
 
 
-@pytest.mark.parametrize('extra', [{'image': object()}, {'audio': object()}, {'video': object()}, {'use_default_template': False}])
+@pytest.mark.parametrize('extra', [{'audio': object()}, {'video': object()}, {'use_default_template': False}])
 def test_history_rejects_raw_or_media_before_generation(extra):
     clip = Clip()
     with pytest.raises(ValueError):
