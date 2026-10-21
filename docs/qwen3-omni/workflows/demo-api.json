@@ -1,0 +1,124 @@
+{
+  "1": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3_omni_30b_a3b_nvfp4.safetensors",
+      "type": "qwen3_omni",
+      "device": "default"
+    }
+  },
+  "2": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "Give three short lines: Image 1: its color and shape. Image 2: its color and shape. Audio: speech, music, or environmental sound."
+    }
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "qwen3_omni_demo/red_square.png"
+    }
+  },
+  "4": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "qwen3_omni_demo/blue_circle.png"
+    }
+  },
+  "5": {
+    "class_type": "ImageBatch",
+    "inputs": {
+      "image1": [
+        "3",
+        0
+      ],
+      "image2": [
+        "4",
+        0
+      ]
+    }
+  },
+  "6": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "qwen3_omni_demo/speech.wav"
+    }
+  },
+  "7": {
+    "class_type": "PrimitiveInt",
+    "inputs": {
+      "value": 512
+    }
+  },
+  "8": {
+    "class_type": "TextGenerate",
+    "inputs": {
+      "clip": [
+        "1",
+        0
+      ],
+      "prompt": [
+        "2",
+        0
+      ],
+      "image": [
+        "5",
+        0
+      ],
+      "audio": [
+        "6",
+        0
+      ],
+      "max_length": [
+        "7",
+        0
+      ],
+      "sampling_mode": "off",
+      "thinking": false,
+      "use_default_template": true,
+      "mtp": "off",
+      "context_budget": 0,
+      "history_policy": "error"
+    }
+  },
+  "9": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "8",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "8",
+        4
+      ]
+    }
+  },
+  "11": {
+    "class_type": "SaveText",
+    "inputs": {
+      "text": [
+        "8",
+        0
+      ],
+      "filename_prefix": "qwen3_omni/demo_final",
+      "format": "txt"
+    }
+  },
+  "12": {
+    "class_type": "SaveText",
+    "inputs": {
+      "text": [
+        "8",
+        4
+      ],
+      "filename_prefix": "qwen3_omni/demo_raw",
+      "format": "txt"
+    }
+  }
+}

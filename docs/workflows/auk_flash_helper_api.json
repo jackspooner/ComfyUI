@@ -1,0 +1,236 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "auk_flash.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "AuK-Flash transformer"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "auk_qwen25_omni_3b.safetensors",
+      "type": "auk",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "AuK Qwen conditioning"
+    }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "auk_audio_vae.safetensors"
+    },
+    "_meta": {
+      "title": "AuK audio VAE"
+    }
+  },
+  "4": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": "Use the same voice to say \"Hello there. This is a short audio test.\""
+    },
+    "_meta": {
+      "title": "Request"
+    }
+  },
+  "15": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "reference.wav"
+    },
+    "_meta": {
+      "title": "Choose reference audio"
+    }
+  },
+  "5": {
+    "class_type": "PrimitiveFloat",
+    "inputs": {
+      "value": 5.0
+    },
+    "_meta": {
+      "title": "Target duration (seconds)"
+    }
+  },
+  "9": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 42
+    },
+    "_meta": {
+      "title": "Initial noise seed"
+    }
+  },
+  "10": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": {
+      "title": "Four-step Euler"
+    }
+  },
+  "11": {
+    "class_type": "ManualSigmas",
+    "inputs": {
+      "sigmas": "1.0, 0.9238795042037964, 0.7071067690849304, 0.3826833963394165, 0.0"
+    },
+    "_meta": {
+      "title": "Exact AuK-Flash schedule"
+    }
+  },
+  "6": {
+    "class_type": "AuKConditioning",
+    "inputs": {
+      "reference_seed": 0,
+      "clip": [
+        "2",
+        0
+      ],
+      "reference_audio": [
+        "15",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "instruction": [
+        "17",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Encode instruction and reference"
+    }
+  },
+  "7": {
+    "class_type": "EmptyAuKLatentAudio",
+    "inputs": {
+      "batch_size": 1,
+      "seconds": [
+        "17",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "24 kHz \u00b7 50 latent frames/sec"
+    }
+  },
+  "8": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "conditioning": [
+        "6",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Conditional only \u00b7 no extra CFG"
+    }
+  },
+  "12": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "9",
+        0
+      ],
+      "guider": [
+        "8",
+        0
+      ],
+      "sampler": [
+        "10",
+        0
+      ],
+      "sigmas": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "7",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Generate audio latents"
+    }
+  },
+  "13": {
+    "class_type": "VAEDecodeAudio",
+    "inputs": {
+      "normalize": false,
+      "samples": [
+        "12",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode \u00b7 preserve waveform amplitude"
+    }
+  },
+  "14": {
+    "class_type": "SaveAudioAdvanced",
+    "inputs": {
+      "filename_prefix": "audio/auk_helper",
+      "format": "flac",
+      "audio": [
+        "13",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Save AuK audio"
+    }
+  },
+  "16": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "moss_audio_8b_thinking_bf16.safetensors",
+      "type": "moss_audio",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Optional MOSS-Audio helper"
+    }
+  },
+  "17": {
+    "class_type": "AuKPromptHelper",
+    "inputs": {
+      "reference_transcript": "",
+      "max_length": 2048,
+      "clip": [
+        "16",
+        0
+      ],
+      "request": [
+        "4",
+        0
+      ],
+      "reference_audio": [
+        "15",
+        0
+      ],
+      "duration": [
+        "5",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Local helper \u00b7 exact speech, explicit duration"
+    }
+  }
+}

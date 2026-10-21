@@ -1,5 +1,7 @@
 from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
+import json
+from comfy.text_generation import read_history, select_context, write_history
 
 class TextGenerate(io.ComfyNode):
     @classmethod
@@ -41,19 +43,36 @@ class TextGenerate(io.ComfyNode):
                 io.Boolean.Input("use_default_template", optional=True, default=True, tooltip="Use the built in system prompt/template if the model has one.", advanced=True),
                 io.Combo.Input("mtp", options=["auto", "off", "2", "3", "4", "5"], default="auto", optional=True, tooltip="Speculative decoding with the checkpoint's multi-token-prediction head. No effect without MTP weights. auto adapts the draft depth; 2-5 pins it. Sampled output stays correctly distributed but differs from non-MTP output for the same seed."),
                 io.String.Input("system_prompt", force_input=True, optional=True, tooltip="Replaces the system prompt in the model's chat template. Ignored when the default template is not used."),
+                io.String.Input("history", force_input=True, optional=True, tooltip='Version 1 text history JSON. Start with {"version":1,"messages":[]}. Empty keeps the existing single prompt path.'),
+                io.Int.Input("context_budget", default=0, min=0, max=1048576, optional=True, tooltip="Total text conversation tokens including output. 0 uses the model limit. A positive budget enables conversation mode."),
+                io.Combo.Input("history_policy", options=["error", "drop_oldest_turns"], default="error", optional=True, tooltip="Fail on overflow, or explicitly exclude oldest complete turns from this generation. Returned history stays complete."),
             ],
             outputs=[
                 io.String.Output(display_name="generated_text"),
                 io.String.Output(display_name="thinking"),
+                io.String.Output(display_name="history"),
+                io.String.Output(display_name="context_info"),
+                io.String.Output(display_name="raw_text"),
             ],
         )
 
     @classmethod
-    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="") -> io.NodeOutput:
+    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error") -> io.NodeOutput:
 
         mtp = False if mtp == "off" else (True if mtp == "auto" else int(mtp))
 
-        tokens = clip.tokenize(prompt, image=image, skip_template=not use_default_template, min_length=1, thinking=thinking, video=video, audio=audio, system_prompt=system_prompt if use_default_template else "")
+        messages = None
+        context_info = None
+        if history or context_budget or history_policy != "error":
+            if not use_default_template:
+                raise ValueError("Text history requires use_default_template enabled.")
+            if image is not None or video is not None or audio is not None:
+                raise ValueError("Text history does not yet support image, video or audio inputs. Use the existing single prompt media path.")
+            messages = read_history(history, prompt, system_prompt)
+            tokens, context_info = select_context(messages, lambda turns: clip.tokenize_chat(turns, thinking=thinking), clip.get_chat_context_length(), context_budget, max_length, history_policy)
+            max_length = context_info["output_allowance"]
+        else:
+            tokens = clip.tokenize(prompt, image=image, skip_template=not use_default_template, min_length=1, thinking=thinking, video=video, audio=audio, system_prompt=system_prompt if use_default_template else "")
 
         # Get sampling parameters from dynamic combo
         do_sample = sampling_mode.get("sampling_mode") == "on"
@@ -81,12 +100,22 @@ class TextGenerate(io.ComfyNode):
 
         generated_text = clip.decode(generated_ids)
 
-        # The opening tag may be in the chat template; truncated reasoning may have no closing tag.
-        reasoning, separator, text = generated_text.partition("</think>")
-        if not separator and not reasoning.lstrip().startswith("<think>") and not prompt.rstrip().endswith("<think>"):
-            reasoning, text = "", generated_text
+        # </think> ends reasoning; without one, reasoning opened by the output or prompt was cut off by max_length
+        reasoning, sep, text = generated_text.partition("</think>")
+        if not sep and not reasoning.lstrip().startswith("<think>") and not prompt.rstrip().endswith("<think>"):
+            prompt_tokens = next(iter(tokens.values())) if isinstance(tokens, dict) else tokens
+            prompt_ids = [t[0] for t in prompt_tokens[-1] if isinstance(t, tuple) and isinstance(t[0], int)] if prompt_tokens else []
+            if not prompt_ids or not clip.decode(prompt_ids[-4:]).rstrip().endswith("<think>"):
+                reasoning, text = "", generated_text
 
-        return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip())
+        updated_history = ""
+        if messages is None and use_default_template and image is None and video is None and audio is None:
+            messages = read_history("", prompt, system_prompt)
+        if messages is not None:
+            updated_history = write_history([*messages, {"role": "assistant", "content": text.strip()}])
+        if context_info is not None:
+            context_info["generated_tokens"] = len(generated_ids)
+        return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip(), updated_history, json.dumps(context_info) if context_info is not None else "", generated_text)
 
 
 LTX2_T2V_SYSTEM_PROMPT = """You are a Creative Assistant. Given a user's raw input prompt describing a scene or concept, expand it into a detailed video generation prompt with specific visuals and integrated audio to guide a text-to-video model.
@@ -229,8 +258,8 @@ class TextGenerateLTX2Prompt(TextGenerate):
             node_id="TextGenerateLTX2Prompt",
             display_name="Generate LTX2 Prompt",
             category=parent_schema.category,
-            inputs=parent_schema.inputs,
-            outputs=parent_schema.outputs,
+            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy")],
+            outputs=parent_schema.outputs[:2],
             search_aliases=["prompt enhance", "LLM", "gemma"],
         )
 

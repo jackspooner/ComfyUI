@@ -1,7 +1,158 @@
+## Native Fibo 2.0 backport
+
+This fork backports upstream [Fibo 2.0 support](https://github.com/Comfy-Org/ComfyUI/pull/17240)
+onto its v0.42.1 base. Load the diffusion model, Qwen3-VL 4B with CLIP type
+`fibo2`, and Flux2 VAE, then use **TextEncodeFibo2** and the normal sampler.
+Edit Turbo uses four steps and CFG 1; Dev also supports text-to-image.
+See [model files, workflow, verification and limits](docs/fibo2.md).
+
+## Native Drama 3 in this fork
+
+Built with Fish Audio. This fork adds native Drama 3 speech, speaker references,
+long-form dialogue and explicit saved take histories for whole-take revisions.
+An offline converter packages routed experts as NVFP4 and the remaining weights
+as BF16; ComfyUI owns generation/codec loading and execution-local caches. The
+initial target is a Blackwell CUDA GPU. The RTX 5090 candidate completes speech,
+cloning, revisions and lifecycle checks within memory, but tested dialogue and
+long-form quality failed; serving activation remains unapproved. See [setup and limitations](docs/drama3.md)
+and the [acceptance record](docs/drama3-acceptance.md). Existing upstream capability
+and attribution are described below.
+
 <div align="center">
 
 # ComfyUI
+
+## Native UniPASE in this fork
+
+This fork adds **Load UniPASE → UniPASE Speech Restoration** for local generative
+speech enhancement with four managed FP32 networks, ordinary AUDIO inputs/outputs,
+rate preservation and bounded long-recording segments. Provision weights explicitly;
+no runtime downloads occur. See [setup, licensing and use](docs/unipase.md) and
+[acceptance limits](docs/unipase-acceptance.md). Music enhancement and guaranteed
+repair of every synthetic artifact are outside the validated scope.
+
+## Native Applio / RVC in this fork
+
+This fork adds **Load Applio / RVC Models → Applio / RVC Voice Convert** for local
+file conversion with trained RVC v1/v2 HiFi-GAN voices, matching ContentVec, shared
+RMVPE and optional FAISS retrieval, with context and overlap blending for segments.
+Dedicated managed handles reuse ComfyUI's
+patchers, casting, queue and media nodes; Applio's application is not launched.
+See [offline setup, supported exports and limits](docs/applio.md) and
+[acceptance evidence](docs/applio-acceptance.md). Training, realtime capture,
+MRF/RefineGAN and other embedders are outside this path. The two 40 kHz demo voices
+pass native GPU conversion and cancellation/recovery checks; explicit idle unload
+acceptance remains unrun while unrelated generation occupies the queue.
+
+## Stable release maintenance in this fork
+
+This fork merges upstream stable [v0.42.1](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.42.1)
+while retaining its native model, conversation and memory-recovery changes.
+Upstream adds MOSS-Image, Qwen decode improvements and solid mesh remeshing;
+source support does not establish local checkpoint or quality acceptance.
+Use the release's pinned frontend, templates and Comfy Kitchen alongside a
+compatible GPU runtime. See [maintenance, verification and rollback](docs/stable-release-maintenance.md).
+
+## Native Audio Flamingo 3 in this fork
+
+This fork adds native audio understanding and transcription with NVIDIA Audio Flamingo 3 through Load CLIP and Generate Text. It reuses ComfyUI model/attention/memory management and repackages a local HF snapshot without downloading during execution. See [setup, licensing, inputs and acceptance limits](docs/audio-flamingo.md). CPU reference checks and short-clip RTX 5090 inference, cancellation/reload and RouterAudio acceptance pass; broader resource and quality limits remain unverified.
+
 **The most powerful and modular AI engine for content creation.**
+
+## Native YingMusic Singer Plus in this fork
+
+This fork adds the Singer Plus transformer and melody encoder to ComfyUI's native
+loaders, attention and memory management. **Load Diffusion Model + Load Audio
+Encoder + Load VAE → YingMusic Generate / Edit Singing** accepts voice and melody
+audio references and Chinese/English lyrics. Weight conversion is local and explicit;
+there is no singing inference worker. Optional phonemizer/espeak and Chinese ONNX
+assets are used only for lyric preprocessing. See [setup, conversion and limitations](docs/yingmusic.md).
+RTX 5090 generation, cancellation/reload and RouterAudio reference editing passed, including optional separation and accompaniment mixing. See the bounded acceptance evidence in the model documentation.
+
+## Native PaddleOCR in this fork
+
+This fork adds **Load PaddleOCR Models → PaddleOCR** for local PP-OCRv6 medium
+text detection and CTC recognition. Native ComfyUI model management owns both
+FP32 models. Outputs include text, region geometry, model scores and preprocessing
+transforms; independent batch images remain separate. Default preprocessing avoids
+enlargement, with an explicit upstream-resize comparison mode. See
+[model setup, node contracts and measured limits](docs/paddleocr.md).
+Worktree preparation for this optional capability uses the normal setup command
+with `--paddleocr` to check its preinstalled OpenCV/torchvision prerequisites.
+Source integration requires activation before new nodes appear in a running
+service. Checkpoint validation supports lazy weight allocation; OCR requests FP32
+attention through the selected dispatcher. Recognition errors remain visible;
+no production advert route is added. RTX 5090 advert tests read all five supplied
+text lines correctly with official preprocessing; the tiny circular badge fails.
+
+## Native GLM-OCR in this fork
+
+This fork adds the official Z.ai GLM-OCR recognizer through **Load CLIP → Generate
+Text**, using ComfyUI's native model loading, attention, prefetch and memory owners.
+It processes one original-pixel image/crop with padding and no enlargement, and
+adds a raw decoded-text output. See [setup, conversion and limits](docs/glm-ocr.md).
+Bounded GPU lifecycle checks passed, but the Almay badge failed literal accuracy;
+the production OCR route remains unconfigured. See the linked acceptance limits.
+
+## Native text conversations in this fork
+
+This fork also adds optional text conversation history and exact context budgets
+to the existing **Load CLIP → Generate Text** path for native Qwen3.5/Qwen3.8 and
+MOSS. History is explicit JSON input/output; saving it belongs to the caller.
+Existing single-prompt and media paths remain available. See
+[native text conversations](docs/text-conversations.md) for prerequisites,
+contracts, examples, limits and verification. This source capability requires
+deployment before it appears in a running ComfyUI process.
+
+## Fork: Krea 2 inference
+
+This fork builds on [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+and its [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
+Upstream provides the node graph, model loading, sampling and local image,
+audio and video generation documented below; upstream credits and licenses remain.
+
+Krea 2 uses the shared attention dispatcher's grouped-query support without
+expanding K/V heads in the model, and projects only target tokens at the output.
+The paired Krea2 Edit source-patch update prepares static text fusion once per
+conditioning during sampling preparation. Update both repositories together;
+existing workflow sockets and checkpoint layouts are unchanged. Hooks and dynamic
+patches retain per-step fusion. See [Krea 2 editing efficiency](docs/krea2-edit-efficiency.md)
+for setup, tests and limitations. These changes do not alter other model families.
+
+## Local MiniMax H3 workflows and acceleration
+
+This installation uses [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI)
+and its [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md):
+the node graph UI/API, local image/audio/video inference, model loading and
+memory management described below are upstream functionality.
+
+The saved **MiniMax H3 - 360 Orbit** workflow uses Pablo Dawson's orbit LoRA
+with the same image at both endpoints, 768×768, 73 frames and 28 steps. Open it
+from the Workflows sidebar and press Run; the default input is the latest toy-house
+image from this installation. It saves silent MP4 video under `output/360_orbit`.
+See the [recipe, model requirements and recovery guide](docs/minimax-h3-360-orbit.md)
+and the repository-owned [agent skill](skills/minimax-h3-360-orbit/SKILL.md).
+The graph passed prompt validation and a complete house render on 7 October 2026
+(73 frames at 24 fps, 768×768, no audio track; about 73 seconds on this host).
+The author's training examples are human-centric, so object orbit quality is not
+established by the model card.
+
+The local Linux RTX 5090 installation additionally includes
+[ComfyUI-Sol-H3](https://github.com/xmarre/ComfyUI-Sol-H3) v0.1.9, pinned at
+`09a3320205512cd87f6110397fca1e25c19f5536`. Its Exact Runtime and experimental
+Sana/CuTe sparse attention are available as MODEL patch nodes. In an existing
+native H3 graph, connect the model after other patches through **Sol-H3 Exact
+Runtime**, or **Sol-H3 SOL Attention (Experimental)**, before the sampler.
+The latter includes Exact Runtime and defaults to one dense evaluation and two
+dense leading layers. Sparse attention approximates the dense result.
+
+GPU kernel and native model-patcher checks passed on 7 October 2026; full-sized
+render quality and end-to-end speed have not been measured here. Existing router
+`sol` selections still use the separate `SolAttnPatch` Triton extension. NVIDIA's
+standalone Sol Engine is not installed by this node pack. See the
+[local setup and recovery notes](../services/infrastructure/Workspace2LinuxDeployment/docs/minimax-h3-sol.md)
+for dependencies, verification, limitations and rollback. Upstream credit and
+licensing remain with the projects linked above.
 
 
 [![Website][website-shield]][website-url]
@@ -44,6 +195,22 @@ ComfyUI is the AI creation engine for visual professionals who demand control ov
 - The most sophisticated workflows can be exposed through a simple UI thanks to App Mode.
 - It integrates seamlessly into production pipelines with our API endpoints.
 
+## Native Qwen3-Omni in this fork
+
+Load CLIP (`qwen3_omni`) → Generate Text supports text, audio, complete image
+batches and combined inputs to text. The offline converter preserves the selected
+NVFP4 checkpoint's packed weights and embeds inference assets in one file. Native
+RTX 5090 execution, cancellation/offload/model transitions and live queue runs
+are verified. The reconstructed-reference suite has no new assertion failures;
+both paths pass 20/24 cases, retaining checkpoint OCR/silence limitations and
+prompt sensitivity. See [operation and saved workflow](docs/qwen3-omni/usage.md),
+[measurements and live evidence](docs/qwen3-omni/status.md), and
+[conversion/recovery](docs/qwen3-omni/quantization.md). Video, speech output,
+diffusion conditioning and Omni history are outside this integration.
+Native packages may mix validated dense and NVFP4 projections; the offline
+converter still targets the pinned source. [Compatibility and upstream assessment](docs/qwen3-omni/upstream-readiness.md)
+records reference blockers, residual precision limits and proposed patch boundaries.
+
 ## Native MOSS-Audio in this fork
 
 [Upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
@@ -77,6 +244,41 @@ Encode Audio Codes → Decode Audio Codes** nodes, with integer payloads and
 ComfyUI model/offload ownership. CPU reference and lifecycle checks pass;
 accelerator, speech quality and live-service adoption remain pending.
 
+## Native AuK-Flash
+
+This fork adds an offline converter and native MODEL, Qwen-Omni conditioning CLIP
+and audio VAE for [Tencent AuK-Flash](https://huggingface.co/tencent/AuK-Flash), plus
+an optional local prompt helper. It reuses standard loading, Euler sampling and
+audio output. [Setup, examples and verification status](docs/auk-flash.md) distinguish
+passing full-weight CPU/GPU checks from pending listening and broader resource acceptance.
+The local deployment includes these nodes; listening and broader quality acceptance
+remain incomplete. Verify the running inventory when using another installation.
+
+## Native SoulX-Singer in this fork
+
+This fork adds native SoulX-Singer lyric synthesis with continuous F0 or note/score
+conditioning, transcription-free singing voice conversion, RMVPE pitch extraction,
+karaoke separation and dereverberation. It uses ComfyUI operations, selected
+attention, managed loading/offloading and the memory compiler, with standard AUDIO
+inputs/outputs and editable lyric/note timing. Runtime inference is offline.
+See [pinned models, conversion, nodes, examples and acceptance limits](docs/soulx-singer.md).
+Default-step full-weight CPU comparisons and short-clip RTX 5090 queue/lifecycle
+checks pass. The retained song excerpt follows pitch but fails its replacement-lyric
+quality gate; automatic alignment, exact singer identity and subjective singing
+quality require separate review. The examples include the complete reference-song
+path and original-backing mixing. Source/candidate acceptance does not restart
+the serving installation. Use the existing worktree setup command with `--soulx`.
+
+## Native model integration development
+
+For model ports and checkpoint conversion, read the
+[native integration guide](docs/native-model-integration.md). It covers component
+selection, standard loaders and dedicated managed handles, offline conversion,
+ComfyUI memory ownership, reference/lifecycle validation and delivery, with links
+to implemented ports. Its Applio example describes scoping only; it adds no Applio
+support. Prepare a development worktree as documented below; GPU acceptance needs
+separately provisioned checkpoints and a compatible runtime.
+
 ## Local stable-release maintenance
 
 The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).
@@ -92,6 +294,9 @@ describe verification, protected GPU dependencies and rollback. Develop changes
 in a linked worktree with `COMFYUI_PYTHON=/path/to/prepared/python python3
 scripts/setup_worktree.py`; it checks Python >=3.10, PyTorch, einops and safetensors
 without installing packages or starting workloads. Use that interpreter for tests.
+The root `.gitnexusignore` keeps local environments, installed node packages and
+disabled third-party node sources outside the core code graph. Index those
+separately owned sources in their repositories when they are relevant.
 
 ## Get Started
 

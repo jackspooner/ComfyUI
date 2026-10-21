@@ -42,6 +42,8 @@ import comfy.text_encoders.cogvideo
 import comfy.text_encoders.hidream_o1
 import comfy.text_encoders.sensenova
 import comfy.text_encoders.pixeldit
+import comfy.text_encoders.moss_image
+import comfy.text_encoders.fibo2
 
 from . import supported_models_base
 from . import latent_formats
@@ -2033,6 +2035,67 @@ class Krea2(supported_models_base.BASE):
         hunyuan_detect = comfy.text_encoders.hunyuan_video.llama_detect(state_dict, "{}qwen3vl_4b.transformer.".format(pref))
         return supported_models_base.ClipTarget(comfy.text_encoders.krea2.Krea2Tokenizer, comfy.text_encoders.krea2.te(**hunyuan_detect))
 
+class MOSSImage(supported_models_base.BASE):
+    unet_config = {
+        "image_model": "moss_image",
+    }
+
+    sampling_settings = {
+        "multiplier": 1.0,
+        "shift": 5.0,
+    }
+
+    memory_usage_factor = 14.6
+
+    unet_extra_config = {}
+    latent_format = latent_formats.Flux2
+
+    supported_inference_dtypes = [torch.bfloat16, torch.float32]
+
+    vae_key_prefix = ["vae."]
+    text_encoder_key_prefix = ["text_encoders."]
+
+    def process_unet_state_dict(self, state_dict):
+        state_dict.pop("rope.bands", None)
+        return state_dict
+
+    def get_model(self, state_dict, prefix="", device=None):
+        out = model_base.MOSSImage(self, device=device)
+        return out
+
+    def clip_target(self, state_dict={}):
+        pref = self.text_encoder_key_prefix[0]
+        hunyuan_detect = comfy.text_encoders.hunyuan_video.llama_detect(state_dict, "{}qwen35_9b.transformer.".format(pref))
+        return supported_models_base.ClipTarget(comfy.text_encoders.moss_image.MOSSImageTokenizer, comfy.text_encoders.moss_image.te(**hunyuan_detect))
+
+class Fibo2(supported_models_base.BASE):
+    unet_config = {
+        "image_model": "fibo2",
+    }
+
+    sampling_settings = {
+        "shift": 1.15,
+    }
+
+    memory_usage_factor = 17.0
+
+    unet_extra_config = {}
+    latent_format = latent_formats.Flux2
+
+    supported_inference_dtypes = [torch.bfloat16, torch.float32]
+
+    vae_key_prefix = ["vae."]
+    text_encoder_key_prefix = ["text_encoders."]
+
+    def get_model(self, state_dict, prefix="", device=None):
+        out = model_base.Fibo2(self, device=device)
+        return out
+
+    def clip_target(self, state_dict={}):
+        pref = self.text_encoder_key_prefix[0]
+        hunyuan_detect = comfy.text_encoders.hunyuan_video.llama_detect(state_dict, "{}qwen3vl_4b.transformer.".format(pref))
+        return supported_models_base.ClipTarget(comfy.text_encoders.fibo2.Fibo2Tokenizer, comfy.text_encoders.fibo2.te(**hunyuan_detect))
+
 class MageFlow(supported_models_base.BASE):
     unet_config = {
         "image_model": "mage_flow",
@@ -2356,6 +2419,21 @@ class YuE2(supported_models_base.BASE):
         return supported_models_base.ClipTarget(comfy.text_encoders.yue2.YuE2Tokenizer, comfy.text_encoders.yue2.te(**detect))
 
 
+class YingMusic(supported_models_base.BASE):
+    unet_config = {"audio_model": "yingmusic"}
+    unet_extra_config = {}
+    latent_format = latent_formats.StableAudio1
+    supported_inference_dtypes = [torch.float32, torch.bfloat16]
+    sampling_settings = {"multiplier": 1.0}
+    memory_usage_factor = 4.0
+
+    def get_model(self, state_dict, prefix="", device=None):
+        return model_base.YingMusic(self, device=device)
+
+    def model_type(self, state_dict, prefix=""):
+        return model_base.ModelType.FLOW
+
+
 class MiniMaxMusic3(supported_models_base.BASE):
     unet_config = {
         "audio_model": "minimax_music3",
@@ -2593,7 +2671,23 @@ class CogVideoX_Inpaint(CogVideoX_T2V):
         return out
 
 
+
+class AuK(supported_models_base.BASE):
+    unet_config = {"audio_model": "auk_flash"}
+    unet_extra_config = {}
+    latent_format = latent_formats.AuK
+    sampling_settings = {"shift": 1.0, "multiplier": 1.0}
+    supported_inference_dtypes = [torch.bfloat16, torch.float32]
+
+    def __init__(self, unet_config):
+        super().__init__(unet_config)
+        self.unet_config.pop("audio_model")
+
+    def get_model(self, state_dict, prefix="", device=None):
+        return model_base.AuK(self, device=device)
+
 models = [
+    AuK,
     LotusD,
     Stable_Zero123,
     SD15_instructpix2pix,
@@ -2676,6 +2770,7 @@ models = [
     ACEStep15,
     MiniMaxMusic3,
     YuE2,
+    YingMusic,
     Omnigen2,
     Boogu,
     MageFlow,
@@ -2684,6 +2779,8 @@ models = [
     JoyImage,
     Ideogram4,
     Krea2,
+    MOSSImage,
+    Fibo2,
     Flux2,
     Flux3,
     Lens,

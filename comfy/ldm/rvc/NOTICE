@@ -1,0 +1,11 @@
+RVC generator inference adapted from IAHispano/Applio, commit
+5379cf261fa7d8085c3b077aa42dabca7c85310b, MIT license (LICENSE).
+Applio builds on RVC, VITS and HiFi-GAN. Upstream references:
+https://github.com/IAHispano/Applio
+https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI
+https://github.com/jaywalnut310/vits
+https://github.com/jik876/hifi-gan
+HuBERT/ContentVec uses ComfyUI's existing Wav2Vec2 layers, with offline
+Applio checkpoint packaging; see https://github.com/auspicious3000/contentvec.
+RMVPE reuses comfy/soulx_singer/pitch.py and its existing license notices.
+Model weights have separate terms; no voice weights are included in this source.

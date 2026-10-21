@@ -1,0 +1,659 @@
+{
+  "date": "2026-10-18",
+  "base_commit": "a3d3d379481bacb448a12a22c386cde27c0d2f48",
+  "evidence_root": "/home/jack/services/runtime/soulx-singer-validation",
+  "conversion": {
+    "manifest": "/home/jack/models/soulx_singer.manifest.json",
+    "outputs": {
+      "diffusion_models/soulx_singer_svs.safetensors": {
+        "sha256": "391520b3be1a00d31e16eca17980ad0aa3ed09d5e66bb8350e9d73b3b86759b7",
+        "bytes": 1797972912,
+        "tensors": 306,
+        "round_trip": "all tensors bit-exact"
+      },
+      "vae/soulx_singer_svs_vocos.safetensors": {
+        "sha256": "629467608e422cc4d4e55185a2a50e9209a36e113533bf5d931adc30cffefa2a",
+        "bytes": 1020206496,
+        "tensors": 279,
+        "round_trip": "all tensors bit-exact"
+      },
+      "diffusion_models/soulx_singer_svc.safetensors": {
+        "sha256": "269b035a640f9149444523900dcdd899e1afc7f270cf7e47e621314e865895d8",
+        "bytes": 1773859720,
+        "tensors": 263,
+        "round_trip": "all tensors bit-exact"
+      },
+      "vae/soulx_singer_svc_vocos.safetensors": {
+        "sha256": "71800e474e4d9267fbe73219e738ddaa857c38ef264253a2199b07b7c2fe8f6d",
+        "bytes": 1020206496,
+        "tensors": 279,
+        "round_trip": "all tensors bit-exact"
+      },
+      "audio_encoders/soulx_singer_whisper_base.safetensors": {
+        "sha256": "d4380afd9b9a1da45ee1de1af65190f6032e5cce5bf4fca006ac5a64b0f6ebc8",
+        "bytes": 82371880,
+        "tensors": 97,
+        "round_trip": "all tensors bit-exact"
+      },
+      "audio_encoders/soulx_singer_rmvpe.safetensors": {
+        "sha256": "28f091bbaba99beb4ba7f2b29465f40075f3e557f34fc6766d553bc4cb947354",
+        "bytes": 181298402,
+        "tensors": 742,
+        "round_trip": "all tensors bit-exact"
+      },
+      "audio_encoders/soulx_singer_karaoke.safetensors": {
+        "sha256": "b859d7cccee59d8ae09ac3a8793a3ec9a2dba6f134e41f8e18402b23f8b08cb8",
+        "bytes": 1718797640,
+        "tensors": 1044,
+        "round_trip": "all tensors bit-exact"
+      },
+      "audio_encoders/soulx_singer_dereverb.safetensors": {
+        "sha256": "659dae892ee223a04fa4323c367faa887af8a3948b6fbfeb77d448fb8d5634bf",
+        "bytes": 912895584,
+        "tensors": 684,
+        "round_trip": "all tensors bit-exact"
+      }
+    },
+    "fidelity": "All exported tensors bit-exact; strict native loads passed for all eight components; original storage precision preserved."
+  },
+  "environment": {
+    "native_python": "3.13.16",
+    "torch": "2.14.1+cu130",
+    "comfy_kitchen": "0.2.37",
+    "comfy_aimdo": "0.5.6",
+    "gpu": "NVIDIA RTX 5090",
+    "reference_python": "3.12",
+    "reference_transformers": "4.41.2",
+    "reference_torchaudio": "2.11.0+cu130",
+    "reference_dependencies": "/home/jack/services/runtime/soulx-singer-validation/reference-vendor",
+    "serving_packages_modified": false
+  },
+  "checks": {
+    "command": "OMP_NUM_THREADS=1 python -m pytest tests-unit/comfy_test/soulx_singer_test.py tests-unit/comfy_test/yingmusic_test.py tests-unit/comfy_test/test_prefetch_recovery.py tests-unit/comfy_test/test_pinned_memory_recovery.py tests-unit/comfy_test/audio_flamingo_test.py -q",
+    "passed": 42,
+    "skipped": 3,
+    "skip_reason": "CUDA-only recovery checks in CPU invocation; actual GPU lifecycle tested separately.",
+    "compileall": "passed",
+    "ruff": "not installed; not run",
+    "setup": "Task worktree --soulx passed twice without modifying tracked files.",
+    "fresh_setup": "Commit 26718ef463f8ff72f828f85c527fbaeb1ad686ef in a fresh linked worktree: setup --soulx twice, tracked files unchanged; focused checks 42 passed / 3 skipped. Same checks pass after main fast-forward."
+  },
+  "parity": {
+    "native-cpu-32step-final": {
+      "settings": {
+        "upstream": "/home/jack/models/audio-sources/SoulX-Singer-81aeb3ae772c70093c3de74dc23c92d983801ae4",
+        "models": "/home/jack/models/audio-sources/SoulX-Singer",
+        "output": "/home/jack/services/runtime/soulx-singer-validation/upstream-cpu-32step",
+        "device": "cpu",
+        "precision": "float32",
+        "control": "melody",
+        "seed": 421,
+        "steps": 32,
+        "seconds": 76.61239135399228,
+        "torch": "2.14.1+cu130",
+        "torchaudio": "2.11.0+cu130",
+        "source_revision": "81aeb3ae772c70093c3de74dc23c92d983801ae4",
+        "input": "upstream English fixture"
+      },
+      "seconds": 78.82269353000447,
+      "device": "cpu",
+      "metrics": {
+        "reference_mel": {
+          "max_abs": 0.0,
+          "rmse": 0.0,
+          "relative_rmse": 0.0,
+          "atol": 2e-06,
+          "rtol": 1e-05,
+          "passed": true
+        },
+        "generated_mel": {
+          "max_abs": 2.9653310775756836e-06,
+          "rmse": 3.751289057163376e-07,
+          "relative_rmse": 5.081841436549439e-07,
+          "atol": 0.0002,
+          "rtol": 0.002,
+          "passed": true
+        },
+        "waveform": {
+          "max_abs": 0.00026647746562957764,
+          "rmse": 1.1187897143827286e-05,
+          "relative_rmse": 5.807456182083115e-05,
+          "atol": 0.001,
+          "rtol": 0.01,
+          "passed": true
+        }
+      }
+    },
+    "native-svc-cpu-32step": {
+      "settings": {
+        "upstream": "/home/jack/models/audio-sources/SoulX-Singer-81aeb3ae772c70093c3de74dc23c92d983801ae4",
+        "models": "/home/jack/models/audio-sources/SoulX-Singer",
+        "output": "/home/jack/services/runtime/soulx-singer-validation/upstream-svc-cpu-32step",
+        "device": "cpu",
+        "precision": "float32",
+        "control": "melody",
+        "seed": 421,
+        "steps": 32,
+        "task": "svc",
+        "whisper_source": "/home/jack/models/audio-sources/SoulX-Whisper-base",
+        "seconds": 84.93742861101055,
+        "torch": "2.14.1+cu130",
+        "torchaudio": "2.11.0+cu130",
+        "source_revision": "81aeb3ae772c70093c3de74dc23c92d983801ae4",
+        "input": "upstream English fixture"
+      },
+      "seconds": 78.1186182500096,
+      "device": "cpu",
+      "metrics": {
+        "reference_mel": {
+          "max_abs": 0.0,
+          "rmse": 0.0,
+          "relative_rmse": 0.0,
+          "atol": 2e-06,
+          "rtol": 1e-05,
+          "passed": true
+        },
+        "generated_mel": {
+          "max_abs": 3.814697265625e-06,
+          "rmse": 6.339908509289671e-07,
+          "relative_rmse": 8.254659746853577e-07,
+          "atol": 0.0002,
+          "rtol": 0.002,
+          "passed": true
+        },
+        "waveform": {
+          "max_abs": 0.00014486908912658691,
+          "rmse": 5.509743004949996e-06,
+          "relative_rmse": 2.8502206987468526e-05,
+          "atol": 0.001,
+          "rtol": 0.01,
+          "passed": true
+        }
+      }
+    },
+    "native-cpu-2step-v2": {
+      "settings": {
+        "upstream": "/home/jack/models/audio-sources/SoulX-Singer-81aeb3ae772c70093c3de74dc23c92d983801ae4",
+        "models": "/home/jack/models/audio-sources/SoulX-Singer",
+        "output": "/home/jack/services/runtime/soulx-singer-validation/upstream-cpu-2step",
+        "device": "cpu",
+        "precision": "float32",
+        "control": "melody",
+        "seed": 421,
+        "steps": 2,
+        "seconds": 5.457475788003649,
+        "torch": "2.14.1+cu130",
+        "torchaudio": "2.11.0+cu130",
+        "source_revision": "81aeb3ae772c70093c3de74dc23c92d983801ae4",
+        "input": "upstream English fixture"
+      },
+      "seconds": 5.166869042004691,
+      "device": "cpu",
+      "metrics": {
+        "reference_mel": {
+          "max_abs": 0.0,
+          "rmse": 0.0,
+          "relative_rmse": 0.0,
+          "atol": 2e-06,
+          "rtol": 1e-05,
+          "passed": true
+        },
+        "generated_mel": {
+          "max_abs": 1.1920928955078125e-05,
+          "rmse": 1.85174178568559e-06,
+          "relative_rmse": 3.0191863515938167e-06,
+          "atol": 0.0002,
+          "rtol": 0.002,
+          "passed": true
+        },
+        "waveform": {
+          "max_abs": 2.5451183319091797e-05,
+          "rmse": 1.95591087503999e-06,
+          "relative_rmse": 1.7688822481432e-05,
+          "atol": 0.001,
+          "rtol": 0.01,
+          "passed": true
+        }
+      }
+    },
+    "native-svc-cpu-2step-v2": {
+      "settings": {
+        "upstream": "/home/jack/models/audio-sources/SoulX-Singer-81aeb3ae772c70093c3de74dc23c92d983801ae4",
+        "models": "/home/jack/models/audio-sources/SoulX-Singer",
+        "output": "/home/jack/services/runtime/soulx-singer-validation/upstream-svc-cpu-2step",
+        "device": "cpu",
+        "precision": "float32",
+        "control": "melody",
+        "seed": 421,
+        "steps": 2,
+        "task": "svc",
+        "whisper_source": "/home/jack/models/audio-sources/SoulX-Whisper-base",
+        "seconds": 5.901627140992787,
+        "torch": "2.14.1+cu130",
+        "torchaudio": "2.11.0+cu130",
+        "source_revision": "81aeb3ae772c70093c3de74dc23c92d983801ae4",
+        "input": "upstream English fixture"
+      },
+      "seconds": 6.669446341009461,
+      "device": "cpu",
+      "metrics": {
+        "reference_mel": {
+          "max_abs": 0.0,
+          "rmse": 0.0,
+          "relative_rmse": 0.0,
+          "atol": 2e-06,
+          "rtol": 1e-05,
+          "passed": true
+        },
+        "generated_mel": {
+          "max_abs": 2.09808349609375e-05,
+          "rmse": 2.0444604160729796e-06,
+          "relative_rmse": 2.754049546638271e-06,
+          "atol": 0.0002,
+          "rtol": 0.002,
+          "passed": true
+        },
+        "waveform": {
+          "max_abs": 0.0020540356636047363,
+          "rmse": 7.833370182197541e-05,
+          "relative_rmse": 0.00042147355270572007,
+          "atol": 0.001,
+          "rtol": 0.01,
+          "passed": false
+        }
+      }
+    }
+  },
+  "preprocessing_parity": {
+    "pitch_hz_max_abs": 0.00037405810428481345,
+    "separation_max_abs": 9.275972843170166e-07,
+    "separation_rmse": 1.3620903871469636e-07
+  },
+  "gpu_queue": {
+    "candidate_port": 8189,
+    "isolated_input_output": true,
+    "dynamic_vram_and_memory_compiler": true,
+    "attention": "Comfy Kitchen selected attention",
+    "runs": [
+      {
+        "name": "v5-queue-after-cancel",
+        "prompt_id": "363cc064-5a80-4ca9-a99e-1c5fd6b3802c",
+        "seconds": 1.287491126000532,
+        "peak_driver_mib": 5147,
+        "status": "success",
+        "cached_nodes": [
+          [
+            "1",
+            "2"
+          ]
+        ]
+      },
+      {
+        "name": "v5-queue-cancel",
+        "prompt_id": "79645a98-7365-48f5-a210-7235a7bcdad4",
+        "seconds": 2.5901898029987933,
+        "peak_driver_mib": 4445,
+        "status": "error",
+        "cached_nodes": [
+          []
+        ]
+      },
+      {
+        "name": "v5-queue-svc-fp32",
+        "prompt_id": "5c5e5884-bde6-4862-a9f7-33cc0239af85",
+        "seconds": 4.213135700003477,
+        "peak_driver_mib": 5435,
+        "status": "success",
+        "cached_nodes": [
+          [
+            "2"
+          ]
+        ]
+      },
+      {
+        "name": "v5-queue-svs-fp16",
+        "prompt_id": "f60831e0-7df2-4275-87d8-11e64277ba23",
+        "seconds": 2.8916979519999586,
+        "peak_driver_mib": 5371,
+        "status": "success",
+        "cached_nodes": [
+          [
+            "2"
+          ]
+        ]
+      },
+      {
+        "name": "v5-queue-svs-fp32",
+        "prompt_id": "fc52391d-4464-41db-80af-e75e3c30fed7",
+        "seconds": 3.152371749994927,
+        "peak_driver_mib": 5370,
+        "status": "success",
+        "cached_nodes": [
+          []
+        ]
+      },
+      {
+        "name": "v5-queue-svs-intervening-seed",
+        "prompt_id": "68fe9aaf-9cea-4877-9400-2b96c18f0925",
+        "seconds": 0.9619468820019392,
+        "peak_driver_mib": 5442,
+        "status": "success",
+        "cached_nodes": [
+          [
+            "1",
+            "2"
+          ]
+        ]
+      },
+      {
+        "name": "v5-queue-svs-reload",
+        "prompt_id": "bcf86381-89cc-4824-86d3-a638a7693d29",
+        "seconds": 3.5358833909995155,
+        "peak_driver_mib": 5246,
+        "status": "success",
+        "cached_nodes": [
+          []
+        ]
+      },
+      {
+        "name": "v5-queue-svs-repeat",
+        "prompt_id": "e98afaab-f66c-4f43-a2a1-dea85a81845a",
+        "seconds": 0.9622654429986142,
+        "peak_driver_mib": 5442,
+        "status": "success",
+        "cached_nodes": [
+          [
+            "1",
+            "2"
+          ]
+        ]
+      },
+      {
+        "name": "v5-queue-svs-score",
+        "prompt_id": "d29a765e-de3b-4548-8ff1-953fb503675e",
+        "seconds": 0.9614433500100859,
+        "peak_driver_mib": 5439,
+        "status": "success",
+        "cached_nodes": [
+          [
+            "1",
+            "2"
+          ]
+        ]
+      }
+    ],
+    "uncached_same_seed_repeat": {
+      "synthesis_node_3_not_cached": true,
+      "saved_waveform_bit_exact": true,
+      "max_abs_error": 0.0
+    },
+    "compiler_rogues_latest_suite": 0,
+    "compiler_graph_breaks": "SVS/Vocos 2; SVC/Whisper/Vocos 3; retained logs.",
+    "cancellation": "1000-step request interrupted after >2 seconds; terminal receipt within 2.59 seconds of submission, then successful normal generation.",
+    "gpu_hold": "Fresh task-owned RuntimeHost hold; serving queue monitored; exact hold released after every window."
+  },
+  "reference_song": {
+    "source": {
+      "source": "/home/jack/Documents/David B - Let It Be/source/let-it-be-album.wav",
+      "source_sha256": "7c3103128a7c42a4036f0a3cfe8abc16403bb938e9a4c0d83b176b7a885f7b93",
+      "start": 11.55,
+      "end": 24.45,
+      "output": "/home/jack/services/runtime/soulx-singer-validation/candidate/input/reference-song-excerpt.wav",
+      "sha256": "c783c27d28a99f643b1f9b0328d02e4aefedd41a2b22ed316439cac5c7ddbb64",
+      "timing": "existing read-only Whisper result; approximate words, not forced phoneme alignment"
+    },
+    "replacement": "When I find myself in times of trouble | Blue Fig's books come after me | Nasally words of wisdom | David B",
+    "read_only_project_changed": false,
+    "short_reference_default32_manual_word_timing": {
+      "alignment": "same 50 Hz grid, same zero-time reference/output placement; no free time offset",
+      "direct": {
+        "joint_voiced_frames": 437,
+        "median_abs_cents": 8.764929056379735,
+        "p95_abs_cents": 50.52111375965403,
+        "within_50_cents": 0.9473684210526315,
+        "within_100_cents": 0.9908466819221968
+      },
+      "voicing_precision": 0.9776286353467561,
+      "voicing_recall": 0.9954441913439636,
+      "dtw_300ms": {
+        "joint_voiced_frames": 446,
+        "median_abs_cents": 8.596905554577111,
+        "p95_abs_cents": 56.43215362181604,
+        "within_50_cents": 0.9417040358744395,
+        "within_100_cents": 0.9820627802690582,
+        "max_abs_warp_seconds": 0.08,
+        "mean_abs_warp_seconds": 0.0014984709480122325
+      },
+      "mix": {
+        "path": "/home/jack/services/runtime/soulx-singer-validation/candidate/output/soulx/david-b-excerpt-mix_00003.flac",
+        "sample_rate": 44100,
+        "seconds": 12.9,
+        "channels": 2,
+        "finite": true,
+        "sample_peak": 0.676116943359375,
+        "rms": 0.07588373869657516
+      },
+      "generated_lead": {
+        "path": "/home/jack/services/runtime/soulx-singer-validation/candidate/output/soulx/david-b-excerpt-lead_00003.flac",
+        "sample_rate": 24000,
+        "seconds": 12.9,
+        "channels": 1,
+        "finite": true,
+        "sample_peak": 0.675445556640625,
+        "rms": 0.06534616649150848
+      },
+      "reference_lead": {
+        "path": "/home/jack/services/runtime/soulx-singer-validation/candidate/output/soulx/david-b-excerpt-reference-lead_00003.flac",
+        "sample_rate": 44100,
+        "seconds": 12.9,
+        "channels": 2,
+        "finite": true,
+        "sample_peak": 0.379180908203125,
+        "rms": 0.048257943242788315
+      },
+      "accompaniment": {
+        "path": "/home/jack/services/runtime/soulx-singer-validation/candidate/output/soulx/david-b-excerpt-accompaniment_00003.flac",
+        "sample_rate": 44100,
+        "seconds": 12.9,
+        "channels": 2,
+        "finite": true,
+        "sample_peak": 0.268585205078125,
+        "rms": 0.03841666132211685
+      },
+      "subjective_listening": "not performed",
+      "singer_identity": "not measured with a validated speaker-identity model"
+    },
+    "complete_25_node_graph": {
+      "receipt": {
+        "prompt_id": "a81c5339-05a9-466d-b7a3-1165931817eb",
+        "seconds": 19.49320644099498,
+        "peak_driver_mib": 7775,
+        "status": {
+          "status_str": "success",
+          "completed": true,
+          "messages": [
+            [
+              "execution_start",
+              {
+                "prompt_id": "a81c5339-05a9-466d-b7a3-1165931817eb",
+                "timestamp": 1792347834699
+              }
+            ],
+            [
+              "execution_cached",
+              {
+                "nodes": [],
+                "prompt_id": "a81c5339-05a9-466d-b7a3-1165931817eb",
+                "timestamp": 1792347834705
+              }
+            ],
+            [
+              "execution_success",
+              {
+                "prompt_id": "a81c5339-05a9-466d-b7a3-1165931817eb",
+                "timestamp": 1792347853617
+              }
+            ]
+          ]
+        }
+      },
+      "metrics": {
+        "alignment": "same 50 Hz grid, same zero-time reference/output placement; no free time offset",
+        "direct": {
+          "joint_voiced_frames": 438,
+          "median_abs_cents": 8.948398976442832,
+          "p95_abs_cents": 60.28054356078485,
+          "within_50_cents": 0.9315068493150684,
+          "within_100_cents": 0.9885844748858448
+        },
+        "voicing_precision": 0.9733333333333334,
+        "voicing_recall": 0.9977220956719818,
+        "dtw_300ms": {
+          "joint_voiced_frames": 451,
+          "median_abs_cents": 8.643035387410718,
+          "p95_abs_cents": 60.32443972102618,
+          "within_50_cents": 0.9334811529933481,
+          "within_100_cents": 0.9822616407982262,
+          "max_abs_warp_seconds": 0.08,
+          "mean_abs_warp_seconds": 0.0020364741641337386
+        },
+        "mix": {
+          "path": "/home/jack/services/runtime/soulx-singer-validation/candidate/output/soulx/full-graph-lyric-replacement-mix_00001.flac",
+          "sample_rate": 44100,
+          "seconds": 12.9,
+          "channels": 2,
+          "finite": true,
+          "sample_peak": 0.6578369140625,
+          "rms": 0.07546541094779968
+        },
+        "generated_lead": {
+          "path": "/home/jack/services/runtime/soulx-singer-validation/candidate/output/soulx/full-graph-lyric-replacement-lead_00001.flac",
+          "sample_rate": 24000,
+          "seconds": 12.9,
+          "channels": 1,
+          "finite": true,
+          "sample_peak": 0.65838623046875,
+          "rms": 0.0648268461227417
+        },
+        "reference_lead": {
+          "path": "/home/jack/services/runtime/soulx-singer-validation/candidate/output/soulx/david-b-excerpt-reference-lead_00003.flac",
+          "sample_rate": 44100,
+          "seconds": 12.9,
+          "channels": 2,
+          "finite": true,
+          "sample_peak": 0.379180908203125,
+          "rms": 0.048257943242788315
+        },
+        "accompaniment": {
+          "path": "/home/jack/services/runtime/soulx-singer-validation/candidate/output/soulx/david-b-excerpt-accompaniment_00003.flac",
+          "sample_rate": 44100,
+          "seconds": 12.9,
+          "channels": 2,
+          "finite": true,
+          "sample_peak": 0.268585205078125,
+          "rms": 0.03841666132211685
+        },
+        "subjective_listening": "not performed",
+        "singer_identity": "not measured with a validated speaker-identity model"
+      },
+      "prompt": "/home/jack/services/runtime/soulx-singer-validation/full-graph-prompt.json",
+      "history": "/home/jack/services/runtime/soulx-singer-validation/v5-full-reference-song-graph-history.json"
+    },
+    "blind_asr": {
+      "english-fixture": {
+        "status": "success",
+        "transcript": "Who says you're not pretty? Who says you're not beautiful? Who says?"
+      },
+      "excerpt-generated": {
+        "status": "success",
+        "transcript": "When I find myself in times of trouble, Mother Mary comes to me, speaking words of wisdom, let it be."
+      },
+      "excerpt-syllables": {
+        "status": "success",
+        "transcript": "When I find myself in times of trouble, Mother Mary comes to me, speaking words of wisdom, let it be."
+      },
+      "excerpt-short-reference": {
+        "status": "success",
+        "transcript": "When I find myself in times of trouble Face bomb after me ace I'll see you off with some from David B"
+      },
+      "excerpt-guidance5": {
+        "status": "success",
+        "transcript": "When I find myself in times of trouble Facebook after me ace I'll see you off with some David B"
+      },
+      "excerpt-guidance8": {
+        "status": "success",
+        "transcript": "When I find myself in times of trouble I'm after me I'll see a word with David B"
+      },
+      "full-graph": {
+        "status": "success",
+        "transcript": "When I find myself in times of trouble Facebook after me ace I'll see you off with some from David B"
+      }
+    },
+    "gates": {
+      "lyrics_pronunciation": "FAILED for replacement excerpt: whole-passage reference copied old lyrics; short reference changes words but several requested words are misheard. Guidance 5/64 and 8/32 did not resolve this. Controlled upstream fixture wording broadly matches requested lyrics.",
+      "pitch": "Joint voicing mask, direct same-time grid plus separately reported bounded DTW. Complete graph direct median 8.95 cents, p95 60.28 cents, 93.15% within 50 cents. Not evidence of lyric correctness.",
+      "syllable_note_timing": "Explicit estimated/editable rows preserve placement. ASR times are not forced phoneme alignment; timing quality NOT accepted due lyric errors. No waveform stretching.",
+      "singer_timbre": "NOT verified with human listening or validated speaker comparison.",
+      "artifacts_joins_mix": "Finite, no sample clipping and exact 12.9-second placement in draft. Subjective artifacts, backing leakage and full-song joins NOT verified."
+    }
+  },
+  "workflows": {
+    "versioned": "examples/soulx_singer",
+    "editable_library": "/home/jack/comfyui/user/default/workflows/SoulX-Singer",
+    "layout": "All three pass owned layout checker; API/editor node/link sets agree.",
+    "full_graph_execution": "25-node graph passes actual queue including both existing offline CPU ASR calls; wording gate separately fails."
+  },
+  "guidance": {
+    "comfyui_shared_skill": {
+      "commit": "e9f8cfa16da4298e8e00b0312e25baebdea552a9",
+      "status": "Integrated /home/jack/skills main; discovery reconciled and doctor passed; no remote configured. Declared docs scope deferred canonical graph maintenance.",
+      "acceptance_update_commit": "26414341cfc2bcc4f753015c32cb57d423573622"
+    },
+    "model_runtimes": {
+      "commit": "43f3a800cdd4e0740005cfad3bc7bb40cd9940ac",
+      "branch": "soulx-singer-native-guidance",
+      "task_id": "soulx-singer-native-guidance-6516e6da",
+      "status": "Verified and branch pushed; owner blocks integration with SERVING_CHECKOUT_BUSY for runtime-host.service. No service restart."
+    }
+  },
+  "graph": {
+    "initial_exact_checkout": "Complete before implementation: 1291 files, 35750 nodes, 77450 edges.",
+    "refresh": "Owner refused three refresh attempts: Candidate analysis lacks a complete authenticated database and receipt. Prior complete graph preserved; no forced rebuild or source exclusion.",
+    "jobs": [
+      "1e588eb1-059b-46ae-8bfe-b230a24e708c",
+      "61de7922-44ae-4256-ba49-a9105dbf2491",
+      "22fbb1ae-3a4b-49d4-925c-37c11a84fe30"
+    ],
+    "detect_changes": "Exact repo/worktree scope all: 29 changed files, 5 prior indexed symbols, zero reported affected processes. Stale graph lacks new-source coverage; low risk result is not full safety evidence.",
+    "fresh_committed_code": {
+      "job": "8bdad565-a5fc-4b1c-abdc-98388b077e66",
+      "commit": "26718ef463f8ff72f828f85c527fbaeb1ad686ef",
+      "status": "complete current authenticated graph, 1316 files / 35961 nodes / 77955 edges; zero embeddings or model requests; owner index_reuse refreshed the task index from this exact committed sibling."
+    },
+    "final_cumulative_review": {
+      "changed_symbols": 184,
+      "affected_processes": 23,
+      "risk_label": "critical (size of added model integration)",
+      "review": "Reviewed complete new source and one-line builtin registration. Reported flows are model loading, tensor/archive readers and selected-device/allocator helpers used by new nodes and parity checker; no existing shared-owner implementation changed. Strict model loads, CPU parity, recovery tests and actual GPU queue cover these paths. Graph process enumeration is bounded and not complete proof of all callers."
+    },
+    "canonical_pending": {
+      "job": "8de43437-f674-4b7d-a7df-58592b2db177",
+      "status": "Owner validation-refused, previous graph preserved. Exact sibling reuse to canonical refused relevant pre-existing source drift (cpp-header/coverage). Ordinary canonical ensure also refused authenticated publication. Retain exact committed task graph; do not exclude unrelated source or force rebuild."
+    }
+  },
+  "limits": [
+    "Short-clip Linux CPU and RTX 5090 coverage only. BF16, other devices, low-VRAM capacity and full songs not accepted.",
+    "Explicit Cantonese metadata supported; automatic Cantonese G2P not supplied. English homographs/names need correction.",
+    "One scalar F0 describes a monophonic lead; harmony leakage and separate singer stems need review.",
+    "Failed two-step SVC waveform comparison retained; default 32-step parity passes without tolerance changes.",
+    "Serving 8188 was not restarted. Isolated candidate stopped and task GPU hold released."
+  ],
+  "delivery": {
+    "implementation_commit": "26718ef463f8ff72f828f85c527fbaeb1ad686ef",
+    "branch": "soulx-singer-native",
+    "integration": "Fast-forward into main; focused checks pass; personal/main and task branch pushed. This follow-up only records final verification evidence.",
+    "serving_activation": "Not performed; existing process remains running with its prior imported inventory. Candidate stopped and GPU hold released.",
+    "runtime_guidance_integration": "Pending owner idle-window guard; committed/pushed branch retained.",
+    "cleanup": "Canonical graph publication remains blocked; exact source graph/worktree retained for recovery."
+  }
+}

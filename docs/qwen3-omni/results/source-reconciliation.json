@@ -1,0 +1,13 @@
+{
+  "source_revision": "0ed3aa2b00eeedbb0d38b6d4738f506af759213b",
+  "verified_files": 15,
+  "verified_tensors": 65880,
+  "all_shapes_and_dtypes_match": true,
+  "metadata_reconciliation": {
+    "declared_payload_bytes": 25850817744,
+    "actual_payload_bytes": 25850816336,
+    "size_matches": false,
+    "correction_bytes": -1408,
+    "reason": "Pinned publisher index aggregate is stale; every source file hash and every expected tensor matches."
+  }
+}

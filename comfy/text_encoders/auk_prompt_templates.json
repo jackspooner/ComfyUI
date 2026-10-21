@@ -1,0 +1,611 @@
+{
+  "upstream_revision": "9481474f107ee4d8dec959b3aed05b0627cebbf8",
+  "license": "MIT",
+  "tasks": {
+    "content_edit": {
+      "needs_audio": true,
+      "description": "改「说了什么」的文字内容，声音/音色不变，需要输入语音。 Use for: 可逐字落到 插入/删除/替换 的确切内容改动（把'今天'改成'明天'、删掉'那个'、在'你好'后加'呀'）；删除时若目标词在音频里多处出现，用锚点定位删的是锚点前(delete_before)还是锚点后(delete_after)的那个，如\"删掉'谢谢'后面那个'再见'\"→delete_after(anchor=谢谢, target=再见)。 Do NOT use: 风格/音色/情感/语速改动、改写润色翻译；一句里多处同时编辑须拆成多步（本模型单条只表达一个编辑意图）。 vs vocal_edit: content_edit 针对普通说话录音；vocal_edit 针对歌唱录音的歌词。 Example: 把'今天下午开会'改成'明天上午开会' -> subtype=replace, orig=今天下午开会, new=明天上午开会。\n",
+      "subtypes": [
+        "insert_before",
+        "insert_after",
+        "delete",
+        "delete_before",
+        "delete_after",
+        "replace"
+      ],
+      "params": [
+        {
+          "name": "anchor",
+          "type": "string",
+          "required_for": [
+            "insert_before",
+            "insert_after",
+            "delete_before",
+            "delete_after"
+          ]
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required_for": [
+            "insert_before",
+            "insert_after"
+          ]
+        },
+        {
+          "name": "target",
+          "type": "string",
+          "required_for": [
+            "delete",
+            "delete_before",
+            "delete_after"
+          ]
+        },
+        {
+          "name": "orig",
+          "type": "string",
+          "required_for": [
+            "replace"
+          ]
+        },
+        {
+          "name": "new",
+          "type": "string",
+          "required_for": [
+            "replace"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "content_scaled"
+      },
+      "templates": {
+        "zh": {
+          "insert_before": "在‘{anchor}’前面加上‘{text}’",
+          "insert_after": "在‘{anchor}’后面加上‘{text}’",
+          "delete": "删掉‘{target}’",
+          "delete_before": "删掉‘{anchor}’前的‘{target}’",
+          "delete_after": "删掉‘{anchor}’后的‘{target}’",
+          "replace": "把‘{orig}’改成‘{new}’"
+        },
+        "en": {
+          "insert_before": "Add '{text}' before '{anchor}'.",
+          "insert_after": "Add '{text}' after '{anchor}'.",
+          "delete": "Remove '{target}'.",
+          "delete_before": "Remove '{target}' before '{anchor}'.",
+          "delete_after": "Remove '{target}' after '{anchor}'.",
+          "replace": "Replace '{orig}' with '{new}'."
+        }
+      }
+    },
+    "speed_edit": {
+      "needs_audio": true,
+      "description": "调节语速，音色/内容不变，需要输入语音。 Use for: 明确的语速加快/放慢请求。 Do NOT use: 无法安全映射到合法档位的模糊请求（如「更紧凑一点」）；正常语速/1倍/不变属无操作 -> 判不支持。 Example: 说太快了慢一点 -> speed_multiplier=0.75。\n",
+      "params": [
+        {
+          "name": "speed_multiplier",
+          "type": "float",
+          "required": true,
+          "choices": [
+            0.5,
+            0.75,
+            1.25,
+            1.5,
+            2.0
+          ],
+          "normalization_hints": [
+            "慢一点/稍慢 -> 0.75",
+            "慢很多/慢一半 -> 0.5",
+            "快一点/稍快 -> 1.25",
+            "快很多/快一倍/两倍/2倍 -> 2.0",
+            "非法值(如1.8) -> snap 到最近档位(2.0)"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "speed_scaled"
+      },
+      "templates": {
+        "zh": "将语速调整为{speed_multiplier}倍。",
+        "en": "Adjust the speech speed to {speed_multiplier}x."
+      }
+    },
+    "volume_edit": {
+      "needs_audio": true,
+      "description": "调节音量，内容/音色不变，需要输入语音。 Use for: 明确的调大/调小音量请求。 Do NOT use: 0dB/不变属无操作 -> 判不支持；方向由 increase/decrease 决定。 Example: 声音大一点 -> subtype=increase, gain_db=5。\n",
+      "subtypes": [
+        "increase",
+        "decrease"
+      ],
+      "params": [
+        {
+          "name": "gain_db",
+          "type": "int",
+          "required": true,
+          "choices": [
+            5,
+            10,
+            15
+          ],
+          "normalization_hints": [
+            "大声一点/小声一点 -> 5",
+            "大很多/小很多 -> 10 或 15",
+            "非法 dB -> snap 到最近档位"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": {
+          "increase": "将音量升高{gain_db}分贝。",
+          "decrease": "将音量降低{gain_db}分贝。"
+        },
+        "en": {
+          "increase": "Increase the volume by {gain_db} dB.",
+          "decrease": "Decrease the volume by {gain_db} dB."
+        }
+      }
+    },
+    "pitch_edit": {
+      "needs_audio": true,
+      "description": "调节音调（半音），内容/音色不变，需要输入语音。 Use for: 明确的音调升高/降低请求。 Do NOT use: 音色转换/情感转换（那是 voice_edit/emotion_edit）；0 半音/不变属无操作 -> 判不支持。 Example: 声音再低沉一点 -> subtype=decrease, semitones=1。\n",
+      "subtypes": [
+        "increase",
+        "decrease"
+      ],
+      "params": [
+        {
+          "name": "semitones",
+          "type": "int",
+          "required": true,
+          "choices": [
+            1,
+            2,
+            3
+          ],
+          "normalization_hints": [
+            "高一点/尖一点 -> 1",
+            "低一点/低沉一点 -> 1",
+            "高很多/低很多 -> 2 或 3"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": {
+          "increase": "将音调升高{semitones}个半音。",
+          "decrease": "将音调降低{semitones}个半音。"
+        },
+        "en": {
+          "increase": "Raise the pitch by {semitones} semitones.",
+          "decrease": "Lower the pitch by {semitones} semitones."
+        }
+      }
+    },
+    "emotion_edit": {
+      "needs_audio": true,
+      "description": "转换说话情感，内容/音色不变，需要输入语音。 Use for: 显式的情感转换请求，可映射到 8 种合法情感之一。 Do NOT use: 音色克隆/音调升降/措辞编辑；无法映射到 8 种情感 -> 判不支持。 Example: 让他听起来开心点 -> emotion=happy。\n",
+      "params": [
+        {
+          "name": "emotion",
+          "type": "string",
+          "required": true,
+          "choices": [
+            "happy",
+            "angry",
+            "sad",
+            "fearful",
+            "surprised",
+            "disgusted",
+            "calm",
+            "excited"
+          ],
+          "labels": {
+            "happy": {
+              "zh": "开心",
+              "en": "happy"
+            },
+            "angry": {
+              "zh": "愤怒",
+              "en": "angry"
+            },
+            "sad": {
+              "zh": "悲伤",
+              "en": "sad"
+            },
+            "fearful": {
+              "zh": "恐惧",
+              "en": "fearful"
+            },
+            "surprised": {
+              "zh": "惊讶",
+              "en": "surprised"
+            },
+            "disgusted": {
+              "zh": "厌恶",
+              "en": "disgusted"
+            },
+            "calm": {
+              "zh": "平静",
+              "en": "calm"
+            },
+            "excited": {
+              "zh": "兴奋",
+              "en": "excited"
+            }
+          },
+          "normalization_hints": [
+            "开心/高兴/愉快 -> happy；生气/愤怒/恼怒 -> angry；难过/伤心/悲伤 -> sad",
+            "害怕/恐惧 -> fearful；惊讶/吃惊 -> surprised；厌恶/嫌弃/反感 -> disgusted",
+            "平静/冷静/淡定 -> calm；兴奋/激动 -> excited"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "equal_length",
+        "emotion_multipliers": {
+          "sad": 1.22,
+          "fearful": 1.16,
+          "happy": 1.06,
+          "angry": 1.06,
+          "surprised": 1.06,
+          "disgusted": 1.06,
+          "calm": 1.06,
+          "excited": 1.06
+        },
+        "default_emotion_multiplier": 1.06
+      },
+      "templates": {
+        "zh": "将情感转变为{emotion}。",
+        "en": "Change the emotion to {emotion}."
+      }
+    },
+    "enhance_speech": {
+      "needs_audio": true,
+      "description": "语音增强：去噪 + 去混响，保留所有说话人，输出等长干净人声，需要输入语音。 Use for: 降噪/去噪/去底噪/清理杂音/去混响/让声音干净点。 Do NOT use: 只保留某人（separate_speech）、提取歌声（extract_vocals）、带宽/音色/清晰度修复（improve_quality）。 用户显式要求只去噪、只去混响或二者都去时，可抽取 cleanup_mode 选择训练库中的精确 instruction 变体； 未显式要求时不要自行添加，库中无精确变体时渲染侧保持原 instruction。\n",
+      "params": [
+        {
+          "name": "cleanup_mode",
+          "type": "string",
+          "choices": [
+            "denoise",
+            "dereverb",
+            "denoise_dereverb"
+          ],
+          "normalization_hints": [
+            "只说降噪/去噪/去底噪/去杂音 -> denoise",
+            "只说去混响/去回声 -> dereverb",
+            "同时明确说去噪和去混响 -> denoise_dereverb"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": "请清理这段输入语音，不做说话人删除，并去除房间混响，输出干净的人声结果。"
+      }
+    },
+    "separate_speech": {
+      "needs_audio": true,
+      "description": "多说话人里只保留某人，输出等长纯净人声，需要输入语音。 Use for: 只留说某句话的人（by_content）、只保留第 n 个开始说话的人（by_order）。 Do NOT use: 通用降噪、提取歌声、按内容间接指代时先做理解。 用户在说话人选择之外显式要求去噪/去混响时，仍属于本任务支持的 instruction 变体， 抽取 cleanup_mode；未显式要求时不要自行添加，库中无精确变体时渲染侧保持原 instruction。 Example: 只保留第一个说话的人 -> subtype=by_order, n=1。\n",
+      "subtypes": [
+        "by_content",
+        "by_order"
+      ],
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "required_for": [
+            "by_content"
+          ]
+        },
+        {
+          "name": "n",
+          "type": "int",
+          "required_for": [
+            "by_order"
+          ]
+        },
+        {
+          "name": "cleanup_mode",
+          "type": "string",
+          "choices": [
+            "denoise",
+            "dereverb",
+            "denoise_dereverb"
+          ],
+          "normalization_hints": [
+            "只说降噪/去噪/去底噪/去杂音 -> denoise",
+            "只说去混响/去回声 -> dereverb",
+            "同时明确说去噪和去混响 -> denoise_dereverb"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": {
+          "by_content": "请只保留说'{text}'的人，去掉其他说话人，输出等长纯净人声。",
+          "by_order": "这段音频中只保留第{n_zh}个开始说话的人对应的语音，去掉其余说话人。"
+        }
+      }
+    },
+    "extract_vocals": {
+      "needs_audio": true,
+      "description": "从混音中提取歌声或全部人声，需要输入音频。 Use for: 只保留歌唱声、去掉说话与伴奏时选 singing_only；明确要求保留说话+歌声、 只去伴奏时选 all_human_voices。 Do NOT use: 会议里挑某个说话人（separate_speech）、说话录音降噪（enhance_speech）。 Example: 只提取歌唱的声音不要说话 -> subtype=singing_only； 提取所有人声包括说话和歌唱去掉伴奏 -> subtype=all_human_voices。\n",
+      "subtypes": [
+        "singing_only",
+        "all_human_voices"
+      ],
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": {
+          "singing_only": "请只保留歌声，其余声音都去掉。",
+          "all_human_voices": "请保留所有人声，说话和歌唱都算，其余声音都去掉。"
+        },
+        "en": {
+          "singing_only": "Keep only the singing voice, drop everything else.",
+          "all_human_voices": "Keep all human voices, speech and singing alike, drop everything else."
+        }
+      }
+    },
+    "improve_quality": {
+      "needs_audio": true,
+      "description": "音质提升：带宽扩展、去电话/扩音器音色、恢复清晰度，需要输入语音。 Use for: 音质太差/像电话/像扩音器/水下闷声/削波破音/丢包瞬断/直流偏置/提升清晰度/补高频。 Do NOT use: 单纯噪声+混响的「脏」用 enhance_speech；本类针对带宽/音色/清晰度的「闷/糊/电话感」。 用户在带宽扩展或去音色之外显式要求去噪/去混响时，仍属于本任务支持的 instruction 变体， 抽取 cleanup_mode；未显式要求时不要自行添加，库中无精确变体时渲染侧保持原 instruction。 Example: 音质太差像打电话 -> subtype=remove_effect, effect=电话。\n",
+      "subtypes": [
+        "bandwidth_extension",
+        "remove_effect"
+      ],
+      "params": [
+        {
+          "name": "effect",
+          "type": "string",
+          "required_for": [
+            "remove_effect"
+          ]
+        },
+        {
+          "name": "cleanup_mode",
+          "type": "string",
+          "choices": [
+            "denoise",
+            "dereverb",
+            "denoise_dereverb"
+          ],
+          "normalization_hints": [
+            "只说降噪/去噪/去底噪/去杂音 -> denoise",
+            "只说去混响/去回声 -> dereverb",
+            "同时明确说去噪和去混响 -> denoise_dereverb"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": {
+          "bandwidth_extension": "请对这段语音做超分辨率/带宽扩展处理，恢复被削掉的高频成分，输出宽带纯净人声。",
+          "remove_effect": "请消除这段音频的{effect}音色，这段音频带有混响，请恢复成无混响的干声，输出自然清晰的人声。"
+        }
+      }
+    },
+    "instruct_tts": {
+      "needs_audio": false,
+      "description": "用文字描述音色/风格从零合成语音，不依赖参考音频，需要「要念的文本」。 Use for: 用户用文字描述想要的嗓音/风格（「用年轻女生温柔的语气说…」）且给了要念的文本。 Do NOT use: 要克隆某段参考音色（zero_shot_tts）；保留原音频只改音色（voice_edit）；没给要念文本时判不支持并提示补文本。 vs zero_shot_tts: instruct_tts 音色随机、无参考音；zero_shot_tts 克隆参考音频音色。 vs voice_edit: instruct_tts 无输入音频、合成新文本；voice_edit 有输入音频、保留原内容只改音色。 Example: style_desc=年轻女生温柔体贴的语气, text=欢迎回来今天上班累不累呀。\n",
+      "params": [
+        {
+          "name": "style_desc",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "duration": {
+        "strategy": "tts_by_text"
+      },
+      "templates": {
+        "zh": "请基于下面的描述: \"{style_desc}\",生成语音内容\"{text}\".",
+        "en": "Based on the following description: \"{style_desc}\", generate speech content \"{text}\"."
+      }
+    },
+    "zero_shot_tts": {
+      "needs_audio": true,
+      "description": "用上传参考音频的说话人音色念出指定文本，需要参考音频 + 「要念的文本」。 Use for: 用这个人/这段音频的声音说…、用同样的声音念…、克隆这个音色说…。 Do NOT use: 原地改说话内容（content_edit）；无参考音的纯文字描述合成（instruct_tts）；缺要念文本时判不支持。 vs instruct_tts: zero_shot_tts 克隆参考音频音色；instruct_tts 用文字描述风格、音色随机。 Example: 用这个人的声音说“大家好，欢迎收看今天的节目” -> text=大家好，欢迎收看今天的节目。\n",
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "duration": {
+        "strategy": "tts_by_text"
+      },
+      "templates": {
+        "zh": "Say the following with the same voice: \"{text}\"",
+        "en": "Say the following with the same voice: \"{text}\""
+      }
+    },
+    "voice_edit": {
+      "needs_audio": true,
+      "description": "保留说话内容不变，用文字描述把嗓音/音色换成目标音色，需要输入语音。 Use for: 保留原话内容、只把音色换成文字描述的目标（换成低沉磁性的男声、变成清亮的年轻女声）。 Do NOT use: 合成新文本（instruct_tts）；克隆参考音色（zero_shot_tts）；情感/音调调整。 vs zero_shot_tts: voice_edit 用文字描述目标音色；zero_shot_tts 用参考音频克隆音色。 Example: 把这段话的声音换成低沉磁性的男声内容别变 -> timbre_desc=低沉磁性的男声。\n",
+      "params": [
+        {
+          "name": "timbre_desc",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": "请将这段音频的音色修改为符合以下描述的声音：“{timbre_desc}”。",
+        "en": "Keep the spoken content unchanged and change the timbre to: \"{timbre_desc}\"."
+      }
+    },
+    "nonverbal_edit": {
+      "needs_audio": true,
+      "description": "增删呼吸声/换气声/喘气声/笑声/语气词等非说话内容的声音，需要输入语音。 Use for: 删除某种非语言声、在锚点前后或语音开头结尾增加某种非语言声。 Do NOT use: 说话内容文字编辑（content_edit）；无法归入非语言声事件的请求。 Example: 在开头加一声笑 -> subtype=add_head, sound=笑声。\n",
+      "subtypes": [
+        "delete",
+        "add_after",
+        "add_before",
+        "add_head",
+        "add_tail"
+      ],
+      "params": [
+        {
+          "name": "sound",
+          "type": "string",
+          "required_for": [
+            "delete",
+            "add_after",
+            "add_before",
+            "add_head",
+            "add_tail"
+          ]
+        },
+        {
+          "name": "anchor",
+          "type": "string",
+          "required_for": [
+            "add_after",
+            "add_before"
+          ]
+        }
+      ],
+      "duration": {
+        "strategy": "equal_length",
+        "nonverbal_adjustments": [
+          {
+            "keywords": [
+              "呼吸",
+              "换气",
+              "喘",
+              "breath",
+              "breathing",
+              "pant",
+              "inhale",
+              "exhale"
+            ],
+            "add": 0.35,
+            "delete": -0.6
+          },
+          {
+            "keywords": [
+              "咂嘴",
+              "咂舌",
+              "吸鼻",
+              "倒吸",
+              "惊讶",
+              "tsk",
+              "smack",
+              "sniff",
+              "gasp"
+            ],
+            "add": 0.5,
+            "delete": -1.0
+          },
+          {
+            "keywords": [
+              "笑",
+              "叹气",
+              "咳",
+              "清嗓",
+              "语气",
+              "laugh",
+              "laughter",
+              "chuckle",
+              "sigh",
+              "cough",
+              "throat",
+              "clearing"
+            ],
+            "add": 0.75,
+            "delete": -1.05
+          }
+        ],
+        "default_nonverbal_adjustment": {
+          "add": 0.55,
+          "delete": -0.9
+        }
+      },
+      "templates": {
+        "zh": {
+          "delete": "删除音频中所有的{sound}。",
+          "add_after": "在“{anchor}”后增加{sound}。",
+          "add_before": "在“{anchor}”前增加{sound}。",
+          "add_head": "在语音开头增加{sound}。",
+          "add_tail": "在语音结尾增加{sound}。"
+        },
+        "en": {
+          "delete": "Remove all the {sound} from the audio."
+        }
+      }
+    },
+    "whisper_edit": {
+      "needs_audio": true,
+      "description": "耳语↔正常互转：把耳语转成正常发声，或把正常说话转成耳语；说话内容与音色不变，需要输入语音。 Use for: 转成正常说话/别耳语了/正常发声（to_normal）；转成耳语/悄悄说/用气声说（to_whisper）。 Do NOT use: 音量调整（volume_edit）；只改发声方式，不改内容与音色。 Example: 把这段话转换成耳语 -> subtype=to_whisper。\n",
+      "subtypes": [
+        "to_normal",
+        "to_whisper"
+      ],
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": {
+          "to_normal": "把这段耳语转换成正常说话的声音。",
+          "to_whisper": "用小声耳语的方式把这段话说出来。"
+        }
+      }
+    },
+    "vocal_edit": {
+      "needs_audio": true,
+      "description": "把歌唱录音里唱的某段歌词改成另一段词，旋律/音色/唱腔不变，需要输入语音。 Use for: 改歌里「唱的是什么词」（把歌词‘明天你好’改成‘未来你好’）；用户提到歌词/唱的/这首歌/演唱时选本类。 Do NOT use: 普通说话录音的文字内容（content_edit）；改音色（voice_edit）。 Example: 把这首歌里唱的‘明天你好’改成‘未来你好’ -> orig=明天你好, new=未来你好。\n",
+      "params": [
+        {
+          "name": "orig",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "new",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "duration": {
+        "strategy": "content_scaled"
+      },
+      "templates": {
+        "zh": "把这段歌词中的“{orig}”改成“{new}”。",
+        "en": "Change \"{orig}\" to \"{new}\" in the vocal recording."
+      }
+    },
+    "accent_edit": {
+      "needs_audio": true,
+      "description": "去除方言口音、把发音标准化为普通话，说话人音色与内容不变，需要输入语音。 Use for: 去掉口音/去方言腔/转成标准普通话/发音标准化，且要求保留原说话人音色。 Do NOT use: 音色转换（voice_edit）；改说话内容。\n",
+      "duration": {
+        "strategy": "equal_length"
+      },
+      "templates": {
+        "zh": "请去掉这段语音里的方言口音，保持说话人音色一致。"
+      }
+    }
+  }
+}

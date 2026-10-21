@@ -12,6 +12,7 @@ import comfy.audio
 import comfy.model_management
 import comfy.model_prefetch
 from comfy import sd1_clip
+from comfy.text_generation import format_qwen_chat
 from comfy.audio_encoders.whisper import EncoderLayer
 from .llama import Qwen3_8B
 
@@ -192,6 +193,11 @@ class MossAudioSDTokenizer(sd1_clip.SDTokenizer):
 
 
 class MossAudioTokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_chat(self, messages, thinking=False):
+        if not messages or messages[0]["role"] != "system":
+            messages = [{"role": "system", "content": "You are a helpful assistant."}, *messages]
+        return self.tokenize_with_weights(format_qwen_chat(messages, thinking), skip_template=True, thinking=thinking)
+
     def __init__(self, embedding_directory=None, tokenizer_data={}):
         super().__init__(embedding_directory=embedding_directory, tokenizer_data=tokenizer_data, name="moss_audio", tokenizer=MossAudioSDTokenizer)
 
@@ -221,6 +227,9 @@ class MossAudioTokenizer(sd1_clip.SD1Tokenizer):
 
 def te(dtype_llama=None, llama_quantization_metadata=None):
     class MossAudioTEModel(sd1_clip.SD1ClipModel):
+        def get_chat_context_length(self):
+            return self.moss_audio.transformer.model.config.max_position_embeddings
+
         def __init__(self, device="cpu", dtype=None, model_options={}):
             if llama_quantization_metadata is not None:
                 raise ValueError("MOSS-Audio currently supports the original BF16 checkpoint only.")

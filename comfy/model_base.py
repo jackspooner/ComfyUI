@@ -24,6 +24,7 @@ import comfy.ldm.lightricks.av_model
 import comfy.ldm.minimax.model
 import comfy.ldm.minimax_music.dit
 import comfy.ldm.yue2.model
+import comfy.ldm.yingmusic.model
 import comfy.nested_tensor
 import comfy.ldm.lightricks.symmetric_patchifier
 import comfy.context_windows
@@ -83,9 +84,12 @@ import comfy.ldm.sensenova.conditioning
 import comfy.ldm.sensenova.model
 from comfy.ldm.sensenova.sampling import SenseNovaModelSampling, time_snr_shift
 import comfy.ldm.depth_anything_3.model
+import comfy.ldm.moss_image.model
+import comfy.ldm.fibo2.model
 
 import comfy.model_management
 import comfy.patcher_extension
+import comfy.ldm.auk.model
 import comfy.conds
 import comfy.ops
 from enum import Enum
@@ -2617,6 +2621,26 @@ class YuE2(BaseModel):
         return super().memory_required(input_shape, cond_shapes) + context_size * comfy.model_management.dtype_size(self.get_dtype_inference())
 
 
+class YingMusic(BaseModel):
+    def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
+        super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.yingmusic.model.YingMusic)
+
+    def process_timestep(self, timestep, **kwargs):
+        return 1.0 - timestep
+
+    def extra_conds(self, **kwargs):
+        out = super().extra_conds(**kwargs)
+        device, dtype = kwargs["device"], self.get_dtype_inference()
+        context = self.diffusion_model.preprocess_conditioning(
+            kwargs["ying_tokens"].to(device=device),
+            kwargs["ying_melody"].to(device=device, dtype=dtype),
+            kwargs["ying_reference"].to(device=device, dtype=dtype),
+            unconditioned=kwargs.get("ying_unconditioned", False),
+        )
+        out["c_crossattn"] = comfy.conds.CONDRegular(context)
+        return out
+
+
 class MiniMaxMusic3(BaseModel):
     def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
         super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.minimax_music.dit.MiniMaxMusic3DiT)
@@ -2794,6 +2818,36 @@ class Krea2(BaseModel):
         if ref_latents is not None:
             out['ref_latents'] = list([1, 16, sum(map(lambda a: math.prod(a.size()), ref_latents)) // 16])
         return out
+
+class MOSSImage(BaseModel):
+    def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
+        super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.moss_image.model.MOSSImage)
+
+    def extra_conds(self, **kwargs):
+        out = super().extra_conds(**kwargs)
+        cross_attn = kwargs.get("cross_attn", None)
+        # rope positions follow the true text length, so no repeat padding: cond and uncond of different lengths run separately
+        if cross_attn is not None:
+            out['c_crossattn'] = comfy.conds.CONDRegular(cross_attn)
+        return out
+
+class Fibo2(BaseModel):
+    def __init__(self, model_config, model_type=ModelType.FLUX, device=None):
+        super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.fibo2.model.Fibo2)
+        self.memory_usage_factor_conds = ("ref_latents",)
+
+    def extra_conds(self, **kwargs):
+        out = super().extra_conds(**kwargs)
+        cross_attn = kwargs.get("cross_attn", None)
+        # the gist token count follows the true text length, so no repeat padding: cond and uncond of different lengths run separately
+        if cross_attn is not None:
+            out['c_crossattn'] = comfy.conds.CONDRegular(cross_attn)
+        ref_latents = kwargs.get("reference_latents", None)
+        if ref_latents is not None:
+            out['ref_latents'] = comfy.conds.CONDList([self.process_latent_in(lat) for lat in ref_latents])
+        return out
+
+    extra_conds_shapes = Flux.extra_conds_shapes
 
 class HunyuanImage21(BaseModel):
     def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
@@ -3063,4 +3117,27 @@ class CogVideoX(BaseModel):
                 noise = kwargs.get("noise", None)
                 ofs = torch.full((noise.shape[0],), 2.0, device=noise.device, dtype=noise.dtype)
             out['ofs'] = comfy.conds.CONDRegular(ofs)
+        return out
+
+
+class AuK(BaseModel):
+    def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
+        super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.auk.model.AuK)
+        self.memory_usage_factor_conds = ("reference",)
+
+    def extra_conds(self, **kwargs):
+        out = super().extra_conds(**kwargs)
+        context = kwargs.get("cross_attn")
+        if context is not None:
+            context = self.diffusion_model.preprocess_text(context.to(device=kwargs["device"], dtype=self.get_dtype_inference()))
+            out["c_crossattn"] = comfy.conds.CONDRegular(context)
+        mask = kwargs.get("attention_mask")
+        if mask is not None:
+            out["attention_mask"] = comfy.conds.CONDRegular(mask.bool())
+        reference = kwargs.get("auk_reference")
+        if reference is not None:
+            out["reference"] = comfy.conds.CONDRegular(reference)
+            length = kwargs.get("auk_reference_length", reference.shape[-1])
+            mask = torch.arange(reference.shape[-1], device=reference.device)[None, :] < length
+            out["reference_mask"] = comfy.conds.CONDRegular(mask)
         return out

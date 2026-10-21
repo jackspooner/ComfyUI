@@ -55,6 +55,8 @@ folder_names_and_paths["classifiers"] = ([os.path.join(models_dir, "classifiers"
 folder_names_and_paths["model_patches"] = ([os.path.join(models_dir, "model_patches")], supported_pt_extensions)
 
 folder_names_and_paths["audio_encoders"] = ([os.path.join(models_dir, "audio_encoders")], supported_pt_extensions)
+folder_names_and_paths["audio_models"] = ([os.path.join(models_dir, "audio_models")], supported_pt_extensions)
+folder_names_and_paths["rvc_indexes"] = ([os.path.join(models_dir, "rvc_indexes")], {".index"})
 
 folder_names_and_paths["background_removal"] = ([os.path.join(models_dir, "background_removal")], supported_pt_extensions)
 

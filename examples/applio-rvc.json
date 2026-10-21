@@ -1,0 +1,252 @@
+{
+  "last_node_id": 4,
+  "last_link_id": 3,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "RVCModelLoader",
+      "title": "Load target voice and analysis models",
+      "pos": [
+        30,
+        80
+      ],
+      "size": [
+        340,
+        150
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "RVC_MODEL",
+          "type": "RVC_MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "widgets_values": [
+        "rvc/kikiV1.safetensors",
+        "rvc_contentvec.safetensors",
+        "soulx_singer_rmvpe.safetensors"
+      ],
+      "order": 0,
+      "mode": 0,
+      "flags": {},
+      "properties": {
+        "Node name for S&R": "RVCModelLoader"
+      }
+    },
+    {
+      "id": 2,
+      "type": "LoadAudio",
+      "title": "Source recording \u2014 replace this audio",
+      "pos": [
+        30,
+        400
+      ],
+      "size": [
+        340,
+        170
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "widgets_values": [
+        "applio_demo_source.wav",
+        null,
+        null
+      ],
+      "order": 1,
+      "mode": 0,
+      "flags": {},
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      }
+    },
+    {
+      "id": 3,
+      "type": "RVCVoiceConvert",
+      "title": "Convert voice \u2014 pitch, protection, retrieval",
+      "pos": [
+        510,
+        80
+      ],
+      "size": [
+        380,
+        330
+      ],
+      "inputs": [
+        {
+          "name": "model",
+          "type": "RVC_MODEL",
+          "link": 1
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "widgets_values": [
+        0.0,
+        0,
+        0.33,
+        1.0,
+        "kikiV1.index",
+        0.5,
+        42,
+        "fixed"
+      ],
+      "order": 2,
+      "mode": 0,
+      "flags": {},
+      "properties": {
+        "Node name for S&R": "RVCVoiceConvert"
+      }
+    },
+    {
+      "id": 4,
+      "type": "SaveAudioAdvanced",
+      "title": "Save converted speech (FLAC)",
+      "pos": [
+        1030,
+        80
+      ],
+      "size": [
+        340,
+        150
+      ],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": []
+        }
+      ],
+      "widgets_values": [
+        "audio/Applio-RVC",
+        "flac"
+      ],
+      "order": 3,
+      "mode": 0,
+      "flags": {},
+      "properties": {
+        "Node name for S&R": "SaveAudioAdvanced"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      3,
+      0,
+      "RVC_MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      1,
+      "AUDIO"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1 \u00b7 Model loading",
+      "bounding": [
+        0,
+        0,
+        400,
+        260
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2 \u00b7 Input recording",
+      "bounding": [
+        0,
+        320,
+        400,
+        280
+      ],
+      "color": "#4c8c70",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3 \u00b7 Voice conversion and controls",
+      "bounding": [
+        480,
+        0,
+        440,
+        440
+      ],
+      "color": "#9b7444",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4 \u00b7 Output",
+      "bounding": [
+        1000,
+        0,
+        400,
+        260
+      ],
+      "color": "#80549b",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.8,
+      "offset": [
+        50,
+        60
+      ]
+    }
+  },
+  "version": 0.4
+}

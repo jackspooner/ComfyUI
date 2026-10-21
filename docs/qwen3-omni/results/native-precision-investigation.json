@@ -1,0 +1,834 @@
+{
+  "status": "Accelerated production acceptance remains pending",
+  "reports": {
+    "native-decoded-full-v1": {
+      "results_sha256": "7b566e9804819a7e050f6ef851911e1966031afb614926ec5ced4c84e8ca36f8",
+      "comparison_sha256": "4d15c921d18c57d3c878a65381defd49bd3851965e7526d692137868d7abad18",
+      "precision": "decoded-reference",
+      "artifact_sha256": "039c9d4347a4be90ddbc8994909bd9870e610228dd95b336f612bf2936f2fe9b",
+      "case_count": 24,
+      "cases_passed": 20,
+      "new_assertion_failures": [],
+      "all_positions_equal": true,
+      "cases": [
+        {
+          "id": "text_arithmetic",
+          "text": "12",
+          "assertions": [
+            {
+              "alternatives": [
+                "12"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 3
+        },
+        {
+          "id": "text_capital",
+          "text": "Paris",
+          "assertions": [
+            {
+              "alternatives": [
+                "paris"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 2
+        },
+        {
+          "id": "text_copy",
+          "text": "OMEGA",
+          "assertions": [
+            {
+              "alternatives": [
+                "omega"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 3
+        },
+        {
+          "id": "text_unicode",
+          "text": "",
+          "assertions": [
+            {
+              "alternatives": [
+                "caf\u00e9"
+              ],
+              "passed": false
+            }
+          ],
+          "eos_reached": false,
+          "token_count": 96
+        },
+        {
+          "id": "text_extract",
+          "text": "```python\nBLUE42\n```",
+          "assertions": [
+            {
+              "alternatives": [
+                "blue42"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 9
+        },
+        {
+          "id": "text_compare",
+          "text": "9",
+          "assertions": [
+            {
+              "alternatives": [
+                "9"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 2
+        },
+        {
+          "id": "audio_speech",
+          "text": "speech",
+          "assertions": [
+            {
+              "alternatives": [
+                "speech"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 2
+        },
+        {
+          "id": "audio_music",
+          "text": "The main instrument is a trumpet playing a short, bright, and celebratory fanfare.",
+          "assertions": [
+            {
+              "alternatives": [
+                "trumpet"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 19
+        },
+        {
+          "id": "audio_birds",
+          "text": "The main sound is a bird singing a melodic and repetitive song.",
+          "assertions": [
+            {
+              "alternatives": [
+                "bird"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 15
+        },
+        {
+          "id": "audio_silence",
+          "text": "This audio contains a clearly audible sound. It is a single, sustained, low-pitched electronic tone, similar to a dial tone or a test signal.",
+          "assertions": [
+            {
+              "alternatives": [
+                "silence",
+                "silent",
+                "quiet",
+                "no audible",
+                "no sound"
+              ],
+              "passed": false
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 32
+        },
+        {
+          "id": "audio_tone",
+          "text": "This is a single, sustained, low-pitched electronic tone, similar to a dial tone or a test signal.",
+          "assertions": [
+            {
+              "alternatives": [
+                "tone",
+                "beep"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 24
+        },
+        {
+          "id": "audio_clicks",
+          "text": "The sound is a series of short, sharp, and repetitive clicks, similar to the sound of a camera shutter being fired multiple times in quick succession.",
+          "assertions": [
+            {
+              "alternatives": [
+                "click",
+                "pop",
+                "tap",
+                "pulse"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 31
+        },
+        {
+          "id": "image_red",
+          "text": "The central shape is red.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 7
+        },
+        {
+          "id": "image_blue",
+          "text": "The central shape is blue.",
+          "assertions": [
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 7
+        },
+        {
+          "id": "image_triangle",
+          "text": "Triangle",
+          "assertions": [
+            {
+              "alternatives": [
+                "triangle"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 2
+        },
+        {
+          "id": "image_sign",
+          "text": "",
+          "assertions": [
+            {
+              "alternatives": [
+                "qwen42"
+              ],
+              "passed": false
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 1
+        },
+        {
+          "id": "image_wide",
+          "text": "Based on the image provided, we can identify the two colored objects from left to right.\n\n- The object on the left is a **red square**.\n- The object on the right is a **blue circle**.\n\nTherefore, the two colored objects from left to right are a red square and a blue circle.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 64
+        },
+        {
+          "id": "image_batch",
+          "text": "The color in the first image is red, and the color in the second image is blue.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 20
+        },
+        {
+          "id": "combined_baseline",
+          "text": "The image contains a red square. The audio is a male voice speaking.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "speech",
+                "voice",
+                "speaking",
+                "narrat"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 16
+        },
+        {
+          "id": "combined_replace_image",
+          "text": "The image contains a solid blue circle on a white background. The audio is a male voice speaking.",
+          "assertions": [
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "speech",
+                "voice",
+                "speaking",
+                "narrat"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 21
+        },
+        {
+          "id": "combined_replace_audio",
+          "text": "The image contains a red square.\n\nThe main audio sound is a bird chirping.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "bird"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 18
+        },
+        {
+          "id": "combined_remove_image",
+          "text": "**Modalities:**\n\n*   **Audio:** Speech\n*   **Image:** Text",
+          "assertions": [
+            {
+              "alternatives": [
+                "speech",
+                "voice",
+                "speaking",
+                "narrat"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 19
+        },
+        {
+          "id": "combined_remove_audio",
+          "text": "The image contains a red square. The main audio sound is a buzzer.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 17
+        },
+        {
+          "id": "combined_batch",
+          "text": "The image contains the text \"OVAL\" in a bold, black, sans-serif font. The text is positioned above a solid blue circle. The background of the image is white.\n\nThe audio is a single, sustained, low-pitched electronic tone.",
+          "assertions": [
+            {
+              "alternatives": [
+                "qwen42"
+              ],
+              "passed": false
+            },
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "tone",
+                "beep"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 52
+        }
+      ]
+    },
+    "native-nvfp4-full-v1": {
+      "results_sha256": "deb725c103f51a4638ce32fb7c73ba4f496cdfd92bc9d4fd4b1273506674a608",
+      "comparison_sha256": "432d4707ea580ed56095bf7a04ed9fceca455ae6bc03af23df6a4c63eeab124e",
+      "precision": "nvfp4",
+      "artifact_sha256": "039c9d4347a4be90ddbc8994909bd9870e610228dd95b336f612bf2936f2fe9b",
+      "case_count": 24,
+      "cases_passed": 19,
+      "new_assertion_failures": [
+        [
+          "audio_speech",
+          [
+            0
+          ]
+        ],
+        [
+          "audio_clicks",
+          [
+            0
+          ]
+        ]
+      ],
+      "all_positions_equal": true,
+      "cases": [
+        {
+          "id": "text_arithmetic",
+          "text": "12",
+          "assertions": [
+            {
+              "alternatives": [
+                "12"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 3
+        },
+        {
+          "id": "text_capital",
+          "text": "Paris",
+          "assertions": [
+            {
+              "alternatives": [
+                "paris"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 2
+        },
+        {
+          "id": "text_copy",
+          "text": "OMEGA",
+          "assertions": [
+            {
+              "alternatives": [
+                "omega"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 3
+        },
+        {
+          "id": "text_unicode",
+          "text": "caf\u00e9",
+          "assertions": [
+            {
+              "alternatives": [
+                "caf\u00e9"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 3
+        },
+        {
+          "id": "text_extract",
+          "text": "```python\nBLUE42\n```",
+          "assertions": [
+            {
+              "alternatives": [
+                "blue42"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 9
+        },
+        {
+          "id": "text_compare",
+          "text": "9",
+          "assertions": [
+            {
+              "alternatives": [
+                "9"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 2
+        },
+        {
+          "id": "audio_speech",
+          "text": "",
+          "assertions": [
+            {
+              "alternatives": [
+                "speech"
+              ],
+              "passed": false
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 3
+        },
+        {
+          "id": "audio_music",
+          "text": "The main instrument is a trumpet playing a short, bright, and celebratory fanfare.",
+          "assertions": [
+            {
+              "alternatives": [
+                "trumpet"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 19
+        },
+        {
+          "id": "audio_birds",
+          "text": "The main sound is a bird singing a high-pitched, melodic song.",
+          "assertions": [
+            {
+              "alternatives": [
+                "bird"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 17
+        },
+        {
+          "id": "audio_silence",
+          "text": "Yes, the audio contains a clearly audible sound. It is a single, sustained, low-pitched electronic tone, similar to a dial tone or a test signal.",
+          "assertions": [
+            {
+              "alternatives": [
+                "silence",
+                "silent",
+                "quiet",
+                "no audible",
+                "no sound"
+              ],
+              "passed": false
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 34
+        },
+        {
+          "id": "audio_tone",
+          "text": "This is a single, sustained, low-pitched electronic tone, similar to a dial tone or a test signal.",
+          "assertions": [
+            {
+              "alternatives": [
+                "tone",
+                "beep"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 24
+        },
+        {
+          "id": "audio_clicks",
+          "text": "The repeated sound is a rhythmic, electronic drum beat, similar to a simple drum machine pattern. It consists of a steady kick drum on each beat and a snare or clap sound on the second and fourth beats, creating a basic four-on-the-floor groove.",
+          "assertions": [
+            {
+              "alternatives": [
+                "click",
+                "pop",
+                "tap",
+                "pulse"
+              ],
+              "passed": false
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 54
+        },
+        {
+          "id": "image_red",
+          "text": "Red",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 2
+        },
+        {
+          "id": "image_blue",
+          "text": "The central shape is blue.",
+          "assertions": [
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 7
+        },
+        {
+          "id": "image_triangle",
+          "text": "Triangle",
+          "assertions": [
+            {
+              "alternatives": [
+                "triangle"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 2
+        },
+        {
+          "id": "image_sign",
+          "text": "",
+          "assertions": [
+            {
+              "alternatives": [
+                "qwen42"
+              ],
+              "passed": false
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 1
+        },
+        {
+          "id": "image_wide",
+          "text": "Based on the image provided, we can identify the two colored objects from left to right.\n\n- The object on the left is a red square.\n- The object on the right is a blue circle.\n\nTherefore, the two colored objects from left to right are a red square and a blue circle.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 60
+        },
+        {
+          "id": "image_batch",
+          "text": "The color in the first image is red, and the color in the second image is blue.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 20
+        },
+        {
+          "id": "combined_baseline",
+          "text": "The image contains a solid red square on a white background.\n\nThe audio is a male voice speaking.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "speech",
+                "voice",
+                "speaking",
+                "narrat"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 21
+        },
+        {
+          "id": "combined_replace_image",
+          "text": "**Image:** The image displays a solid blue circle on a white background.\n\n**Audio:** The audio contains the sound of a human voice speaking.",
+          "assertions": [
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "speech",
+                "voice",
+                "speaking",
+                "narrat"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 30
+        },
+        {
+          "id": "combined_replace_audio",
+          "text": "The image contains a red square.\n\nThe main audio sound is a bird chirping.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "bird"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 18
+        },
+        {
+          "id": "combined_remove_image",
+          "text": "The image is a black and white photograph. The main audio sound is a male voice speaking.",
+          "assertions": [
+            {
+              "alternatives": [
+                "speech",
+                "voice",
+                "speaking",
+                "narrat"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 20
+        },
+        {
+          "id": "combined_remove_audio",
+          "text": "The image contains a red square.",
+          "assertions": [
+            {
+              "alternatives": [
+                "red"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 8
+        },
+        {
+          "id": "combined_batch",
+          "text": "The image contains two main elements:\n\n1.  **Text:** The word \"OWEN\" is displayed in a bold, black, sans-serif font against a white background.\n2.  **Shape:** A solid, bright blue circle is shown on a white background.\n\nThe audio consists of a single, sustained, low-pitched electronic tone.",
+          "assertions": [
+            {
+              "alternatives": [
+                "qwen42"
+              ],
+              "passed": false
+            },
+            {
+              "alternatives": [
+                "blue"
+              ],
+              "passed": true
+            },
+            {
+              "alternatives": [
+                "tone",
+                "beep"
+              ],
+              "passed": true
+            }
+          ],
+          "eos_reached": true,
+          "token_count": 70
+        }
+      ]
+    }
+  }
+}

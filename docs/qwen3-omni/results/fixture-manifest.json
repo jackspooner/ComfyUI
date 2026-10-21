@@ -1,0 +1,20 @@
+{
+  "files": {
+    "silence.wav": "20eaebffe1816e0ffa6f7f854f5ef4ea80d5349faaf0ce1fec1b713e7fde58fa",
+    "speech.wav": "c60e2a819b1d5308b1b8084e507e6e8483247dd6e553a2ddc8cbdc7db215a7d9",
+    "non_square.png": "5ac032f88616c54293aac35d471f2e06f0cbde9f70b60bac54a41bf72c90a37a",
+    "birds.wav": "82a5a54ef2426ae3c3ed58603fd7ae71e4c89e6d6d3f4a10f197994d0cc8e2af",
+    "green_triangle.png": "67f59b87ddfb3dc244552ea2964ba8d6634f1f07801325c668ac5a8a6b6bd102",
+    "clicks.wav": "93cff612bda200c599a3051104061c98a78d9f302d31b72844c73982874bc182",
+    "music.wav": "d1e4af523c2925ca0607f98323280c1921ee93843aa8e4a3795230bbe71c1566",
+    "sign.png": "f6d30f5aaf2d6ce48a07c33854bbee00018a380cebff42bc9378d7879fc21b67",
+    "tone.wav": "3c86821f29db589708e33ec5fc711ab3393d3c2c305c6b21a1a8c22a961d71cb",
+    "cases.json": "4b9913d0a92f625654da1c06a08b504ebe9808f188a1ac3ab098dc73840e6ee7",
+    "blue_circle.png": "06037d4ff34abd6d55e760f9f1ab17983b2af1bb43721b5776561d04c96ce0c4",
+    "red_square.png": "540cef8f3429434b3b1fc0999576bc3b16631316763aa3ad9b72f3ddebe5c45b",
+    "credits.txt": "92894125ee25355a44acc5537b70642700efa9fd2563f99642072fe3f9afd430"
+  },
+  "audio_source": "/home/jack/services/runtime/moss-audio-reference/fixtures",
+  "credits": "Speech: LibriSpeech/SLR12 CC-BY 4.0; trumpet: sorohanro_; birds: InspectorJ. Preserve original fixture attribution sidecars.",
+  "synthetic_assets": "Images, silence, tone and clicks created locally by this script."
+}

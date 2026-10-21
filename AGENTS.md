@@ -389,11 +389,30 @@
   memory regressions, broken model loading, workflow incompatibility, and noisy
   or misleading user-facing output.
 
+## Native model integration
+
+Before integrating a model or converting a checkpoint for native execution, read
+[docs/native-model-integration.md](docs/native-model-integration.md). It consolidates
+component/loader selection, offline conversion, optimized execution and memory
+ownership, reference/lifecycle acceptance, documentation and activation boundaries.
+Use the existing shared `comfyui` skill for discovery and operating guidance and
+`comfyui-model-runtimes` for native-versus-isolated placement; extend their
+authoritative sources through `shared-agent-skills` when capabilities change.
+
 ## Worktree development
 
 Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_worktree.py` before editing. The configured Python must be >=3.10 with PyTorch, einops and safetensors installed from the ComfyUI deployment's requirements. The check reuses that explicit runtime without copying dependencies, installing packages, loading models or connecting to a service. It is safe to rerun and leaves tracked files unchanged. GPU validation requires a compatible GPU/runtime and separately provisioned model files; unit tests use isolated fixtures.
 
-Prepare the exact worktree GitNexus index separately after setup with embeddings disabled. Operating guidance belongs to the existing shared ComfyUI model-runtimes skill; do not register temporary worktrees as shared skill sources.
+Prepare the exact worktree GitNexus index separately after setup with embeddings disabled. The root `.gitnexusignore` excludes local environment, installed-package and disabled-node source trees; their separate owners are outside the core repository graph. Do not hide tracked ComfyUI source to bypass an indexing failure. Operating guidance belongs to the existing shared ComfyUI model-runtimes skill; do not register temporary worktrees as shared skill sources.
+
+### Optional native PaddleOCR
+
+For native PP-OCRv6 work, add `--paddleocr` to the setup command. It checks
+preinstalled OpenCV Python, NumPy and torchvision without installing packages or
+loading models. Run `python -m pytest tests-unit/comfy_test/paddleocr_test.py -q`
+with the prepared interpreter. `docs/paddleocr.md` documents the offline reference
+harness, pinned models, node contracts and acceptance limits. Update the existing
+authoritative `comfyui` and `comfyui-model-runtimes` skills for capability changes.
 
 ### Optional Trellis2 mesh encoder
 
@@ -403,3 +422,49 @@ CPU extension; no downloads or package installs occur. See
 `docs/trellis2-mesh-texturing.md` for compiler/PyTorch prerequisites and tests.
 The shared authoritative `comfyui` skill owns this workflow operating guidance;
 extend it alongside this capability rather than creating a per-model skill.
+
+### Text conversation verification
+
+Native Qwen35 and MOSS TextGenerate history is documented in
+`docs/text-conversations.md`. Use the prepared interpreter to run
+`python -m pytest tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q`.
+Run broader required checks and report external/runtime limitations. The shared
+`comfyui` skill owns operating guidance; locate its authoritative source with
+`skills show comfyui` and update it alongside capability changes. Reconcile
+discovery after integration; never register task worktrees globally. History is
+explicit data, without model-owned sessions, persistent GPU caches or implicit
+trimming. Setup must not restart services.
+
+### Optional native YingMusic
+
+Use `--yingmusic` with the standard worktree setup command to check preinstalled lyric dependencies and espeak-ng. `docs/yingmusic.md` documents local conversion, native loader/node contracts and acceptance status. Run `python -m pytest tests-unit/comfy_test/yingmusic_test.py -q` with the prepared interpreter; real checkpoint comparisons are a separate explicit check. Extend the authoritative shared ComfyUI/model-runtimes guidance alongside reusable changes.
+
+### Optional native SoulX-Singer
+
+Use `--soulx` with the standard setup command to check preinstalled NumPy, SciPy,
+librosa and soundfile without installing packages or loading models. See
+`docs/soulx-singer.md` for the pinned offline converter, native SVS/SVC and
+preprocessing contracts, examples, parity commands and acceptance limits. Run
+`python -m pytest tests-unit/comfy_test/soulx_singer_test.py -q`. Extend the existing
+authoritative `comfyui` and `comfyui-model-runtimes` skills with reusable changes;
+never register this task worktree globally. Setup does not activate the service.
+
+### Optional native Applio / RVC
+
+Use `--applio` with the standard worktree setup command to check preinstalled
+NumPy, SciPy and librosa. Optional FAISS CPU is needed only for retrieval indexes.
+See `docs/applio.md` for offline conversion, dedicated managed voice/ContentVec
+loading, reused RMVPE and normal-queue workflow operation. Run
+`python -m pytest tests-unit/comfy_test/rvc_test.py tests-unit/comfy_test/soulx_singer_test.py -q`.
+`scripts/check_rvc.py` performs pinned upstream CPU component comparisons separately.
+Update the existing shared ComfyUI/model-runtimes guidance for reusable changes;
+setup and validation do not start live workloads or restart services.
+
+### Native Drama 3
+
+Use the standard worktree setup command. `docs/drama3.md` owns offline FP8-to-NVFP4
+conversion, native node/history contracts, reference verification and acceptance
+limits. Run `python -m pytest tests-unit/comfy_test/drama3_test.py -q`; set
+`DRAMA3_UPSTREAM` to the pinned offline source for independent component checks.
+Keep model files outside Git. Update the authoritative existing ComfyUI and
+model-runtime skills with capability changes; do not register task worktrees.
