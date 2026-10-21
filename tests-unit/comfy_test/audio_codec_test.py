@@ -94,6 +94,21 @@ def test_empty_decode_does_not_load_model(codec):
     loader.assert_not_called()
 
 
+def test_decode_prefix_is_trimmed_after_full_context(codec):
+    codec, _ = codec
+    output = codec.decode(payload(decode_skip_frames=(1, 2)))
+    assert len(output) == 1
+    assert output[0]['waveform'].shape == (1, 1, 1920)
+    assert output[0]['waveform']._base is None
+    assert [x.shape[-1] for x in codec.model.inputs] == [2, 1]
+
+
+@pytest.mark.parametrize('skip', [(-1, 0), (0,), (True, 0)])
+def test_decode_prefix_requires_nonnegative_batch_lengths(skip):
+    with pytest.raises(ValueError, match='decoded prefix lengths'):
+        payload(decode_skip_frames=skip).validate(ac.MOSS_V1)
+
+
 def test_encode_mono_resample_and_partial_frames(codec):
     codec, loader = codec
     audio = {'waveform': torch.ones(2, 2, 3874), 'sample_rate': 48000}

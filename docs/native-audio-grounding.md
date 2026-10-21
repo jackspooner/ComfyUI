@@ -79,8 +79,8 @@ below. INT8/ConvRot artifacts are not yet supported.
 The same converter accepts `--variant delay`, `--variant acting`, or
 `--variant ttsd`. Each requires its own committed `scripts/moss_speech_<variant>.json`
 manifest and complete local bundle. No source Python is executed and no files
-are downloaded. Native generation adapters for these three variants are still
-pending; the VoiceGenerator loader does not accept their converted weights.
+are downloaded. The native CLIP loader supports these larger variants with
+the generation nodes documented below.
 
 | Variant | Immutable model revision | Inventory / extra output space |
 | --- | --- | --- |
@@ -168,8 +168,87 @@ and compares FP32 prefill plus three cached steps across all 17 heads. Omitting
 `MOSS_VOICEGENERATOR_WEIGHTS` skips that test. An isolated CPU queue run produced
 four seconds of 24 kHz mono FLAC through the complete native graph in 14.81 seconds;
 this is one local run, not a performance guarantee. Listening/quality comparisons,
-GPU and low-memory lifecycle acceptance, long speech, quantization and serving
-adoption remain pending. Existing worker workflows remain available.
+low-memory acceptance, long speech, quantization and serving adoption remain
+pending. On 21 October 2026, an isolated RTX 5090 queue completed cold/warm and
+unload/reload VoiceGenerator runs; an active generation was interrupted, and a
+later fresh candidate completed after merging current main. The merged cold run
+took 26.5 seconds and emitted 6.24- and 2-second segments. These observations do
+not establish speech quality or a performance guarantee. Existing worker
+workflows remain available; no serving routes were changed.
+
+## Native Delay, acting and TTSD
+
+Load the matching converted BF16 artifact using `CLIPLoader` type `moss_tts`.
+The loader selects the 8B backbone and 32 books for Delay/acting or 16 for TTSD.
+Connect **MOSS Speech Generate**, **MOSS v1.5 Voice Acting**, or **MOSS Dialogue
+Generate** to the same separate codec/decode/save path. The acting node enables
+the pinned Apache-2.0 text normalizer by default; turn `normalize_text` off to
+preserve text verbatim. Language labels are passed verbatim (acting examples use
+`English` or `Chinese`). No checkpoint Python executes during native inference.
+
+Speech Generate exposes `clip`, `text`, `instruction`, `language`, `duration_tokens`,
+`quality`, `sound_event`, `ambient_sound`, `seed`, `max_length`, text/audio
+temperature, top-p, top-k and audio repetition penalty. Empty optional strings and
+zero duration tokens serialize as `None`. Duration is a prompt hint, not an exact
+output length. Base/acting defaults are text 1.5/1/50 and audio 1.7/0.8/25 with
+repetition penalty 1. Dialogue uses text/audio temperature 1.1, top-p 0.9, top-k 50,
+repetition penalty 1.1 and max length 8192. It omits duration: the pinned TTSD
+processor always writes Tokens and Scene as `None`. Speaker tags such as `[S1]`
+remain in the text. Punctuation/tag rewriting from custom worker UI nodes is not
+implicit in the native dialogue node.
+
+For cloning, connect AUDIO and the loaded codec to **MOSS Speech Reference**.
+It mixes to mono, resamples to 24 kHz, applies the pinned -20 dBFS normalization
+with gain limited to ±3 dB, then encodes all 32 books. Connect its AUDIO_CODES to
+the generator's growing `references` input. Books are consumed as an ordered
+prefix; encoding fewer books than the generator needs fails explicitly.
+References are separate speaker slots; batch items/segments expand in order.
+Sparse slots preserve speaker numbers. TTSD writes explicit missing-speaker
+entries; Delay/acting omit their lines while preserving the numbers.
+
+A complete API generation node with one reference is:
+
+```json
+{"class_type":"MossSpeechGenerate","inputs":{"clip":["1",0],"text":"Hello world.","instruction":"Speak naturally.","language":"en","duration_tokens":0,"quality":"","sound_event":"","ambient_sound":"","seed":7,"max_length":256,"text_temperature":1.5,"text_top_p":1.0,"text_top_k":50,"audio_temperature":1.7,"audio_top_p":0.8,"audio_top_k":25,"audio_repetition_penalty":1.0,"references.reference_0":["9",0]}}
+```
+
+Here node 9 is `MossSpeechReference` with `audio:["8",0]` and `codec:["3",0]`.
+Autogrow API keys include the `references.` prefix; `reference_1` is speaker S2.
+Omit all reference keys for prompt-only synthesis. Discover model names and
+schemas through the selected server's `/object_info` before submission.
+
+For continuation, connect encoded prefix AUDIO_CODES to optional `continuation`
+and include its transcript before the new text. For the TTSD worker-equivalent
+path, join the reference waveforms in speaker order, encode that joined waveform
+once through Speech Reference, and use it as continuation; also supply each
+speaker's separately encoded reference in its own slot. Concatenating independently
+encoded codes is supported but differs from encoding joined audio. Prefix audio
+stays in the generated codes to preserve causal codec context. The adapter marks
+the first segment's decoded prefix length; the codec owner decodes it fully, then
+trims at waveform level using the pinned prefix/frame ratio. Fully consumed
+segments are omitted. This is explicit data, without persistent model sessions.
+
+CPU tests compare full prompt/reference/continuation matrices, sparse speakers,
+normalization and gain against each pinned processor. Use `MOSS_DELAY_SOURCE`,
+`MOSS_ACTING_SOURCE`, and `MOSS_TTSD_SOURCE` alongside the isolated Transformers 5
+overlay in the reference command above, running `moss_speech_variants_test.py`
+and `moss_delay_reference_test.py`. The overlay is test-only; production keeps
+the prepared native environment. Standard contract tests are `audio_codec_test.py`
+and `moss_speech_adapter_test.py`.
+
+The isolated RTX 5090 Base Delay graph produced 3.92 seconds of audio in 11.8
+seconds; a reference-conditioned run produced 4.96 seconds in 12.7 seconds.
+Acting and TTSD also completed short native RTX 5090 runs. Base Delay and TTSD
+continuation outputs transcribed to their requested suffixes with independent
+Whisper large-v3; the acting output matched its spoken text. Speaker similarity,
+prosody/listening quality, long continuation and low-memory acceptance remain
+pending. One ASR attempt failed the GPU reserve check during candidate shutdown;
+it succeeded only after candidate exit and free-memory readback. The 8B generator weights require about 17 GB plus the 7.10 GB FP32 codec,
+KV cache and workspace. Native loading/offload owns placement; large context
+budgets substantially increase reservation. Cancellation is checked each outer
+generation step and between codec operations. Follow the recorded prompt ID
+after uncertain submission; do not regenerate to recover output. No deployment,
+download, remote inference, Local Transformer or SoundEffect v2 support is implied.
 
 ## MOSS v1 codec baseline
 
@@ -243,13 +322,16 @@ clip may be unsupported by the selected audio writer.
 `comfy.audio_codec.AudioCodes` version 1 carries an immutable codec identity
 (family, revision, sample rate, hop and ordered codebook sizes) and a tuple of
 `AudioCodeSegment` values. Each segment contains an integer `[B,Q,T]` tensor,
-Python valid frame lengths, and optional source sample lengths at the codec
-rate. Codebooks are a prefix in codec order. Decoding validates identity and
+Python valid frame lengths, optional source sample lengths at the codec rate,
+and optional per-item `decode_skip_frames`. The latter trims decoded audio by
+its prefix/valid-frame ratio after full decoding; it never removes codec context
+before inference. Codebooks are a prefix in codec order. Decoding validates identity and
 valid IDs, ignores storage beyond each valid length, and never casts floats to
 IDs. MOSS protocol padding 1024 is invalid inside valid frames. Source lengths
 are provenance, not a request to synthesize a partial frame: 1,937 input samples
 produce two stored frames, one valid frame, and 1,920 decoded samples. Speech
-protocol trimming and reference loudness processing belong to their adapters.
+protocol prefix accounting and reference loudness processing belong to their
+adapters; the codec boundary applies only the declared decoded-frame trim.
 
 The owner processes one stream at a time and reserves attention/block/output
 workspace plus the 169,984,000-byte streaming ring when needed. These conservative
@@ -265,14 +347,15 @@ node schema, containment, lifecycle boundary and cancellation fixtures. The real
 decode after unload/reload; observed peak process RSS was about 12.75 GiB. An
 isolated CPU queue also completed the five-node load/encode/decode/save graph,
 producing a mono 24 kHz FLAC with the expected 1,920 samples. This is a synthetic
-fixture, not a speech-quality result or live-service deployment. GPU, dynamic
-offload, constrained-memory and audible quality acceptance remain open.
+fixture, not a speech-quality result or live-service deployment. Short GPU
+encode/decode now also passes through the speech graphs above. Long streaming,
+constrained-memory and audible quality acceptance remain open.
 
 ## Remaining integrations
 
-These are shared prerequisites for the requested native MOSS speech family,
+These are shared prerequisites for the remaining native MOSS Local Transformer,
 SoundEffect v2, LocateAnything, Qwen3-ASR, Qwen3 ForcedAligner and Fish S2-Pro
-integrations. Their speech loaders, remaining codecs, generation/alignment nodes,
+integrations. Their remaining loaders/codecs and generation/alignment nodes,
 quality comparisons and live workflows are **not implemented or accepted by this
 change**. Existing worker/runtime paths remain unchanged. Integer speech codes
 use the discrete codec contract above; SoundEffect's continuous diffusion

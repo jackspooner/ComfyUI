@@ -39,7 +39,7 @@ class AudioCodecDecode(IO.ComfyNode):
     def define_schema(cls):
         return IO.Schema(
             node_id='AudioCodecDecode', display_name='Decode Audio Codes', category='audio/codec',
-            description='Decode valid integer frames to raw PCM, returning one AUDIO per segment/batch item without padding or normalization.',
+            description='Decode valid integer frames to raw PCM without normalization. Continuation prefixes retain causal context during decoding, then are trimmed from the returned audio.',
             inputs=[IO.Custom('AUDIO_CODES').Input('codes'), IO.Custom('AUDIO_CODEC').Input('codec')],
             outputs=[IO.Audio.Output(is_output_list=True)],
         )

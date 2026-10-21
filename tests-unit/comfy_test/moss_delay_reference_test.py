@@ -18,20 +18,22 @@ from comfy.text_encoders.moss_tts_delay import DelayPattern, MossTTSDelay, sampl
 from comfy.text_encoders.moss_speech import MossSpeechTokenizer
 
 
-@pytest.fixture(scope='module')
-def reference():
-    source = os.environ.get('MOSS_VOICEGENERATOR_SOURCE')
+@pytest.fixture(scope='module', params=['voicegenerator', 'delay', 'acting', 'ttsd'])
+def reference(request):
+    variant = request.param
+    variable = f'MOSS_{variant.upper()}_SOURCE'
+    source = os.environ.get(variable)
     if not source:
-        pytest.skip('Requires pinned VoiceGenerator source and isolated Transformers 5 overlay')
+        pytest.skip(f'Requires pinned {variable} source and isolated Transformers 5 overlay')
     source = Path(source)
-    manifest = json.loads((Path(__file__).parents[2] / 'scripts/moss_speech_voicegenerator.json').read_text())
+    manifest = json.loads((Path(__file__).parents[2] / f'scripts/moss_speech_{variant}.json').read_text())
     for name in ('configuration_moss_tts.py', 'modeling_moss_tts.py', 'processing_moss_tts.py', 'inference_utils.py'):
         assert hashlib.sha256((source / name).read_bytes()).hexdigest() == manifest['files'][name]['sha256']
-    package = types.ModuleType('moss_delay_reference')
+    package = types.ModuleType(f'moss_{variant}_generation_reference')
     package.__path__ = [str(source)]
     sys.modules[package.__name__] = package
-    return (importlib.import_module('moss_delay_reference.modeling_moss_tts'),
-            importlib.import_module('moss_delay_reference.inference_utils'))
+    return (importlib.import_module(package.__name__ + '.modeling_moss_tts'),
+            importlib.import_module(package.__name__ + '.inference_utils'))
 
 
 @pytest.fixture(autouse=True)
@@ -161,23 +163,27 @@ def test_batch_items_stop_independently(reference):
 ])
 def test_tokenization_matches_worker_dictionary_path(reference, text, instruction, language):
     original, _ = reference
-    source = Path(os.environ['MOSS_VOICEGENERATOR_SOURCE'])
+    source = Path(original.__file__).parent
     tokenizer = Qwen2TokenizerFast.from_pretrained(str(source), local_files_only=True)
     config = original.MossTTSDelayConfig.from_pretrained(str(source), local_files_only=True)
-    processor = original.MossTTSDelayProcessor(tokenizer=tokenizer, model_config=config, normalize_inputs=True)
+    options = {'normalize_inputs': True} if 'voicegenerator' in original.__name__ else {}
+    processor = original.MossTTSDelayProcessor(tokenizer=tokenizer, model_config=config, **options)
     message = processor.build_user_message(text=text, instruction=instruction, language=language)
     expected = processor([[message]], mode='generation')['input_ids'][0, :, 0]
     raw = torch.frombuffer(bytearray((source / 'tokenizer.json').read_bytes()), dtype=torch.uint8)
-    native = MossSpeechTokenizer(tokenizer_data={'tokenizer_json': raw})
-    tokens = native.tokenize_with_weights(text, instruction=instruction, language=language)['moss_delay'][0]
+    native = MossSpeechTokenizer(tokenizer_data={'tokenizer_json': raw, 'dialogue': config.n_vq == 16 and config.language_config.hidden_size == 4096})
+    tokens = native.tokenize_with_weights(text, instruction=instruction, language=language,
+                                         normalize_text='acting' in original.__name__)['moss_delay'][0]
     assert [pair[0] for pair in tokens] == expected.tolist()
 
 
 def test_full_checkpoint_cached_logits(reference):
+    original, _ = reference
+    if 'voicegenerator' not in original.__name__:
+        pytest.skip('Full checkpoint logit fixture is specific to VoiceGenerator')
     checkpoint = os.environ.get('MOSS_VOICEGENERATOR_WEIGHTS')
     if not checkpoint:
         pytest.skip('Requires the full original VoiceGenerator checkpoint and about 10 GB RAM')
-    original, _ = reference
     source = Path(os.environ['MOSS_VOICEGENERATOR_SOURCE'])
     manifest = json.loads((Path(__file__).parents[2] / 'scripts/moss_speech_voicegenerator.json').read_text())
     with open(checkpoint, 'rb') as stream:
