@@ -1750,6 +1750,8 @@ class TEModel(Enum):
     AUDIO_FLAMINGO = 42
     QWEN3_OMNI = 43
     MOSS_VOICEGENERATOR = 44
+    MOSS_DELAY_8B = 45
+    MOSS_TTSD = 46
 
 
 def detect_te_model(sd):
@@ -1836,12 +1838,14 @@ def detect_te_model(sd):
     if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in moss_signature.items()):
         return TEModel.MOSS_AUDIO
     if 'emb_ext.0.weight' in sd and 'lm_heads.0.weight' in sd:
-        signature = {'model.norm.weight': 2048, 'model.layers.27.self_attn.q_norm.weight': 128,
-                     'model.embed_tokens.weight': 155648, 'lm_heads.0.weight': 155648,
-                     'emb_ext.0.weight': 1025, 'emb_ext.15.weight': 1025, 'lm_heads.16.weight': 1025}
-        if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in signature.items()):
-            return TEModel.MOSS_VOICEGENERATOR
-        raise ValueError('Unsupported MOSS speech checkpoint; this loader currently supports converted VoiceGenerator')
+        for kind, hidden, layers, books in ((TEModel.MOSS_VOICEGENERATOR, 2048, 28, 16),
+                                           (TEModel.MOSS_DELAY_8B, 4096, 36, 32), (TEModel.MOSS_TTSD, 4096, 36, 16)):
+            signature = {'model.norm.weight': hidden, f'model.layers.{layers - 1}.self_attn.q_norm.weight': 128,
+                         'model.embed_tokens.weight': 155648, 'lm_heads.0.weight': 155648,
+                         'emb_ext.0.weight': 1025, f'emb_ext.{books - 1}.weight': 1025, f'lm_heads.{books}.weight': 1025}
+            if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in signature.items()):
+                return kind
+        raise ValueError('Unsupported MOSS speech checkpoint; use the pinned delay-family converter')
     glm_signature = {"model.layers.0.post_self_attn_layernorm.weight": 1536,
                      "model.layers.0.post_mlp_layernorm.weight": 1536,
                      "model.layers.0.self_attn.q_proj.weight": 2048,
@@ -2072,10 +2076,16 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.clip = comfy.text_encoders.moss_audio.te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.moss_audio.MossAudioTokenizer
             tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
-        elif te_model == TEModel.MOSS_VOICEGENERATOR:
-            clip_target.clip = comfy.text_encoders.moss_speech.te(**llama_detect(clip_data))
+        elif te_model in (TEModel.MOSS_VOICEGENERATOR, TEModel.MOSS_DELAY_8B, TEModel.MOSS_TTSD):
+            speech_config = {}
+            if te_model != TEModel.MOSS_VOICEGENERATOR:
+                speech_config = {'language': dict(hidden_size=4096, intermediate_size=12288, num_hidden_layers=36, num_attention_heads=32),
+                                 'codebooks': 32 if te_model == TEModel.MOSS_DELAY_8B else 16}
+            clip_target.clip = comfy.text_encoders.moss_speech.te(**llama_detect(clip_data), speech_config=speech_config)
             clip_target.tokenizer = comfy.text_encoders.moss_speech.MossSpeechTokenizer
             tokenizer_data['tokenizer_json'] = clip_data[0].pop('tokenizer_json', None)
+            tokenizer_data['codebooks'] = speech_config.get('codebooks', 16)
+            tokenizer_data['dialogue'] = te_model == TEModel.MOSS_TTSD
         elif te_model == TEModel.GLM_OCR:
             clip_target.clip = comfy.text_encoders.glm_ocr.te(dtype_llama=clip_data[0]['model.norm.weight'].dtype)
             clip_target.tokenizer = comfy.text_encoders.glm_ocr.GlmOCRTokenizer

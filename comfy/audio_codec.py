@@ -30,6 +30,7 @@ class AudioCodeSegment:
     codes: torch.Tensor  # [batch, ordered codebook prefix, frames], integer IDs
     lengths: tuple[int, ...]
     source_sample_lengths: tuple[int, ...] | None = None
+    decode_skip_frames: tuple[int, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,8 @@ class AudioCodes:
                 raise ValueError('AUDIO_CODES valid frame lengths must match the batch and stored frames')
             if segment.source_sample_lengths is not None and (len(segment.source_sample_lengths) != codes.shape[0] or any(type(n) is not int or n < 0 for n in segment.source_sample_lengths)):
                 raise ValueError('AUDIO_CODES source sample lengths must be nonnegative integers matching the batch')
+            if segment.decode_skip_frames is not None and (len(segment.decode_skip_frames) != codes.shape[0] or any(type(n) is not int or n < 0 for n in segment.decode_skip_frames)):
+                raise ValueError('AUDIO_CODES decoded prefix lengths must be nonnegative integers matching the batch')
             for i, length in enumerate(segment.lengths):
                 for book, size in enumerate(codec.codebook_sizes[:codes.shape[1]]):
                     valid = codes[i, book, :length]
@@ -136,6 +139,12 @@ class AudioCodec:
                             waveform = self.model.decode(valid).to(device='cpu', copy=True)
                         else:
                             waveform = torch.empty((1, 1, 0), dtype=torch.float32)
+                        skip = segment.decode_skip_frames[i] if segment.decode_skip_frames is not None else 0
+                        if skip:
+                            if skip >= length:
+                                continue
+                            # Retain causal codec context until decoding is complete.
+                            waveform = waveform[..., int(waveform.shape[-1] * (skip / length)):].clone()
                         output.append({'waveform': waveform, 'sample_rate': self.identity.sample_rate})
         return output
 
