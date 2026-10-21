@@ -29,8 +29,8 @@ See [model files, workflow, verification and limits](docs/fibo2.md).
 
 This fork adds offline BF16 packaging and native CLIP generation for MOSS Local
 Transformer, using synchronous 32-book audio, the shared MOSS v1 codec, references
-and continuation. Pinned CPU comparisons pass; GPU and quality acceptance remain
-pending. See [conversion, explicit sampling defaults and limits](docs/native-audio-grounding.md#native-local-transformer).
+and continuation. Pinned CPU comparisons and short RTX 5090 generation/lifecycle
+checks pass; broader quality and serving acceptance remain pending. See [conversion, explicit sampling defaults and limits](docs/native-audio-grounding.md#native-local-transformer).
 
 ## Native Drama 3 in this fork
 
