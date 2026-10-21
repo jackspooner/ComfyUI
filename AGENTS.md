@@ -468,3 +468,17 @@ limits. Run `python -m pytest tests-unit/comfy_test/drama3_test.py -q`; set
 `DRAMA3_UPSTREAM` to the pinned offline source for independent component checks.
 Keep model files outside Git. Update the authoritative existing ComfyUI and
 model-runtime skills with capability changes; do not register task worktrees.
+
+
+### Native archive model cache
+
+Read `docs/model-cache.md` before changing `comfy/model_cache`, archive resolution,
+execution resource tracking or selective cache release. It runs inside ComfyUI;
+never add a parallel daemon for the same ownership. Setup additionally checks the
+existing PyYAML and standard SQLite modules. Run the prepared interpreter with
+`-m pytest tests-unit/comfy_test/model_cache_test.py tests-unit/execution_test tests-unit/folder_paths_test -q`.
+The execution suite requires its declared pytest-asyncio dependency. All cache
+fixtures must use isolated archive/cache directories; never test eviction against
+operator models. Model files remain outside Git. Update the authoritative shared
+`comfyui` skill and its model-cache reference alongside reusable changes. The local
+CLI queues commands; no new HTTP or MCP interface is introduced.
