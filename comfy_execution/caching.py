@@ -1,4 +1,5 @@
 import asyncio
+import comfy.model_cache
 import bisect
 import itertools
 import logging
@@ -156,6 +157,7 @@ class BasicCache:
         self.dynprompt: DynamicPrompt
         self.cache_key_set: CacheKeySet
         self.cache = {}
+        self.model_files = {}
         self.subcaches = {}
         self._pending_store_tasks: set = set()
 
@@ -183,6 +185,7 @@ class BasicCache:
             del self.cache[key]
 
     def _clean_subcaches(self):
+        self.model_files = {key: value for key, value in self.model_files.items() if key in self.cache}
         preserve_subcaches = set(self.cache_key_set.get_used_subcache_keys())
 
         to_remove = []
@@ -241,6 +244,8 @@ class BasicCache:
             CacheValue, _contains_self_unequal, _logger
         )
 
+        if comfy.model_cache.resources():
+            return
         if not self.enable_providers:
             return
         if not _has_cache_providers():
@@ -351,6 +356,25 @@ class BasicCache:
         else:
             return None
 
+    def get_model_files(self, node_id):
+        if not self.initialized:
+            return frozenset()
+        return self.model_files.get(self.cache_key_set.get_data_key(node_id), frozenset())
+
+    def set_model_files(self, node_id, files):
+        if self.initialized:
+            key = self.cache_key_set.get_data_key(node_id)
+            if key in self.cache and files:
+                self.model_files[key] = self.model_files.get(key, frozenset()) | frozenset(files)
+
+    def evict_model_files(self, files):
+        for key in list(self.model_files):
+            if key not in self.cache or self.model_files[key] & files:
+                self.cache.pop(key, None)
+                del self.model_files[key]
+        for cache in self.subcaches.values():
+            cache.evict_model_files(files)
+
     def recursive_debug_dump(self):
         result = []
         for key in self.cache:
@@ -381,6 +405,18 @@ class HierarchicalCache(BasicCache):
                 return None
         return cache
 
+    def get_model_files(self, node_id):
+        if not self.initialized:
+            return frozenset()
+        cache = self._get_cache_for(node_id)
+        return BasicCache.get_model_files(cache, node_id) if cache is not None else frozenset()
+
+    def set_model_files(self, node_id, files):
+        if self.initialized:
+            cache = self._get_cache_for(node_id)
+            if cache is not None:
+                BasicCache.set_model_files(cache, node_id, files)
+
     async def get(self, node_id):
         cache = self._get_cache_for(node_id)
         if cache is None:
@@ -409,6 +445,15 @@ class HierarchicalCache(BasicCache):
         return await cache._ensure_subcache(node_id, children_ids)
 
 class NullCache:
+
+    def get_model_files(self, node_id):
+        return frozenset()
+
+    def set_model_files(self, node_id, files):
+        pass
+
+    def evict_model_files(self, files):
+        pass
 
     async def set_prompt(self, dynprompt, node_ids, is_changed_cache):
         pass
@@ -445,6 +490,11 @@ class LRUCache(BasicCache):
         self.generation = 0
         self.used_generation = {}
         self.children = {}
+
+    def evict_model_files(self, files):
+        super().evict_model_files(files)
+        self.used_generation = {key: value for key, value in self.used_generation.items() if key in self.cache}
+        self.children = {key: value for key, value in self.children.items() if key in self.cache}
 
     async def set_prompt(self, dynprompt, node_ids, is_changed_cache):
         await super().set_prompt(dynprompt, node_ids, is_changed_cache)
@@ -547,6 +597,10 @@ class RAMPressureCache(LRUCache):
     def set_local(self, node_id, value):
         self.timestamps[self.cache_key_set.get_data_key(node_id)] = time.time()
         super().set_local(node_id, value)
+
+    def evict_model_files(self, files):
+        super().evict_model_files(files)
+        self.timestamps = {key: value for key, value in self.timestamps.items() if key in self.cache}
 
     def ram_release(self, target, free_active=False, min_entry_size=0):
         if virtual_memory_available() >= target:

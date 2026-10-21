@@ -1,0 +1,9 @@
+# Opt-in: python main.py --model-cache-config /absolute/path/model-cache.yaml
+# Discover the source filesystem UUID with: findmnt -n -o UUID --target /mnt/model-archive/Models
+archive_root: /mnt/model-archive/Models
+archive_uuid: REPLACE_WITH_SOURCE_FILESYSTEM_UUID
+# Dedicated private directory (0700), detected as fast NVMe by ComfyUI.
+cache_root: /path/on/nvme/comfy-model-cache
+max_bytes: 107374182400       # 100 GiB
+reserve_bytes: 107374182400   # Keep 100 GiB free for other applications
+idle_seconds: 1800

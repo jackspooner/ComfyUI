@@ -18,6 +18,7 @@
 
 
 import torch
+import comfy.model_cache
 import math
 import struct
 import ctypes
@@ -157,6 +158,8 @@ def load_safetensors(ckpt):
 
 
 def load_torch_file(ckpt, safe_load=False, device=None, return_metadata=False):
+    progress = ProgressBar(100) if comfy.model_cache.manager is not None else None
+    ckpt = comfy.model_cache.stage(ckpt, (lambda done, total: progress.update_absolute(int(done * 100 / max(total, 1)))) if progress else None)
     if device is None:
         device = torch.device("cpu")
     metadata = None
