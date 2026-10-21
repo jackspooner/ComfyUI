@@ -425,9 +425,9 @@ extend it alongside this capability rather than creating a per-model skill.
 
 ### Text conversation verification
 
-Native Qwen35 and MOSS TextGenerate history is documented in
+Native text/image TextGenerate history is documented in
 `docs/text-conversations.md`. Use the prepared interpreter to run
-`python -m pytest tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q`.
+`python -m pytest tests-unit/comfy_test/image_history_test.py tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q`.
 Run broader required checks and report external/runtime limitations. The shared
 `comfyui` skill owns operating guidance; locate its authoritative source with
 `skills show comfyui` and update it alongside capability changes. Reconcile

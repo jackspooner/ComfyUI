@@ -229,6 +229,9 @@ class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
                     else:
                         emb = None
 
+                expected = o[1].get("expected_length") if isinstance(o[1], dict) else None
+                if expected is not None and emb is None:
+                    raise ValueError("Image history could not be encoded by this model.")
                 if emb is None:
                     index += -1
                     continue
@@ -236,6 +239,10 @@ class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
                 ind = index + o[0]
                 emb = emb.view(1, -1, emb.shape[-1]).to(device=device, dtype=torch.float32)
                 emb_shape = emb.shape[1]
+                if expected is not None and emb.shape[-1] != tokens_embed.shape[-1]:
+                    raise ValueError("Image history embedding width does not match the text model.")
+                if expected is not None and emb_shape != expected:
+                    raise ValueError(f"Image token accounting mismatch: expected {expected}, encoded {emb_shape}.")
                 if emb.shape[-1] == tokens_embed.shape[-1]:
                     tokens_embed = torch.cat([tokens_embed[:, :ind], emb, tokens_embed[:, ind:]], dim=1)
                     attention_mask = attention_mask[:ind] + [1] * emb_shape + attention_mask[ind:]
@@ -307,6 +314,12 @@ class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
 
     def load_sd(self, sd):
         return self.transformer.load_state_dict(sd, strict=False, assign=getattr(self, "can_assign_sd", False))
+
+    def get_chat_context_length(self):
+        return self.transformer.model.config.max_position_embeddings
+
+    def count_chat_tokens(self, tokens):
+        return self.transformer.count_chat_tokens(tokens)
 
     def generate(self, tokens, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, presence_penalty=0.0, mtp=True):
         if isinstance(tokens, dict):
@@ -745,6 +758,12 @@ class SD1ClipModel(torch.nn.Module):
 
     def load_sd(self, sd):
         return getattr(self, self.clip).load_sd(sd)
+
+    def get_chat_context_length(self):
+        return getattr(self, self.clip).get_chat_context_length()
+
+    def count_chat_tokens(self, tokens):
+        return getattr(self, self.clip).count_chat_tokens(tokens)
 
     def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True):
         return getattr(self, self.clip).generate(tokens, do_sample=do_sample, max_length=max_length, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty, seed=seed, presence_penalty=presence_penalty, mtp=mtp)

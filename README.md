@@ -128,9 +128,11 @@ the production OCR route remains unconfigured. See the linked acceptance limits.
 
 ## Native text conversations in this fork
 
-This fork also adds optional text conversation history and exact context budgets
+This fork also adds text/image conversation history and exact context budgets
 to the existing **Load CLIP → Generate Text** path for native Qwen3.5/Qwen3.8 and
-MOSS. History is explicit JSON input/output; saving it belongs to the caller.
+MOSS, plus complete Qwen-VL/Omni, Gemma3/4 and GLM-OCR image paths.
+Templated image turns snapshot exact pixels into local immutable safetensors;
+replay needs both the JSON and attachments. Saving history belongs to the caller.
 Existing single-prompt and media paths remain available. See
 [native text conversations](docs/text-conversations.md) for prerequisites,
 contracts, examples, limits and verification. This source capability requires
@@ -238,7 +240,8 @@ both paths pass 20/24 cases, retaining checkpoint OCR/silence limitations and
 prompt sensitivity. See [operation and saved workflow](docs/qwen3-omni/usage.md),
 [measurements and live evidence](docs/qwen3-omni/status.md), and
 [conversion/recovery](docs/qwen3-omni/quantization.md). Video, speech output,
-diffusion conditioning and Omni history are outside this integration.
+diffusion conditioning remain outside this integration. Text/image history uses
+the shared [conversation contract](docs/text-conversations.md); audio/video history is excluded.
 Native packages may mix validated dense and NVFP4 projections; the offline
 converter still targets the pinned source. [Compatibility and upstream assessment](docs/qwen3-omni/upstream-readiness.md)
 records reference blockers, residual precision limits and proposed patch boundaries.

@@ -1,18 +1,20 @@
 # Native text conversations
 
 This fork extends the existing `CLIPLoader → TextGenerate` path with explicit,
-versioned text history and exact context accounting. These source changes require
+versioned text/image history and exact context accounting. These source changes require
 a ComfyUI restart before the running node exposes them. No model is downloaded,
-session stored, tool executed or external service contacted by this feature.
+implicit session stored, tool executed or external service contacted by this feature.
 
 ## Models and prerequisites
 
-Use an installed generative Qwen3.5/Qwen3.8 text encoder or native MOSS-Audio
-checkpoint with its existing loader type. The Qwen35 and MOSS tokenizer/model
-adapters own formatting and runtime context limits. Other CLIP implementations
-fail explicitly when they lack this interface. Embedding-only encoders do not gain
-generation support. Discover filenames from `/object_info/CLIPLoader` and verify
-checkpoint completeness with the existing model owner.
+Complete native Qwen2.5-VL, Qwen3-VL, Qwen3.5/3.8, Qwen3-Omni,
+Gemma3, Gemma4 and GLM-OCR support text/image history. Native MOSS and Audio
+Flamingo retain text-only history. Use the existing loader and a complete
+checkpoint; conditioning-only/truncated encoders are not made generative.
+GLM-OCR remains a task-specific recognizer: replay support is not evidence of
+conversational quality. Discover filenames from `/object_info/CLIPLoader`.
+Tokenizers own formatting and models own their context limit and visual count.
+Unsupported adapters fail explicitly.
 
 ## Node interface
 
@@ -21,24 +23,27 @@ inputs are optional:
 
 | Input | Behavior |
 | --- | --- |
-| `history` | STRING containing version 1 JSON. Connect `{"version":1,"messages":[]}` to start a conversation. Empty/omitted keeps the existing single-prompt path unless another new control enables conversation mode. |
+| `history` | STRING containing version 1 text or version 2 image JSON. Connect `{"version":1,"messages":[]}` to start a conversation. Empty/omitted keeps the existing single-prompt path unless another new control enables conversation mode. |
+| `prompt_content` | Optional STRING JSON array of ordered text/image parts. Requires empty `prompt` and no IMAGE socket. |
 | `context_budget` | Total conversation token ceiling, including generated output. `0` uses the loaded model limit; a positive value enables conversation mode and may only lower that limit. |
 | `history_policy` | `error` (default) or `drop_oldest_turns`. The latter explicitly enables exclusion of complete old user/assistant pairs from this generation. |
 
 Conversation mode uses `prompt` as a new user message. `system_prompt`, when
 nonempty, replaces the leading system message; otherwise an existing one is
 preserved. MOSS supplies its ordinary helpful-assistant default when absent.
-Use `use_default_template=true`. Raw-template bypass and image/video/audio inputs
-are rejected in conversation mode. Existing single-prompt media paths remain
-available with the new controls at their defaults and history absent.
+Use `use_default_template=true`. IMAGE batches become individual image parts before
+the current prompt; different turns can have different dimensions. Templated image
+requests automatically enter history mode, including an image-only first turn.
+Explicit history rejects raw-template bypass and audio/video. Raw and audio/video
+paths retain their existing behavior with history controls absent.
 
 Outputs are `generated_text` at 0, `thinking` at 1, `history` at 2 and
-`context_info` at 3. Ordinary templated text also returns its first turn as history
+`context_info` at 3, and `raw_text` at 4. Ordinary templated text also returns its first turn as history
 so it can connect directly to another generation; its generation path stays
-unchanged and context_info is empty. Raw-prompt and media paths return empty
-history. Supply the empty envelope or a positive budget to budget the first turn
+unchanged and context_info is empty. Raw-prompt and audio/video paths return empty
+history. Templated image paths return reusable history and exact context_info. Supply the empty envelope or a positive budget to budget the first turn
 exactly. The specialized Generate LTX2 Prompt node retains its original inputs
-and two outputs.
+and two outputs, and never snapshots images.
 
 ## History and state
 
@@ -50,9 +55,9 @@ and two outputs.
 ]}
 ```
 
-Only role and string content are accepted per message. There may be one leading
+Version 1 accepts only role and string content per message; version 2 also accepts ordered content arrays for user/assistant messages. There may be one leading
 system message; remaining messages may be user or assistant. Role order is
-preserved, including consecutive messages of the same role. Tools, media parts,
+preserved, including consecutive messages of the same role. Tools, unsupported media parts,
 additional fields and unknown envelope versions fail before generation.
 
 The returned history contains the complete normalized input and the new user and
@@ -68,12 +73,46 @@ not introduced. Use an existing SaveText output node to expose strings in
 ComfyUI `/history`; sockets alone do not appear there automatically. Saved JSON
 is ordinary plaintext and follows the caller's file retention policy.
 
+## Image attachments
+
+`prompt_content` is a JSON string encoding this array (not a separate prompt):
+
+```json
+[{"type":"text","text":"Compare this with the first image."},
+ {"type":"image","file":{"filename":"second.png","subfolder":"chat"}}]
+```
+
+An image part may instead use `{"type":"image","image_id":"<64 lowercase hex characters>"}`.
+The same parts are accepted in version 2 history message content. URLs, absolute
+paths and escaping references are rejected. File references resolve only inside
+ComfyUI's input directory, select the first frame, apply EXIF orientation and decode
+RGB. IMAGE sockets preserve their exact supplied tensor pixels, shape and dtype.
+Model-specific resizing/normalization happens only after resolution.
+
+On successful generation, snapshots are published as safetensors in the configured
+system-user directory's `text_history/images/` folder. IDs hash dtype, shape and
+pixel bytes. Atomic publication deduplicates identical snapshots. Returned histories
+use IDs only; they do not depend on the original uploads. Copy the JSON **and all
+referenced safetensors** together when backing up or migrating. Retention is explicit:
+there is no expiry or automatic garbage collection. Branches may share attachments.
+Deleting a RouterText chat does not delete these independently reusable files.
+
+Generation/cancellation/write failures return no updated history and leave the
+input unchanged. Temporary files are removed; already published shared attachments
+are never rolled back (partial publication may leave an unused snapshot). Restore
+missing/corrupt snapshots under their original IDs; do not substitute other pixels.
+Traversal and escaping symlinks fail. File content participates in node cache
+fingerprints; linked history that cannot be inspected invalidates conservatively.
+Models/tokenizers receive tensors and content only, never IDs or filesystem paths.
+
 ## Context accounting
 
 The model tokenizer formats role delimiters and the generation/thinking prefix
 before counting. Text tokens are measured from the actual integer token stream;
-media embeddings are rejected rather than estimated. No GPU loading or vision
-encoding is required to count these text tokens.
+visual tokens use the same geometry/configuration as preprocessing, without vision
+inference during context selection. The actual expanded embeddings must match the
+count. Excluding a turn excludes its images from inference while retaining all
+references in returned history. No persistent GPU/session cache is introduced.
 
 `input_tokens + output_allowance <= context_limit`. Positive `max_length`
 reserves that many new tokens, including thinking. `max_length=0` uses remaining
@@ -140,7 +179,7 @@ require correcting the envelope. Never clear another user's queue to recover.
 Prepare a worktree with the root AGENTS.md setup command. Run:
 
 ```sh
-"$COMFYUI_PYTHON" -m pytest tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q
+"$COMFYUI_PYTHON" -m pytest tests-unit/comfy_test/image_history_test.py tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q
 ```
 
 The tests cover exact boundaries, a real Qwen tokenizer, system replacement,

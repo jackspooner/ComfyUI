@@ -1,5 +1,7 @@
+from .chat import qwen_chat
 from transformers import Qwen2Tokenizer
 from comfy import sd1_clip
+import comfy.text_encoders.qwen_vl
 import comfy.text_encoders.llama
 import os
 import torch
@@ -12,6 +14,9 @@ class Qwen25_7BVLITokenizer(sd1_clip.SDTokenizer):
 
 
 class QwenImageTokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_chat(self, messages, thinking=False):
+        return {self.clip: qwen_chat(messages, getattr(self, self.clip).tokenizer)}
+
     def __init__(self, embedding_directory=None, tokenizer_data={}):
         super().__init__(embedding_directory=embedding_directory, tokenizer_data=tokenizer_data, name="qwen25_7b", tokenizer=Qwen25_7BVLITokenizer)
         self.llama_template = "<|im_start|>system\nDescribe the image by detailing the color, shape, size, texture, quantity, text, spatial relationships of the objects and background:<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
@@ -50,6 +55,13 @@ class QwenImageTokenizer(sd1_clip.SD1Tokenizer):
 
 
 class Qwen25_7BVLIModel(sd1_clip.SDClipModel):
+    def generate(self, tokens, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, presence_penalty=0.0, mtp=True):
+        rows = next(iter(tokens.values())) if isinstance(tokens, dict) else tokens
+        embeds, _, _, info = self.process_tokens([[t[0] for t in row] for row in rows], self.execution_device)
+        positions = comfy.text_encoders.qwen_vl.qwen2vl_mrope_position_ids(info, embeds.shape[1], embeds.device)
+        return self.transformer.generate(embeds, do_sample, max_length, temperature, top_k, top_p, min_p,
+                                         repetition_penalty, seed, presence_penalty=presence_penalty, position_ids=positions)
+
     def __init__(self, device="cpu", layer="last", layer_idx=None, dtype=None, attention_mask=True, model_options={}):
         super().__init__(device=device, layer=layer, layer_idx=layer_idx, textmodel_json_config={}, dtype=dtype, special_tokens={"pad": 151643}, layer_norm_hidden_state=False, model_class=comfy.text_encoders.llama.Qwen25_7BVLI, enable_attention_masks=attention_mask, return_attention_masks=attention_mask, model_options=model_options)
 

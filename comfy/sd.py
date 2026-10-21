@@ -350,6 +350,9 @@ class CLIP:
             raise ValueError("This tokenizer does not support structured text conversations.")
         return tokenize(messages, thinking=thinking)
 
+    def count_chat_tokens(self, tokens):
+        return self.cond_stage_model.count_chat_tokens(tokens)
+
     def get_chat_context_length(self):
         context = getattr(self.cond_stage_model, "get_chat_context_length", None)
         if context is None:

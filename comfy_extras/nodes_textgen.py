@@ -1,9 +1,13 @@
 from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 import json
-from comfy.text_generation import read_history, select_context, write_history
+from comfy.text_generation import read_history, select_context, write_history, count_text_tokens
+import comfy.model_management
+from comfy_extras.text_history_images import resolve_images, publish_images, fingerprint
 
 class TextGenerate(io.ComfyNode):
+    history_output = True
+
     @classmethod
     def define_schema(cls):
         # Define dynamic combo options for sampling mode
@@ -43,8 +47,9 @@ class TextGenerate(io.ComfyNode):
                 io.Boolean.Input("use_default_template", optional=True, default=True, tooltip="Use the built in system prompt/template if the model has one.", advanced=True),
                 io.Combo.Input("mtp", options=["auto", "off", "2", "3", "4", "5"], default="auto", optional=True, tooltip="Speculative decoding with the checkpoint's multi-token-prediction head. No effect without MTP weights. auto adapts the draft depth; 2-5 pins it. Sampled output stays correctly distributed but differs from non-MTP output for the same seed."),
                 io.String.Input("system_prompt", force_input=True, optional=True, tooltip="Replaces the system prompt in the model's chat template. Ignored when the default template is not used."),
-                io.String.Input("history", force_input=True, optional=True, tooltip='Version 1 text history JSON. Start with {"version":1,"messages":[]}. Empty keeps the existing single prompt path.'),
-                io.Int.Input("context_budget", default=0, min=0, max=1048576, optional=True, tooltip="Total text conversation tokens including output. 0 uses the model limit. A positive budget enables conversation mode."),
+                io.String.Input("history", force_input=True, optional=True, tooltip='Version 1 text or version 2 image history JSON. Start with {"version":1,"messages":[]}. Empty keeps the existing single prompt path.'),
+                io.String.Input("prompt_content", force_input=True, optional=True, tooltip="Ordered JSON text/image parts for the current user message. Requires empty prompt and no IMAGE input. Local input files or saved image IDs only."),
+                io.Int.Input("context_budget", default=0, min=0, max=1048576, optional=True, tooltip="Total conversation tokens including images and output. 0 uses the model limit. A positive budget enables conversation mode."),
                 io.Combo.Input("history_policy", options=["error", "drop_oldest_turns"], default="error", optional=True, tooltip="Fail on overflow, or explicitly exclude oldest complete turns from this generation. Returned history stays complete."),
             ],
             outputs=[
@@ -57,19 +62,33 @@ class TextGenerate(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error") -> io.NodeOutput:
+    def fingerprint_inputs(cls, history="", prompt_content="", **kwargs):
+        if history is None or prompt_content is None:
+            return float("nan")  # Linked histories are unavailable during the constants-only fingerprint pass.
+        return fingerprint(read_history(history, "", prompt_content=prompt_content))
+
+    @classmethod
+    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="") -> io.NodeOutput:
 
         mtp = False if mtp == "off" else (True if mtp == "auto" else int(mtp))
 
         messages = None
         context_info = None
-        if history or context_budget or history_policy != "error":
+        stored_messages = None
+        pending_images = {}
+        if prompt_content and (prompt or image is not None):
+            raise ValueError("prompt_content requires an empty prompt and no IMAGE input.")
+        image_conversation = cls.history_output and use_default_template and image is not None and video is None and audio is None
+        if history or prompt_content or context_budget or history_policy != "error" or image_conversation:
             if not use_default_template:
                 raise ValueError("Text history requires use_default_template enabled.")
-            if image is not None or video is not None or audio is not None:
-                raise ValueError("Text history does not yet support image, video or audio inputs. Use the existing single prompt media path.")
-            messages = read_history(history, prompt, system_prompt)
-            tokens, context_info = select_context(messages, lambda turns: clip.tokenize_chat(turns, thinking=thinking), clip.get_chat_context_length(), context_budget, max_length, history_policy)
+            if video is not None or audio is not None:
+                raise ValueError("Conversation history does not support video or audio inputs. Use the existing single prompt media path.")
+            messages = read_history(history, prompt, system_prompt, prompt_content)
+            messages, stored_messages, pending_images = resolve_images(messages, image)
+            has_images = any(isinstance(m["content"], list) and any(p["type"] == "image" for p in m["content"]) for m in messages)
+            counter = clip.count_chat_tokens if has_images else count_text_tokens
+            tokens, context_info = select_context(messages, lambda turns: clip.tokenize_chat(turns, thinking=thinking), clip.get_chat_context_length(), context_budget, max_length, history_policy, counter)
             max_length = context_info["output_allowance"]
         else:
             tokens = clip.tokenize(prompt, image=image, skip_template=not use_default_template, min_length=1, thinking=thinking, video=video, audio=audio, system_prompt=system_prompt if use_default_template else "")
@@ -109,10 +128,12 @@ class TextGenerate(io.ComfyNode):
                 reasoning, text = "", generated_text
 
         updated_history = ""
-        if messages is None and use_default_template and image is None and video is None and audio is None:
+        if messages is None and cls.history_output and use_default_template and image is None and video is None and audio is None:
             messages = read_history("", prompt, system_prompt)
         if messages is not None:
-            updated_history = write_history([*messages, {"role": "assistant", "content": text.strip()}])
+            comfy.model_management.throw_exception_if_processing_interrupted()
+            publish_images(pending_images)
+            updated_history = write_history([*(stored_messages if stored_messages is not None else messages), {"role": "assistant", "content": text.strip()}])
         if context_info is not None:
             context_info["generated_tokens"] = len(generated_ids)
         return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip(), updated_history, json.dumps(context_info) if context_info is not None else "", generated_text)
@@ -251,6 +272,8 @@ AESTHETIC QUALITY (in addition to the above, without breaking the objective capt
 
 
 class TextGenerateLTX2Prompt(TextGenerate):
+    history_output = False
+
     @classmethod
     def define_schema(cls):
         parent_schema = super().define_schema()
@@ -258,7 +281,7 @@ class TextGenerateLTX2Prompt(TextGenerate):
             node_id="TextGenerateLTX2Prompt",
             display_name="Generate LTX2 Prompt",
             category=parent_schema.category,
-            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy")],
+            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy", "prompt_content")],
             outputs=parent_schema.outputs[:2],
             search_aliases=["prompt enhance", "LLM", "gemma"],
         )
