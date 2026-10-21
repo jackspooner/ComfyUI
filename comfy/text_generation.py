@@ -53,9 +53,11 @@ def format_qwen_chat(messages, thinking):
 
 
 def count_text_tokens(tokens):
-    if len(tokens) != 1:
-        raise ValueError("Conversation token accounting requires one generative tokenizer stream.")
-    rows = next(iter(tokens.values()))
+    if isinstance(tokens, dict):
+        if len(tokens) != 1:
+            raise ValueError("Conversation token accounting requires one generative tokenizer stream.")
+        tokens = next(iter(tokens.values()))
+    rows = tokens
     if any(type(item[0]) is not int for row in rows for item in row):
         raise ValueError("Text history does not support media embeddings.")
     return sum(len(row) for row in rows)
