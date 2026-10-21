@@ -1,3 +1,11 @@
+## MiniMax H3 blueprints in this fork
+
+**MiniMax H3 - Ref2V** and **MiniMax H3 - FL2V** provide editable video/audio
+subgraphs with distillation and attention dropdowns, preset attention defaults,
+an optional step-count override, duration in seconds, prompt, width and height.
+They use the locally provisioned native H3 models and installed PDD/Cutlery nodes;
+no weights are downloaded. See [controls, requirements and verification limits](docs/h3-video-blueprints.md).
+
 ## Native archive model cache in this fork
 
 This fork adds an opt-in Linux NVMe cache for safetensors models stored in a
