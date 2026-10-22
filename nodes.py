@@ -41,6 +41,7 @@ import importlib
 
 from app import governance
 import folder_paths
+from comfy.image_paths import resolve_image_path
 import latent_preview
 import node_helpers
 
@@ -1762,7 +1763,7 @@ class LoadImage:
     FUNCTION = "load_image"
 
     def load_image(self, image):
-        image_path = folder_paths.get_annotated_filepath(image)
+        image_path = resolve_image_path(image)
 
         dtype = comfy.model_management.intermediate_dtype()
         device = comfy.model_management.intermediate_device()
@@ -1807,7 +1808,7 @@ class LoadImage:
 
     @classmethod
     def IS_CHANGED(s, image):
-        image_path = folder_paths.get_annotated_filepath(image)
+        image_path = resolve_image_path(image)
         m = hashlib.sha256()
         with open(image_path, 'rb') as f:
             m.update(f.read())
@@ -1815,8 +1816,12 @@ class LoadImage:
 
     @classmethod
     def VALIDATE_INPUTS(s, image):
-        if not folder_paths.exists_annotated_filepath(image):
-            return "Invalid image file: {}".format(image)
+        try:
+            image_path = resolve_image_path(image)
+            if not os.path.isfile(image_path):
+                return "Invalid image file: {}".format(image)
+        except (OSError, ValueError) as error:
+            return "Invalid image file: {} ({})".format(image, error)
 
         return True
 

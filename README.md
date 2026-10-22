@@ -1,3 +1,19 @@
+## External image references in this fork
+
+Start with `--allow-external-image-paths` to let **Load Image** and **Load Image
+(as Mask)** read an absolute image filename anywhere the process can read. The
+file stays in its original location; changing it changes subsequent executions,
+and moving or deleting it breaks the reference. This is opt-in and does not relax
+the generic annotated-path resolver or other file endpoints. `/features` reports
+`external_image_paths`; `/view?filename=<URL-encoded-absolute-path>` serves only
+verified image files with the existing preview/channel options. Relative input,
+output and temporary references keep their existing behavior.
+
+The matching Cutlery external-image preview extension restores these references
+in frontend workflow views. RouterImage uses direct local references and imports
+URL/inline bytes through `/upload/image`; imported inputs persist until deleted.
+Old outputs referencing already-deleted temporary inputs are not repaired.
+
 ## MiniMax H3 blueprints in this fork
 
 **MiniMax H3 - Ref2V** and **MiniMax H3 - FL2V** provide editable video/audio

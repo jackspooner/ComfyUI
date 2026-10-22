@@ -7,6 +7,7 @@ import time
 
 import nodes
 import folder_paths
+from comfy.image_paths import resolve_image_path
 import execution
 from comfy_execution.jobs import (
     JobStatus,
@@ -602,7 +603,19 @@ class PromptServer():
                 # (e.g. "blake3:...") as widget values. When litegraph renders the
                 # node preview, it constructs /view?filename=<asset_hash>, so this
                 # endpoint must resolve blake3 hashes to their on-disk file paths.
-                if filename.startswith("blake3:"):
+                if os.path.isabs(filename):
+                    try:
+                        file = resolve_image_path(filename)
+                        with Image.open(file) as image:
+                            resolved_content_type = Image.MIME.get(image.format, 'application/octet-stream')
+                    except PermissionError:
+                        return web.Response(status=403, text="External image is not permitted or readable")
+                    except FileNotFoundError:
+                        return web.Response(status=404, text="External image is missing")
+                    except (OSError, ValueError):
+                        return web.Response(status=400, text="Invalid external image")
+                    filename = os.path.basename(file)
+                elif filename.startswith("blake3:"):
                     if not self.asset_manager.enabled:
                         return web.Response(status=404)
                     # Side-effect call: get_request_user_id raises KeyError for an unknown or
