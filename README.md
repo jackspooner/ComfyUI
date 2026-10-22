@@ -142,7 +142,8 @@ MOSS, plus complete Qwen-VL/Omni, Gemma3/4 and GLM-OCR image paths.
 Templated image turns snapshot exact pixels into local immutable safetensors under
 the configured system-user `text_history/images` directory;
 replay needs both the JSON and attachments. Saving history belongs to the caller.
-Existing single-prompt and media paths remain available. See
+Audio/video inputs automatically use the single-prompt media path when no history
+or structured content is supplied, regardless of conversation budget/policy settings. See
 [native text conversations](docs/text-conversations.md) for prerequisites,
 contracts, examples, limits and verification. This source capability requires
 deployment before it appears in a running ComfyUI process. The

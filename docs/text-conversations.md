@@ -25,8 +25,8 @@ inputs are optional:
 | --- | --- |
 | `history` | STRING containing version 1 text or version 2 image JSON. Connect `{"version":1,"messages":[]}` to start a conversation. Empty/omitted keeps the existing single-prompt path unless another new control enables conversation mode. |
 | `prompt_content` | Optional STRING JSON array of ordered text/image parts. Requires empty `prompt` and no IMAGE socket. |
-| `context_budget` | Total conversation token ceiling, including generated output. `0` uses the loaded model limit; a positive value enables conversation mode and may only lower that limit. |
-| `history_policy` | `error` (default) or `drop_oldest_turns`. The latter explicitly enables exclusion of complete old user/assistant pairs from this generation. |
+| `context_budget` | Total conversation token ceiling, including generated output. `0` uses the loaded model limit; a positive value enables text/image conversation mode and may only lower that limit. Does not apply to audio/video inputs. |
+| `history_policy` | `error` (default) or `drop_oldest_turns`. The latter explicitly enables exclusion of complete old user/assistant pairs from this generation. Does not apply to audio/video inputs. |
 
 Conversation mode uses `prompt` as a new user message. `system_prompt`, when
 nonempty, replaces the leading system message; otherwise an existing one is
@@ -34,8 +34,12 @@ preserved. MOSS supplies its ordinary helpful-assistant default when absent.
 Use `use_default_template=true`. IMAGE batches become individual image parts before
 the current prompt; different turns can have different dimensions. Templated image
 requests automatically enter history mode, including an image-only first turn.
-Explicit history rejects raw-template bypass and audio/video. Raw and audio/video
-paths retain their existing behavior with history controls absent.
+Explicit history rejects raw-template bypass and audio/video. With empty `history`
+and `prompt_content`, audio/video inputs automatically select the existing media
+path regardless of `context_budget` or `history_policy`; those conversation-only
+settings are ignored. `max_length` and the model's media-aware context checks still
+apply. For example, MOSS audio with `context_budget=32000` needs no manual history
+mode change. Raw prompts retain their existing behavior when history controls are absent.
 
 Outputs are `generated_text` at 0, `thinking` at 1, `history` at 2 and
 `context_info` at 3, and `raw_text` at 4. Ordinary templated text also returns its first turn as history
