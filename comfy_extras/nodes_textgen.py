@@ -49,8 +49,8 @@ class TextGenerate(io.ComfyNode):
                 io.String.Input("system_prompt", force_input=True, optional=True, tooltip="Replaces the system prompt in the model's chat template. Ignored when the default template is not used."),
                 io.String.Input("history", force_input=True, optional=True, tooltip='Version 1 text or version 2 image history JSON. Start with {"version":1,"messages":[]}. Empty keeps the existing single prompt path.'),
                 io.String.Input("prompt_content", force_input=True, optional=True, tooltip="Ordered JSON text/image parts for the current user message. Requires empty prompt and no IMAGE input. Local input files or saved image IDs only."),
-                io.Int.Input("context_budget", default=0, min=0, max=1048576, optional=True, tooltip="Total conversation tokens including images and output. 0 uses the model limit. A positive budget enables conversation mode."),
-                io.Combo.Input("history_policy", options=["error", "drop_oldest_turns"], default="error", optional=True, tooltip="Fail on overflow, or explicitly exclude oldest complete turns from this generation. Returned history stays complete."),
+                io.Int.Input("context_budget", default=0, min=0, max=1048576, optional=True, tooltip="Total conversation tokens including images and output. 0 uses the model limit. A positive budget enables text/image conversation mode. Does not apply to audio/video inputs."),
+                io.Combo.Input("history_policy", options=["error", "drop_oldest_turns"], default="error", optional=True, tooltip="Fail on overflow, or explicitly exclude oldest complete turns from this generation. Returned history stays complete. Does not apply to audio/video inputs."),
             ],
             outputs=[
                 io.String.Output(display_name="generated_text"),
@@ -79,7 +79,8 @@ class TextGenerate(io.ComfyNode):
         if prompt_content and (prompt or image is not None):
             raise ValueError("prompt_content requires an empty prompt and no IMAGE input.")
         image_conversation = cls.history_output and use_default_template and image is not None and video is None and audio is None
-        if history or prompt_content or context_budget or history_policy != "error" or image_conversation:
+        conversation_controls = (context_budget or history_policy != "error") and video is None and audio is None
+        if history or prompt_content or conversation_controls or image_conversation:
             if not use_default_template:
                 raise ValueError("Text history requires use_default_template enabled.")
             if video is not None or audio is not None:

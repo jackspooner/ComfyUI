@@ -183,6 +183,33 @@ def test_history_rejects_raw_or_media_before_generation(extra):
     assert clip.calls == []
 
 
+@pytest.mark.parametrize('media', [{'audio': object()}, {'video': object()}, {'audio': object(), 'video': object(), 'image': object()}])
+@pytest.mark.parametrize('controls', [{'context_budget': 32000}, {'history_policy': 'drop_oldest_turns'}, {'context_budget': 32000, 'history_policy': 'drop_oldest_turns'}])
+@pytest.mark.parametrize('use_default_template', [True, False])
+def test_media_controls_do_not_enable_history(media, controls, use_default_template, monkeypatch):
+    calls = []
+
+    def tokenize_media(prompt, **kwargs):
+        calls.append((prompt, kwargs))
+        return []
+
+    def unexpected_history(*args, **kwargs):
+        pytest.fail('Media generation must not parse or publish conversation history')
+
+    monkeypatch.setattr('comfy_extras.nodes_textgen.read_history', unexpected_history)
+    monkeypatch.setattr('comfy_extras.nodes_textgen.publish_images', unexpected_history)
+    clip = Clip()
+    clip.tokenize = tokenize_media
+    result = TextGenerate.execute(clip, 'Describe the media', 32000, {'sampling_mode': 'off'},
+                                  thinking=True, system_prompt='Be precise.', use_default_template=use_default_template,
+                                  **media, **controls).result
+    assert calls == [('Describe the media', dict(image=media.get('image'), video=media.get('video'), audio=media.get('audio'),
+                                                skip_template=not use_default_template, min_length=1, thinking=True,
+                                                system_prompt='Be precise.' if use_default_template else ''))]
+    assert clip.calls[0]['max_length'] == 32000
+    assert result == ('final', 'reason', '', '', '<think>reason</think>final')
+
+
 def test_failure_does_not_append_a_turn():
     history = write_history(transcript()[:-1])
     with pytest.raises(RuntimeError, match='cancelled'):
