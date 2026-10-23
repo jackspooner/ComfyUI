@@ -360,7 +360,7 @@ class CLIP:
             raise ValueError("This model does not expose a text conversation context limit.")
         return context()
 
-    def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False, memory_budget=None, mtp=True):
+    def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False, memory_budget=None, mtp=True, min_short_edge=0):
         prepare = getattr(self.cond_stage_model, "prepare_generation_tokens", None)
         if prepare is None:
             raise ValueError("This CLIP model does not support generation context planning.")
@@ -374,10 +374,10 @@ class CLIP:
             available = max(0, model_management.get_free_memory(device) - model_management.minimum_inference_memory())
             memory_budget = available if memory_budget is None else min(memory_budget, available)
             selected, info = prepare(tokens, context_budget, max_length, auto_resize,
-                                     memory_budget=memory_budget, device=device, mtp=mtp)
+                                     memory_budget=memory_budget, device=device, mtp=mtp, min_short_edge=min_short_edge)
             info.update(memory_device=str(device), memory_kind="ram" if model_management.is_device_cpu(device) else "vram")
             return selected, info
-        return prepare(tokens, context_budget, max_length, auto_resize)
+        return prepare(tokens, context_budget, max_length, auto_resize, min_short_edge=min_short_edge)
 
     def tokenize_video(self, prompt, video, source_fps=24.0, fps=1.0, **kwargs):
         frames, times = sample_video(video, source_fps, fps)
