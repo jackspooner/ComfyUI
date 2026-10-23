@@ -144,6 +144,6 @@ def test_budget_reaches_admission_before_generation(monkeypatch):
 def test_raw_decoded_output_keeps_whitespace():
     from comfy_extras.nodes_textgen import TextGenerate
     clip = SimpleNamespace(tokenize=lambda *a, **kw: [], generate=lambda *a, **kw: [1], decode=lambda _: '  text\n\n')
-    output = TextGenerate.execute(clip, 'Text Recognition:', 64, {'sampling_mode':'off'}, image=torch.zeros(1,28,28,3), use_default_template=False)
+    output = TextGenerate.execute(clip, 'Text Recognition:', 64, {'sampling_mode':'off'}, image=torch.zeros(1,28,28,3), use_default_template=False, auto_resize=False)
     assert output.result[0] == 'text'
     assert output.result[4] == '  text\n\n'

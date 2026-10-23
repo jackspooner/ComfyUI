@@ -1161,10 +1161,10 @@ def apply_penalty(logits, repetition_penalty, presence_penalty):
 
 class BaseGenerate:
     def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False,
-                                  memory_budget=None, device=None, mtp=True):
+                                  memory_budget=None, device=None, mtp=True, min_short_edge=0):
         estimate = None if memory_budget is None else lambda value, count, output: self.generation_memory(value, count, output, device, mtp)
         return prepare_generation_tokens(tokens, self.model.config.max_position_embeddings, context_budget,
-                                         max_length, self.count_chat_tokens, self.image_geometry, auto_resize, memory_budget, estimate)
+                                         max_length, self.count_chat_tokens, self.image_geometry, auto_resize, memory_budget, estimate, min_short_edge)
 
     def generation_cache_memory(self, capacity, element_size, mtp=True):
         cfg = self.model.config
