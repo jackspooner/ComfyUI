@@ -315,6 +315,10 @@ actual playback rate), and enabled-by-default `auto_resize` to **Generate Text**
 `auto_resize=false` retains model-default sizing, including for adapters without
 automatic planning support. Saved explicit values are preserved. For example,
 `source_fps=24, fps=4` selects frames 0, 6, 12 and 18 in the first second.
+`min_short_edge` defaults to 256 pixels during automatic sizing, including OOM
+retries. Requests that cannot fit at that quality floor fail clearly; lower FPS,
+shorten the clip or explicitly lower the floor (`0` disables it). Source/model
+limits remain in effect; the floor does not force unsupported enlargement.
 Automatic sizing uses measured device headroom after managed model loading,
 model-aware cache/workspace estimates and the model/user token ceilings while
 preserving a positive `max_length`. It reports the effective window, selected

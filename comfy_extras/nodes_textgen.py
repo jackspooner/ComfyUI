@@ -55,6 +55,7 @@ class TextGenerate(io.ComfyNode):
                 io.Float.Input("fps", default=1.0, min=0.01, max=1000.0, step=0.01, optional=True, tooltip="Frames to analyse per source second: 4 selects one frame every 0.25 seconds. Never duplicates source frames."),
                 io.Float.Input("source_fps", default=24.0, min=0.01, max=1000.0, step=0.01, optional=True, tooltip="Actual playback rate of the supplied IMAGE batch. IMAGE batches do not retain video FPS metadata."),
                 io.Boolean.Input("auto_resize", default=True, optional=True, tooltip="Maximize supported image/frame sizes within available device memory and the token ceiling, preserving max_length. Uses model-aware memory estimates; native model limits still apply."),
+                io.Int.Input("min_short_edge", default=256, min=0, max=16384, optional=True, tooltip="Minimum shorter side in pixels during automatic image/frame sizing, including OOM retries. Fails if media cannot fit at this size or source/model limits cannot reach it. 0 disables this quality floor. Ignored when auto_resize is off."),
             ],
             outputs=[
                 io.String.Output(display_name="generated_text"),
@@ -72,7 +73,7 @@ class TextGenerate(io.ComfyNode):
         return fingerprint(read_history(history, "", prompt_content=prompt_content))
 
     @classmethod
-    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="", fps=1.0, source_fps=24.0, auto_resize=True) -> io.NodeOutput:
+    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="", fps=1.0, source_fps=24.0, auto_resize=True, min_short_edge=256) -> io.NodeOutput:
 
         mtp = False if mtp == "off" else (True if mtp == "auto" else int(mtp))
 
@@ -86,7 +87,7 @@ class TextGenerate(io.ComfyNode):
         def prepare(value):
             nonlocal unplanned_tokens
             unplanned_tokens = value
-            return clip.prepare_generation_tokens(value, context_budget, max_length, True, mtp=mtp)
+            return clip.prepare_generation_tokens(value, context_budget, max_length, True, mtp=mtp, min_short_edge=min_short_edge)
         if prompt_content and (prompt or image is not None):
             raise ValueError("prompt_content requires an empty prompt and no IMAGE input.")
         image_conversation = cls.history_output and use_default_template and image is not None and video is None and audio is None
@@ -145,7 +146,7 @@ class TextGenerate(io.ComfyNode):
             retry_budget = min(previous["memory_budget_bytes"], previous["estimated_working_bytes"])
             tokens, context_info = clip.prepare_generation_tokens(
                 unplanned_tokens, context_budget, max_length, True,
-                memory_budget=int(retry_budget * 0.5), mtp=mtp)
+                memory_budget=int(retry_budget * 0.5), mtp=mtp, min_short_edge=min_short_edge)
             context_info["excluded_message_ranges"] = previous["excluded_message_ranges"]
             if context_info["image_sizes"] == previous["image_sizes"]:
                 raise RuntimeError("Automatic resizing cannot reduce media further after a device out-of-memory error. Reduce frames, text or max_length.")
@@ -319,7 +320,7 @@ class TextGenerateLTX2Prompt(TextGenerate):
             node_id="TextGenerateLTX2Prompt",
             display_name="Generate LTX2 Prompt",
             category=parent_schema.category,
-            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy", "prompt_content", "fps", "source_fps", "auto_resize")],
+            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy", "prompt_content", "fps", "source_fps", "auto_resize", "min_short_edge")],
             outputs=parent_schema.outputs[:2],
             search_aliases=["prompt enhance", "LLM", "gemma"],
         )

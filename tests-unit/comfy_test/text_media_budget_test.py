@@ -105,6 +105,39 @@ def test_auto_output_stays_within_both_budgets():
     assert info['input_tokens'] + info['output_allowance'] == 100
 
 
+@pytest.mark.parametrize('size', [(960, 1728), (1728, 960)])
+def test_short_edge_floor_respects_model_grid_and_orientation(size):
+    result, info = prepare_generation_tokens(images(size), 2048, 400, 64, image_count, geometry,
+                                             True, min_short_edge=300)
+    h, w = result['qwen'][0][1][0]['data'].shape[1:3]
+    assert min(h, w) >= 300 and h % 32 == w % 32 == 0
+    assert (h < w) == (size[0] < size[1])
+    assert info['input_tokens'] + info['output_allowance'] <= 400
+    assert info['output_allowance'] == 64 and info['min_short_edge'] == 300
+
+
+@pytest.mark.parametrize('context,memory', [(128, None), (2048, 170_000)])
+def test_floor_failure_happens_before_pixel_resize(context, memory, monkeypatch):
+    def unexpected_resize(*args, **kwargs):
+        pytest.fail('A request below its quality floor must fail before materializing pixels')
+    monkeypatch.setattr('comfy.text_generation_media.F.interpolate', unexpected_resize)
+    with pytest.raises(ContextOverflowError, match='min_short_edge=256px'):
+        prepare_generation_tokens(images((960, 1728)), 2048, context, 64, image_count, geometry,
+            True, memory, lambda tokens, count, output: (count + output) * 1000,
+            min_short_edge=256)
+
+
+def test_tiny_source_requires_explicit_floor_override():
+    source = images((32, 32))
+    with pytest.raises(ContextOverflowError, match='minimum short edge cannot be reached'):
+        prepare_generation_tokens(source, 2048, 0, 64, image_count, geometry, True, min_short_edge=256)
+    selected, info = prepare_generation_tokens(source, 2048, 0, 64, image_count, geometry, True, min_short_edge=0)
+    assert min(selected['qwen'][0][1][0]['data'].shape[1:3]) < 256
+    assert info['min_short_edge'] == 0
+    unchanged, _ = prepare_generation_tokens(source, 2048, 0, 64, image_count, geometry, False, min_short_edge=256)
+    assert unchanged['qwen'][0][1][0]['data'] is source['qwen'][0][1][0]['data']
+
+
 def test_gemma4_uses_original_pixels_and_native_geometry_ceiling():
     embed = prepare_chat_image(torch.rand(1, 1080, 1920, 3), 70)
     model = SimpleNamespace(model=SimpleNamespace(config=Gemma4_12B_Config()))
@@ -120,6 +153,10 @@ def test_gemma4_uses_original_pixels_and_native_geometry_ceiling():
     actual = result['qwen'][0][1][0]
     assert tuple(actual['data'].shape[1:3]) == shape
     assert 'source' not in actual and 'max_soft_tokens' not in actual
+    with pytest.raises(ContextOverflowError, match='minimum short edge cannot be reached'):
+        prepare_generation_tokens(native, 4096, 2048, 128,
+            lambda tokens: count_chat_tokens(tokens, lambda value: Gemma4Base.image_token_length(model, value)),
+            lambda value, budget: Gemma4Base.image_geometry(model, value, budget), True, min_short_edge=4096)
 
 
 @pytest.mark.parametrize('config', [Gemma4_12B_Config(), Gemma4_E2B_Config()])
@@ -156,10 +193,11 @@ def test_oom_retry_preserves_output_and_publishes_only_success(monkeypatch):
         calls = 0
         budgets = []
         def tokenize_video(self, *args, **kwargs):
-            return images((64, 64)), {'sampled_frames': 4}
+            return images((512, 512)), {'sampled_frames': 4}
         def prepare_generation_tokens(self, tokens, budget, output, auto, memory_budget=None, **kwargs):
+            assert kwargs['min_short_edge'] == 256
             self.budgets.append((output, memory_budget))
-            size = 64 if memory_budget is None else 32
+            size = 512 if memory_budget is None else 256
             return images((size, size)), {'version': 1, 'input_tokens': 4, 'output_allowance': output,
                 'memory_budget_bytes': memory_budget or 1000, 'estimated_working_bytes': memory_budget or 1000,
                 'image_sizes': [[size, size]], 'excluded_message_ranges': []}
@@ -174,9 +212,31 @@ def test_oom_retry_preserves_output_and_publishes_only_success(monkeypatch):
     monkeypatch.setattr('comfy.model_management.soft_empty_cache', lambda: None)
     clip = Clip()
     assert next(item for item in TextGenerate.define_schema().inputs if item.id == 'auto_resize').default is True
+    assert next(item for item in TextGenerate.define_schema().inputs if item.id == 'min_short_edge').default == 256
     result = TextGenerate.execute(clip, 'describe', 128, {'sampling_mode': 'off'}, video=torch.zeros(24, 1, 1, 3)).result
     assert clip.calls == 2 and clip.budgets == [(128, None), (128, 500)]
     assert result[2] == '' and json.loads(result[3])['oom_retries'] == 1
+
+
+def test_oom_replanning_stops_at_floor_without_a_second_generation(monkeypatch):
+    class Clip:
+        calls = 0
+        def tokenize_video(self, *args, **kwargs):
+            return images((512, 512)), {'sampled_frames': 1}
+        def prepare_generation_tokens(self, tokens, budget, output, auto, memory_budget=None, **kwargs):
+            return prepare_generation_tokens(tokens, 2048, budget, output, image_count, geometry, auto,
+                200_000 if memory_budget is None else memory_budget,
+                lambda value, count, reserve: (count + reserve) * 1000,
+                min_short_edge=kwargs['min_short_edge'])
+        def generate(self, tokens, **kwargs):
+            self.calls += 1
+            assert min(tokens['qwen'][0][1][0]['data'].shape[1:3]) >= 256
+            raise torch.cuda.OutOfMemoryError('fixture')
+    monkeypatch.setattr('comfy.model_management.soft_empty_cache', lambda: None)
+    clip = Clip()
+    with pytest.raises(ContextOverflowError, match='min_short_edge=256px'):
+        TextGenerate.execute(clip, 'describe', 128, {'sampling_mode': 'off'}, video=torch.zeros(24, 1, 1, 3))
+    assert clip.calls == 1
 
 
 def test_clip_memory_planning_measures_after_managed_loading(monkeypatch):
@@ -192,11 +252,12 @@ def test_clip_memory_planning_measures_after_managed_loading(monkeypatch):
     monkeypatch.setattr('comfy.model_management.free_memory', lambda total, device, keep_loaded: events.append(('free', keep_loaded)))
     monkeypatch.setattr('comfy.model_management.get_free_memory', lambda device: 4000)
     monkeypatch.setattr('comfy.model_management.minimum_inference_memory', lambda: 1000)
-    _, info = CLIP.prepare_generation_tokens(clip, [], 2048, 128, True, mtp=False)
+    _, info = CLIP.prepare_generation_tokens(clip, [], 2048, 128, True, mtp=False, min_short_edge=384)
     assert [event[0] for event in events] == ['load', 'free', 'prepare']
     assert events[1][1] == [patcher]
     assert events[2][1]['memory_budget'] == 3000
     assert events[2][1]['mtp'] is False
+    assert events[2][1]['min_short_edge'] == 384
     assert info == {'memory_device': 'cuda:0', 'memory_kind': 'vram'}
 
 
