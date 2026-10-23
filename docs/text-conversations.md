@@ -46,8 +46,9 @@ See [sampling and memory-aware sizing](text-media-sizing.md) for `fps`, `source_
 
 Outputs are `generated_text` at 0, `thinking` at 1, `history` at 2 and
 `context_info` at 3, and `raw_text` at 4. Ordinary templated text also returns its first turn as history
-so it can connect directly to another generation; its generation path stays
-unchanged and context_info is empty. Raw-prompt and audio/video paths return empty
+so it can connect directly to another generation. With `auto_resize=false`, its
+legacy generation path stays unchanged and context_info is empty; the default true
+also returns memory-planning diagnostics. Raw-prompt and audio/video paths return empty
 history. Templated image paths return reusable history and exact context_info. Supply the empty envelope or a positive budget to budget the first turn
 exactly. The specialized Generate LTX2 Prompt node retains its original inputs
 and two outputs, and never snapshots images.
@@ -141,7 +142,7 @@ current user message. Generated tokens count the returned model IDs, including
 thinking and any returned stop token. No unreported stop reason or cost is invented.
 
 With `auto_resize=false`, context is a logical ceiling, not a memory-readiness guarantee.
-Opt-in `auto_resize` also uses measured device headroom and model-aware estimates
+Enabled-by-default `auto_resize` also uses measured device headroom and model-aware estimates
 to choose media sizes and a lower practical window; see [limits and recovery](text-media-sizing.md).
 Native model, KV allocation, MTP workspace and offload owners remain unchanged. There is no
 persistent KV reuse; every turn replays its selected input. Larger output/context

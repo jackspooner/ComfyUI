@@ -90,7 +90,7 @@ def test_reasoning_split_with_template_or_generated_opening(decoded, prompt, exp
     clip = SimpleNamespace(tokenize=lambda *args, **kwargs: [],
                            generate=lambda *args, **kwargs: [],
                            decode=lambda ids: decoded)
-    output = TextGenerate.execute(clip, prompt, 512, {'sampling_mode': 'off'}, thinking=False)
+    output = TextGenerate.execute(clip, prompt, 512, {'sampling_mode': 'off'}, thinking=False, auto_resize=False)
     assert output.result[:2] == expected
     assert output.result[2]
     assert output.result[3] == ''
@@ -102,7 +102,7 @@ def test_reasoning_split_reads_the_tokenized_template_tail(template, expected):
     clip = SimpleNamespace(tokenize=lambda *args, **kwargs: tokens,
                            generate=lambda *args, **kwargs: [3],
                            decode=lambda ids: 'unfinished' if ids == [3] else template)
-    output = TextGenerate.execute(clip, 'question', 1, {'sampling_mode': 'off'})
+    output = TextGenerate.execute(clip, 'question', 1, {'sampling_mode': 'off'}, auto_resize=False)
     assert output.result[:2] == expected
     assert output.result[4] == 'unfinished'
     assert tokens == {'qwen': [[(1, 1.0), (2, 1.0)]]}
