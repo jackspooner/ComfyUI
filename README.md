@@ -852,3 +852,5 @@ GPU acquisition. Install both versions before restarting an idle instance; see
 [GPU handoff, memory limits and recovery](https://github.com/jackspooner/Cutlery-Nodes/blob/main/docs/runtime-gpu-handoff.md).
 Run `python -m pytest tests-unit/execution_test/test_prompt_admission.py -q` with
 the prepared runtime; these checks do not start live GPU workloads.
+
+Development prerequisites and focused native validation remain in [AGENTS.md](AGENTS.md#worktree-development). The [native integration guide](docs/native-model-integration.md) uses the prepared Python runtime directly; historical graph/lifecycle receipts are not setup requirements.

@@ -106,16 +106,8 @@ Local evidence is retained under `/home/jack/services/artifacts/applio-native/`:
 `output/audio` directory. Inputs, weights, user workflows and generated media are
 not committed to source control.
 
-The exact task and canonical graphs were prepared with embeddings disabled.
-Cumulative change analysis against the pre-integration v0.42.1 main reports medium
-risk (105 changed symbols, four device-dispatch flows); source review and relevant
-regressions supplement it. Earlier analyses refused publication when code/HEAD
-changed; fresh completed graphs superseded those receipts. RuntimeHost's existing
-customized GitNexus workflow skills were preserved, with installation warnings.
 
 The authoritative shared `comfyui` guidance is integrated (`e6722d8`) and discovery
 checks pass. The complementary RuntimeHost placement guidance is committed and
 pushed on `applio-native-placement` (`4b23f6b`), with all adapter checks passed.
-Its DevTask `applio-native-placement-53537f35` remains blocked by serving-checkout
-coordination/owner recovery; preserve it and resume through DevTask in an idle
-window. That documentation-only branch does not add a RuntimeHost inference path.
+The serving-checkout coordination remains a separate integration/deployment concern; inspect current branch and canonical state before activation. That documentation-only branch does not add a RuntimeHost inference path.
