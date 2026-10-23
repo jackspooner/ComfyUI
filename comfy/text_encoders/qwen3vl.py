@@ -49,6 +49,13 @@ class Qwen3VLVisionModel(Qwen35VisionModel):
 
 
 class Qwen3VL(BaseLlama, BaseQwen3, BaseGenerate, torch.nn.Module):
+    def generation_image_memory(self, embed, element_size):
+        patches = self.image_token_length(embed) * 4
+        return max(4 * 16 * patches * patches, 64 * patches * self.model.config.hidden_size * element_size)
+
+    def image_geometry(self, embed, token_budget):
+        return comfy.text_encoders.qwen_vl.budget_image_size(*embed["data"].shape[1:3], token_budget)
+
     def image_token_length(self, embed):
         h, w = comfy.text_encoders.qwen_vl.image_size(*embed["data"].shape[1:3], patch_size=16)
         return h * w // (32 * 32)

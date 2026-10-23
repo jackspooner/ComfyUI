@@ -38,7 +38,7 @@ def qwen_chat(messages, tokenizer, thinking=None):
     return encode_chat(segments, lambda text: tokenizer.encode(text, add_special_tokens=False))
 
 
-def count_chat_tokens(tokens, image_length=None):
+def count_chat_tokens(tokens, image_length=None, audio_length=None):
     if isinstance(tokens, dict):
         if len(tokens) != 1:
             raise ValueError("Conversation token accounting requires one generative tokenizer stream.")
@@ -50,6 +50,10 @@ def count_chat_tokens(tokens, image_length=None):
                 count += 1
             elif isinstance(token, dict) and token.get("type") == "image" and image_length is not None:
                 length = image_length(token)
+                token["expected_length"] = length
+                count += length
+            elif isinstance(token, dict) and token.get("type") == "audio" and audio_length is not None:
+                length = audio_length(token)
                 token["expected_length"] = length
                 count += length
             else:

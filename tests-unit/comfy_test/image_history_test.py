@@ -41,7 +41,7 @@ def test_gemma3_direct_token_stream_counts_text_and_images():
     text = tokenizer.tokenize_chat([{"role": "user", "content": "Describe"}])
     assert count_text_tokens(text) == sum(map(len, text))
     tokens = tokenizer.tokenize_chat([{"role": "user", "content": [{"type": "image", "data": torch.zeros(1, 64, 48, 3)}]}])
-    transformer = SimpleNamespace(image_token_length=lambda image: 256)
+    transformer = SimpleNamespace(image_token_length=lambda image: 256, audio_token_length=lambda embed: 0)
     transformer.count_chat_tokens = lambda value: BaseGenerate.count_chat_tokens(transformer, value)
     model = SimpleNamespace(transformer=transformer)
     assert SDClipModel.count_chat_tokens(model, tokens) == sum(map(len, tokens)) + 255

@@ -1,4 +1,5 @@
 from .chat import count_chat_tokens
+from comfy.text_generation_media import prepare_generation_tokens
 import torch
 import torch.nn as nn
 from dataclasses import dataclass
@@ -1159,8 +1160,51 @@ def apply_penalty(logits, repetition_penalty, presence_penalty):
 
 
 class BaseGenerate:
+    def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False,
+                                  memory_budget=None, device=None, mtp=True):
+        estimate = None if memory_budget is None else lambda value, count, output: self.generation_memory(value, count, output, device, mtp)
+        return prepare_generation_tokens(tokens, self.model.config.max_position_embeddings, context_budget,
+                                         max_length, self.count_chat_tokens, self.image_geometry, auto_resize, memory_budget, estimate)
+
+    def generation_cache_memory(self, capacity, element_size, mtp=True):
+        cfg = self.model.config
+        return 2 * cfg.num_hidden_layers * cfg.num_key_value_heads * cfg.head_dim * capacity * element_size
+
+    def generation_image_memory(self, embed, element_size):
+        patches = self.image_token_length(embed) * 16
+        return max(4 * 16 * patches * patches, 64 * patches * self.model.config.hidden_size * element_size)
+
+    def generation_audio_memory(self, embed, element_size):
+        raise ValueError("This model does not expose audio working-memory estimation.")
+
+    def generation_memory(self, tokens, input_length, output_length, device, mtp=True):
+        cfg = self.model.config
+        size = 2 if comfy.model_management.should_use_bf16(device) else 4
+        cache = self.generation_cache_memory(input_length + output_length, size, mtp)
+        # The native prefill materializes a causal mask even with fused attention.
+        # Include unfused attention scores conservatively: per-module backend preferences can override dispatch.
+        attention = 4 * cfg.num_attention_heads * input_length * input_length
+        hidden = 32 * input_length * cfg.hidden_size * size
+        mlp = 4 * input_length * getattr(cfg, "intermediate_size", cfg.hidden_size * 4) * size
+        rows = next(iter(tokens.values())) if isinstance(tokens, dict) else tokens
+        media = 0
+        for row in rows:
+            for token, *_ in row:
+                if isinstance(token, dict) and token.get("type") == "image":
+                    media = max(media, self.generation_image_memory(token, size))
+                elif isinstance(token, dict) and token.get("type") == "audio":
+                    media = max(media, self.generation_audio_memory(token, size))
+        return cache + max(attention + hidden + mlp, media) + 256 * 1024 * 1024
+
+    def image_geometry(self, embed, token_budget):
+        # Fixed-resolution encoders cannot save context by shrinking their input pixels.
+        return tuple(embed["data"].shape[1:3])
+
     def count_chat_tokens(self, tokens):
-        return count_chat_tokens(tokens, self.image_token_length)
+        return count_chat_tokens(tokens, self.image_token_length, self.audio_token_length)
+
+    def audio_token_length(self, embed):
+        raise ValueError("This model does not expose exact audio token accounting. Disconnect audio or disable media context planning.")
 
     def image_token_length(self, embed):
         raise ValueError("This model does not support images in conversation history.")
@@ -1455,6 +1499,13 @@ class Ovis25_2B(BaseLlama, torch.nn.Module):
         self.dtype = dtype
 
 class Qwen25_7BVLI(BaseLlama, BaseGenerate, torch.nn.Module):
+    def generation_image_memory(self, embed, element_size):
+        patches = self.image_token_length(embed) * 4
+        return max(4 * 16 * patches * patches, 64 * patches * self.model.config.hidden_size * element_size)
+
+    def image_geometry(self, embed, token_budget):
+        return qwen_vl.budget_image_size(*embed["data"].shape[1:3], token_budget, patch_size=14)
+
     def image_token_length(self, embed):
         h, w = qwen_vl.image_size(*embed["data"].shape[1:3])
         return h * w // (28 * 28)

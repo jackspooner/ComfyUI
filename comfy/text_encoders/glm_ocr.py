@@ -235,6 +235,12 @@ class TextModel(nn.Module):
 
 
 class GlmOCR(BaseLlama, BaseGenerate, nn.Module):
+    def image_geometry(self, embed, token_budget):
+        h, w, _, _ = image_geometry(*embed["data"].shape[1:3])
+        # GLM pads to its 28-pixel merge grid instead of rounding/cropping.
+        scale = min(1.0, math.sqrt(token_budget * 28 * 28 / (h * w)))
+        return max(1, math.floor(h * scale / 28)) * 28, max(1, math.floor(w * scale / 28)) * 28
+
     def image_token_length(self, embed):
         _, _, h, w = image_geometry(*embed['data'].shape[1:3])
         return h * w // (28 * 28)
