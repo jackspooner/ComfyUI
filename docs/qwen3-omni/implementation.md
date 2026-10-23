@@ -28,7 +28,7 @@ the complete Thinker. Do not label M3 as a completed release.
 ## Development procedure
 
 Use the repository's applicable AGENTS.md and supported lifecycle. At the inspected
-baseline there is no `.cutlery/devtask.json`; use native Git worktrees and the
+baseline uses the repository's native setup with the
 existing setup command, from committed main without importing uncommitted work:
 
 ```bash

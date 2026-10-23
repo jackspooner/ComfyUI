@@ -53,9 +53,7 @@ external capabilities; planned bridges or profiles are not executable fallbacks.
 
 ## 2. Prepare the repository and source assets
 
-Follow the repository worktree/lifecycle rules from committed `main`, preserving
-unrelated work. Use a supported DevTask adapter when present; otherwise prepare
-the task worktree with the repository-owned command:
+Check the explicitly configured prepared runtime with the repository-owned command:
 
 ```sh
 COMFYUI_PYTHON=/absolute/prepared/python python3 scripts/setup_worktree.py
@@ -64,10 +62,7 @@ COMFYUI_PYTHON=/absolute/prepared/python python3 scripts/setup_worktree.py
 The explicit Python must be >=3.10 and already provide PyTorch, einops and
 safetensors. Model-specific setup options are documented in AGENTS.md. Setup is a
 read-only runtime check; it installs nothing, loads no models and starts no service.
-Use that interpreter for subsequent checks. Prepare the exact worktree GitNexus
-graph with embeddings disabled, then read its local workflow skill and inspect
-existing symbols/flows before nontrivial implementation. Check graph findings
-against source; missing edges are not proof of safety.
+Use that interpreter for subsequent checks.
 
 Inventory existing files and download jobs before acquiring missing assets.
 Downloads use Download Manager 2 with explicit destinations and the required scoped

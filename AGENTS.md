@@ -410,7 +410,6 @@ guidance belongs to the authoritative shared `comfyui` skill.
 
 Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_worktree.py` before editing. The configured Python must be >=3.10 with PyTorch, einops and safetensors installed from the ComfyUI deployment's requirements. The check reuses that explicit runtime without copying dependencies, installing packages, loading models or connecting to a service. It is safe to rerun and leaves tracked files unchanged. GPU validation requires a compatible GPU/runtime and separately provisioned model files; unit tests use isolated fixtures.
 
-Prepare the exact worktree GitNexus index separately after setup with embeddings disabled. The root `.gitnexusignore` excludes local environment, installed-package and disabled-node source trees; their separate owners are outside the core repository graph. Do not hide tracked ComfyUI source to bypass an indexing failure. Operating guidance belongs to the existing shared ComfyUI model-runtimes skill; do not register temporary worktrees as shared skill sources.
 
 ### Optional native PaddleOCR
 
@@ -460,8 +459,7 @@ librosa and soundfile without installing packages or loading models. See
 `docs/soulx-singer.md` for the pinned offline converter, native SVS/SVC and
 preprocessing contracts, examples, parity commands and acceptance limits. Run
 `python -m pytest tests-unit/comfy_test/soulx_singer_test.py -q`. Extend the existing
-authoritative `comfyui` and `comfyui-model-runtimes` skills with reusable changes;
-never register this task worktree globally. Setup does not activate the service.
+authoritative `comfyui` and `comfyui-model-runtimes` skills with reusable changes. Setup does not activate the service.
 
 ### Optional native Applio / RVC
 
@@ -481,7 +479,7 @@ conversion, native node/history contracts, reference verification and acceptance
 limits. Run `python -m pytest tests-unit/comfy_test/drama3_test.py -q`; set
 `DRAMA3_UPSTREAM` to the pinned offline source for independent component checks.
 Keep model files outside Git. Update the authoritative existing ComfyUI and
-model-runtime skills with capability changes; do not register task worktrees.
+model-runtime skills with capability changes.
 
 ### Optional native MOSS SoundEffect
 
