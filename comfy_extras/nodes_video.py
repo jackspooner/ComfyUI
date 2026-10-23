@@ -313,9 +313,27 @@ class GetVideoComponents(io.ComfyNode):
             search_aliases=["extract frames", "split video", "video to images", "demux"],
             display_name="Get Video Components",
             category="video",
-            description="Extracts video frames, audio, frame rate, bit depth, and color space.",
+            description="Extracts video frames, audio, frame rate, bit depth, and color space. Optional controls reduce decoded components and stored frames.",
             inputs=[
                 io.Video.Input("video", tooltip="The video to extract components from."),
+                io.Combo.Input(
+                    "components", options=["Images and audio", "Images only", "Audio only", "Metadata only"],
+                    default="Images and audio", optional=True, advanced=True,
+                    tooltip="File inputs skip decoding unused streams. Disabled images return an empty batch; disabled audio returns no audio. Unconnected outputs do not select this automatically.",
+                ),
+                io.Int.Input(
+                    "frame_stride", default=1, min=1, max=10000, optional=True, advanced=True,
+                    tooltip="Keep every Nth frame, starting with the first frame of the trimmed video. Output FPS is divided by N; audio is unchanged. Other frames may still need decoding.",
+                ),
+                io.Int.Input(
+                    "max_size", default=0, min=0, max=16384, optional=True, advanced=True,
+                    tooltip="Maximum image edge in pixels; 0 keeps the source size. Preserves aspect ratio without enlarging. Resize happens before file frames are accumulated, after colour conversion and cropping.",
+                ),
+                io.Combo.Input(
+                    "decode_mode", options=["Preserve precision", "8-bit SDR"],
+                    default="Preserve precision", optional=True, advanced=True,
+                    tooltip="8-bit SDR uses faster RGB conversion for 8-bit SDR files and can change colour rounding and chroma interpolation. HDR, high-bit-depth and float inputs retain their precision.",
+                ),
             ],
             outputs=[
                 io.Image.Output(display_name="images"),
@@ -327,12 +345,27 @@ class GetVideoComponents(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, video: Input.Video) -> io.NodeOutput:
-        components = video.get_components()
+    def execute(
+        cls, video: Input.Video, components: str = "Images and audio",
+        frame_stride: int = 1, max_size: int = 0, decode_mode: str = "Preserve precision",
+    ) -> io.NodeOutput:
+        if components not in ("Images and audio", "Images only", "Audio only", "Metadata only"):
+            raise ValueError(f"Unknown video component selection: {components}")
+        if decode_mode not in ("Preserve precision", "8-bit SDR"):
+            raise ValueError(f"Unknown video decode mode: {decode_mode}")
+        # Keep the original entry point for existing VIDEO implementations and workflows.
+        if components == "Images and audio" and frame_stride == 1 and max_size == 0 and decode_mode == "Preserve precision":
+            extracted = video.get_components()
+        else:
+            extracted = video.get_components_selected(
+                include_images=components in ("Images and audio", "Images only"),
+                include_audio=components in ("Images and audio", "Audio only"),
+                frame_stride=frame_stride, max_size=max_size, compact=decode_mode == "8-bit SDR",
+            )
         return io.NodeOutput(
-            components.images,
-            components.audio,
-            float(components.frame_rate),
+            extracted.images,
+            extracted.audio,
+            float(extracted.frame_rate),
             video.get_bit_depth(),
             video.get_color_space(),
         )

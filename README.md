@@ -1,3 +1,19 @@
+## Efficient video extraction in this fork
+
+**Get Video Components** retains its existing outputs and precision by default,
+with direct float-buffer assembly in place of stacking all frame tensors. Its
+advanced controls select images/audio/metadata, retain every Nth frame, limit the
+longest image edge, and optionally use faster 8-bit SDR RGB conversion. File
+inputs skip unused streams and avoid converting discarded frames. HDR, float
+and high-bit-depth inputs retain the existing conversion path. No new dependency,
+external FFmpeg process or GPU decoder is required.
+
+Start with **Load Video → Trim Video → Get Video Components**, then select
+**Images only** if audio is unnecessary. Existing workflows need no changes.
+See [controls, Python contract, memory limits and benchmarks](docs/video-extraction.md).
+Restart an idle instance to load updated core code; source integration alone does
+not update an already-running process.
+
 ## External image references in this fork
 
 Start with `--allow-external-image-paths` to let **Load Image** and **Load Image
