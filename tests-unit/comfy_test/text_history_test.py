@@ -188,6 +188,7 @@ def test_history_rejects_raw_or_media_before_generation(extra):
 @pytest.mark.parametrize('use_default_template', [True, False])
 def test_media_controls_do_not_enable_history(media, controls, use_default_template, monkeypatch):
     calls = []
+    planned = []
 
     def tokenize_media(prompt, **kwargs):
         calls.append((prompt, kwargs))
@@ -200,14 +201,32 @@ def test_media_controls_do_not_enable_history(media, controls, use_default_templ
     monkeypatch.setattr('comfy_extras.nodes_textgen.publish_images', unexpected_history)
     clip = Clip()
     clip.tokenize = tokenize_media
+    def tokenize_video(prompt, video, source_fps, fps, **kwargs):
+        calls.append((prompt, dict(video=video, source_fps=source_fps, fps=fps, **kwargs)))
+        return [], {'sampled_frames': 4}
+    def prepare(tokens, context_budget, max_length, auto_resize, **kwargs):
+        planned.append((context_budget, max_length, auto_resize))
+        return tokens, {'version': 1, 'input_tokens': 4, 'output_allowance': max_length}
+    clip.tokenize_video = tokenize_video
+    clip.prepare_generation_tokens = prepare
     result = TextGenerate.execute(clip, 'Describe the media', 32000, {'sampling_mode': 'off'},
                                   thinking=True, system_prompt='Be precise.', use_default_template=use_default_template,
                                   **media, **controls).result
-    assert calls == [('Describe the media', dict(image=media.get('image'), video=media.get('video'), audio=media.get('audio'),
-                                                skip_template=not use_default_template, min_length=1, thinking=True,
-                                                system_prompt='Be precise.' if use_default_template else ''))]
+    expected = dict(audio=media.get('audio'), skip_template=not use_default_template, min_length=1,
+                    thinking=True, system_prompt='Be precise.' if use_default_template else '')
+    if 'video' in media:
+        expected.update(video=media['video'], source_fps=24.0, fps=1.0)
+    else:
+        expected['image'] = media.get('image')
+    assert calls == [('Describe the media', expected)]
     assert clip.calls[0]['max_length'] == 32000
-    assert result == ('final', 'reason', '', '', '<think>reason</think>final')
+    assert result[:3] == ('final', 'reason', '')
+    assert result[4] == '<think>reason</think>final'
+    if 'video' in media:
+        assert planned == [(controls.get('context_budget', 0), 32000, False)]
+        assert json.loads(result[3])['generated_tokens'] == 3
+    else:
+        assert planned == [] and result[3] == ''
 
 
 def test_failure_does_not_append_a_turn():

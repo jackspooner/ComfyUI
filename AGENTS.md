@@ -425,6 +425,13 @@ extend it alongside this capability rather than creating a per-model skill.
 
 ### Text conversation verification
 
+Video sampling and opt-in memory-aware image sizing are documented in
+`docs/text-media-sizing.md`. Also run
+`python -m pytest tests-unit/comfy_test/text_media_budget_test.py -q`.
+Use metadata-only shape probes for planning, preserve the requested output budget,
+and keep loading/offload and queue ownership in the existing facilities. GPU
+acceptance uses the normal queue; never interrupt an active prompt to deploy.
+
 Native text/image TextGenerate history is documented in
 `docs/text-conversations.md`. Use the prepared interpreter to run
 `python -m pytest tests-unit/comfy_test/image_history_test.py tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q`.

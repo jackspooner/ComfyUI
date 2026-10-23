@@ -159,7 +159,8 @@ Templated image turns snapshot exact pixels into local immutable safetensors und
 the configured system-user `text_history/images` directory;
 replay needs both the JSON and attachments. Saving history belongs to the caller.
 Audio/video inputs automatically use the single-prompt media path when no history
-or structured content is supplied, regardless of conversation budget/policy settings. See
+or structured content is supplied. Video respects its token cap and optional memory-aware sizing without enabling
+conversation history; legacy audio retains its existing budget behavior. See
 [native text conversations](docs/text-conversations.md) for prerequisites,
 contracts, examples, limits and verification. This source capability requires
 deployment before it appears in a running ComfyUI process. The
@@ -292,6 +293,16 @@ thinking and the final answer share that budget. Model context and available
 memory still limit execution. See [token budgets and caption prompting](docs/moss-audio.md#token-budgets-and-caption-prompting).
 Reasoning is separated at `</think>` even when the model omits the opening tag,
 preventing reasoning or duplicate text from leaking into `generated_text`.
+
+This fork adds `fps` (analysed frames per second), `source_fps` (the IMAGE batch's
+actual playback rate), and opt-in `auto_resize` to **Generate Text**. For example,
+`source_fps=24, fps=4` selects frames 0, 6, 12 and 18 in the first second.
+Automatic sizing uses measured device headroom after managed model loading,
+model-aware cache/workspace estimates and the model/user token ceilings while
+preserving a positive `max_length`. It reports the effective window, selected
+sizes and estimates through `context_info`, with bounded smaller-media retries
+on device OOM. This is conservative request-specific planning, not a universal
+maximum-context benchmark. See [media sizing, supported adapters and limits](docs/text-media-sizing.md).
 
 The shared Llama/Qwen attention path honors per-module attention preferences in
 prefill and cached decoding. Explicit preferences use masked dispatch for fixed

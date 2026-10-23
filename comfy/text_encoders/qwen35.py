@@ -722,6 +722,24 @@ class MTPHead(nn.Module):
 
 # Model Wrapper
 class Qwen35(BaseLlama, BaseGenerate, torch.nn.Module):
+    def generation_image_memory(self, embed, element_size):
+        patches = self.image_token_length(embed) * 4
+        return max(4 * 16 * patches * patches, 64 * patches * self.model.config.hidden_size * element_size)
+
+    def generation_cache_memory(self, capacity, element_size, mtp=True):
+        cfg = self.model.config
+        use_mtp = mtp and self.mtp is not None
+        capacity += 7 if use_mtp else 0
+        full = cfg.layer_types.count("full_attention") + int(bool(use_mtp))
+        linear = cfg.layer_types.count("linear_attention")
+        conv_dim = 2 * cfg.linear_num_key_heads * cfg.linear_key_head_dim + cfg.linear_num_value_heads * cfg.linear_value_head_dim
+        recurrent = cfg.linear_num_value_heads * cfg.linear_key_head_dim * cfg.linear_value_head_dim * 4
+        return (2 * full * cfg.num_key_value_heads * cfg.head_dim * capacity * element_size
+                + linear * (recurrent + conv_dim * (cfg.conv_kernel_size + 4) * element_size))
+
+    def image_geometry(self, embed, token_budget):
+        return comfy.text_encoders.qwen_vl.budget_image_size(*embed["data"].shape[1:3], token_budget)
+
     def image_token_length(self, embed):
         h, w = comfy.text_encoders.qwen_vl.image_size(*embed["data"].shape[1:3], patch_size=16)
         return h * w // (32 * 32)
