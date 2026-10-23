@@ -24,6 +24,14 @@ def image_size(height, width, patch_size=14, merge_size=2, min_pixels=3136, max_
     return h_bar, w_bar
 
 
+def budget_image_size(height, width, token_budget, patch_size=16, merge_size=2, min_pixels=3136, max_pixels=12845056):
+    factor = patch_size * merge_size
+    # Preserve source detail up to the processor's native ceiling; do not invent detail by enlargement.
+    native_h, native_w = image_size(height, width, patch_size, merge_size, min_pixels, max_pixels)
+    maximum = min(native_h * native_w, max_pixels, max(min_pixels, token_budget * factor * factor))
+    return image_size(height, width, patch_size, merge_size, min_pixels, maximum)
+
+
 def process_qwen2vl_images(
     images: torch.Tensor,
     min_pixels: int = 3136,

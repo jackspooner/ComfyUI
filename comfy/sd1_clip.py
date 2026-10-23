@@ -316,7 +316,16 @@ class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
         return self.transformer.load_state_dict(sd, strict=False, assign=getattr(self, "can_assign_sd", False))
 
     def get_chat_context_length(self):
-        return self.transformer.model.config.max_position_embeddings
+        limit = getattr(getattr(getattr(self.transformer, "model", None), "config", None), "max_position_embeddings", None)
+        if type(limit) is not int or limit <= 0:
+            raise ValueError("This model does not expose a supported generation context limit.")
+        return limit
+
+    def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False, **kwargs):
+        prepare = getattr(self.transformer, "prepare_generation_tokens", None)
+        if prepare is None:
+            raise ValueError("This model does not support generation context planning.")
+        return prepare(tokens, context_budget, max_length, auto_resize, **kwargs)
 
     def count_chat_tokens(self, tokens):
         return self.transformer.count_chat_tokens(tokens)
@@ -764,6 +773,9 @@ class SD1ClipModel(torch.nn.Module):
 
     def count_chat_tokens(self, tokens):
         return getattr(self, self.clip).count_chat_tokens(tokens)
+
+    def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False, **kwargs):
+        return getattr(self, self.clip).prepare_generation_tokens(tokens, context_budget, max_length, auto_resize, **kwargs)
 
     def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True):
         return getattr(self, self.clip).generate(tokens, do_sample=do_sample, max_length=max_length, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty, seed=seed, presence_penalty=presence_penalty, mtp=mtp)

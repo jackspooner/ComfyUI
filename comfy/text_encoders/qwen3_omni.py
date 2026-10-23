@@ -340,6 +340,26 @@ def audio_features(audio, config):
 
 
 class Qwen3Omni(BaseLlama, BaseGenerate, nn.Module):
+    def generation_audio_memory(self, embed, element_size):
+        return 8 * self.audio_token_length(embed) * self.audio_tower.proj1.in_features * element_size
+
+    def generation_image_memory(self, embed, element_size):
+        patches = self.image_token_length(embed) * 4
+        return max(4 * self.visual.blocks[0].attn.heads * patches * patches,
+                   64 * patches * self.model.config.hidden_size * element_size)
+
+    def image_geometry(self, embed, token_budget):
+        cfg = self.processor_config['image_processor']
+        return comfy.text_encoders.qwen_vl.budget_image_size(
+            *embed['data'].shape[1:3], token_budget, patch_size=cfg['patch_size'], merge_size=cfg['merge_size'],
+            min_pixels=cfg['size']['shortest_edge'], max_pixels=cfg['size']['longest_edge'])
+
+    def audio_token_length(self, embed):
+        audio, cfg = embed['data'], self.processor_config['feature_extractor']
+        samples = math.ceil(float(np.float32(audio['waveform'].shape[-1] * cfg['sampling_rate'] / audio['sample_rate'])))
+        frames = (max(cfg['n_fft'] // 2 + 1, samples) + cfg['hop_length'] - 1) // cfg['hop_length']
+        return audio_output_length(frames, self.audio_tower.chunk_size)
+
     def image_token_length(self, embed):
         cfg = self.processor_config['image_processor']
         patch, merge = cfg['patch_size'], cfg['merge_size']

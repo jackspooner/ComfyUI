@@ -17,6 +17,7 @@ import comfy.quant_ops
 from comfy.ldm.modules.attention import optimized_attention_for_device
 from comfy.rmsnorm import rms_norm
 from comfy.text_encoders.llama import RMSNorm, MLP, BaseLlama, BaseGenerate, FixedKV, _make_scaled_embedding
+from comfy.text_generation_media import sample_video, timestamp
 
 
 # Intentional minor divergences from transformers -reference implementation:
@@ -655,6 +656,28 @@ class Gemma4Transformer(nn.Module):
 
 class Gemma4Base(BaseLlama, BaseGenerate, torch.nn.Module):
     """Common base for all Gemma4 variants: text model + vision."""
+    def image_geometry(self, embed, token_budget):
+        source = embed.get("source", embed["data"])
+        return _get_aspect_ratio_preserving_size(*source.shape[1:3], 16, min(token_budget, 1120) * 9, 3)
+
+    def generation_cache_memory(self, capacity, element_size, mtp=True):
+        cfg = self.model.config
+        first_shared = cfg.num_hidden_layers - cfg.num_kv_shared_layers
+        total = 0
+        for i in range(first_shared):
+            sliding = cfg.sliding_attention[i % len(cfg.sliding_attention)] if cfg.sliding_attention else False
+            head_dim = cfg.head_dim if sliding else cfg.global_head_dim
+            heads = cfg.num_global_key_value_heads if cfg.attention_k_eq_v and not sliding else cfg.num_key_value_heads
+            length = min(capacity, sliding) if sliding else capacity
+            total += 2 * heads * head_dim * length * element_size
+        return total
+
+    def generation_image_memory(self, embed, element_size):
+        cfg = self.model.config.vision_config
+        patches = self.image_token_length(embed) * 9
+        return max(4 * cfg["num_attention_heads"] * patches * patches,
+                   64 * patches * cfg["hidden_size"] * element_size)
+
     def image_token_length(self, embed):
         cfg = self.model.config.vision_config
         factor = cfg["patch_size"] * cfg["pooling_kernel_size"]
@@ -720,6 +743,16 @@ class Gemma4AudioMixin:
         self.audio_model = Gemma4AudioEncoder(config.audio_config, dtype=dtype, device=device, ops=operations)
         self.audio_projector = Gemma4AudioProjector({"audio_output_proj_dims": config.audio_config["output_proj_dims"], "text_hidden_size": config.hidden_size, "rms_norm_eps": config.rms_norm_eps}, dtype=dtype, device=device, ops=operations)
 
+    def audio_token_length(self, embed):
+        length = embed["data"].shape[1]
+        return ((length + 1) // 2 + 1) // 2
+
+    def generation_audio_memory(self, embed, element_size):
+        length = embed["data"].shape[1]
+        cfg = self.model.config.audio_config
+        return max(4 * cfg["num_attention_heads"] * length * length,
+                   64 * length * cfg["hidden_size"] * element_size)
+
     def preprocess_embed(self, embed, device):
         result, extra = super().preprocess_embed(embed, device)
         if result is not None:
@@ -736,6 +769,16 @@ class Gemma4AudioMixin:
 
 class Gemma4UnifiedBase(Gemma4Base):
     """Encoder-free multimodal Gemma4 (gemma4_unified, e.g. 12B): raw image patches and audio frames projected directly into LM space."""
+    def audio_token_length(self, embed):
+        return embed["data"].shape[1]
+
+    def generation_image_memory(self, embed, element_size):
+        # The unified variant projects raw patches; it has no quadratic vision encoder.
+        return self.image_token_length(embed) * (48 * 48 * 3 + self.model.config.hidden_size) * element_size * 8
+
+    def generation_audio_memory(self, embed, element_size):
+        return self.audio_token_length(embed) * (640 + self.model.config.hidden_size) * element_size * 8
+
     def _init_model(self, config, dtype, device, operations):
         self.num_layers = config.num_hidden_layers
         self.model = Gemma4Transformer(config, device=device, dtype=dtype, ops=operations)
@@ -1404,7 +1447,7 @@ def prepare_chat_image(image, max_soft_tokens=280):
     if (target_h, target_w) != (h, w):
         pixels = TVF.resize(pixels, [target_h, target_w], interpolation=TVF.InterpolationMode.BICUBIC, antialias=True)
     pixels = (pixels.float() * (1.0 / 255.0)).unsqueeze(0).movedim(1, -1)[..., :3]
-    return {"type": "image", "data": pixels, "max_soft_tokens": max_soft_tokens}
+    return {"type": "image", "data": pixels, "source": image, "max_soft_tokens": max_soft_tokens}
 
 
 class Gemma4_Tokenizer():
@@ -1498,7 +1541,7 @@ class Gemma4_Tokenizer():
         up_slopes = slopes[:, 2:] / filter_diff[1:]
         return np.maximum(np.zeros(1), np.minimum(down_slopes, up_slopes))
 
-    def tokenize_with_weights(self, text, return_word_ids=False, image=None, audio=None, video=None, llama_template=None, skip_template=True, thinking=False, system_prompt="", **kwargs):
+    def tokenize_with_weights(self, text, return_word_ids=False, image=None, audio=None, video=None, llama_template=None, skip_template=True, thinking=False, system_prompt="", video_timestamps=None, **kwargs):
 
         # Process audio
         audio_features = []
@@ -1518,13 +1561,10 @@ class Gemma4_Tokenizer():
 
             # Subsample video to 1fps
             if is_video:
-                fps = kwargs.get("fps", 24)
-                step = max(1, round(fps))
-                indices = list(range(0, num_frames, step))
-                if len(indices) == 0:
-                    indices = [0]
-                samples = samples[indices]
-                num_frames = len(indices)
+                if video_timestamps is None:
+                    video, video_timestamps = sample_video(video, kwargs.get("source_fps", 24), kwargs.get("fps", 1))
+                    samples = video.movedim(-1, 1)
+                num_frames = samples.shape[0]
 
             max_soft_tokens = kwargs.get("max_soft_tokens", 70 if is_video else 280)
             for i in range(num_frames):
@@ -1547,7 +1587,7 @@ class Gemma4_Tokenizer():
                     if is_video:
                         media += "\n\n"
                         for i in range(len(images)):
-                            ts = f"{int(i // 60):02d}:{int(i % 60):02d}"
+                            ts = timestamp(video_timestamps[i])
                             sep = "" if i == 0 else " "
                             media += f"{sep}{ts} <|image><|video|><image|>"
                         media += "\n\n"
@@ -1642,6 +1682,9 @@ class Gemma4SDTokenizer(Gemma4_Tokenizer, sd1_clip.SDTokenizer):
 
 
 class Gemma4Tokenizer(sd1_clip.SD1Tokenizer):
+    def tokenize_video(self, text, video, timestamps, **kwargs):
+        return self.tokenize_with_weights(text, video=video, video_timestamps=timestamps, **kwargs)
+
     def tokenize_chat(self, messages, thinking=False):
         return {self.clip: self.gemma4.tokenize_chat(messages, thinking)}
 

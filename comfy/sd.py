@@ -4,6 +4,7 @@ from enum import Enum
 import logging
 
 from comfy import model_management
+from comfy.text_generation_media import sample_video, timestamp
 from comfy.utils import ProgressBar
 from .ldm.models.autoencoder import AutoencoderKL, AutoencodingEngine
 from .ldm.cascade.stage_a import StageA
@@ -358,6 +359,49 @@ class CLIP:
         if context is None:
             raise ValueError("This model does not expose a text conversation context limit.")
         return context()
+
+    def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False, memory_budget=None, mtp=True):
+        prepare = getattr(self.cond_stage_model, "prepare_generation_tokens", None)
+        if prepare is None:
+            raise ValueError("This CLIP model does not support generation context planning.")
+        if auto_resize:
+            # Use the memory owner's ordinary loading/offload policy, then measure headroom
+            # with the selected weights resident. Planning never loads a parallel model.
+            self.load_model(tokens)
+            device = self.patcher.load_device
+            keep = [model_management.LoadedModel(p) for p in [self.patcher, *self.patcher.model_patches_models()]]
+            model_management.free_memory(model_management.get_total_memory(device), device, keep_loaded=keep)
+            available = max(0, model_management.get_free_memory(device) - model_management.minimum_inference_memory())
+            memory_budget = available if memory_budget is None else min(memory_budget, available)
+            selected, info = prepare(tokens, context_budget, max_length, auto_resize,
+                                     memory_budget=memory_budget, device=device, mtp=mtp)
+            info.update(memory_device=str(device), memory_kind="ram" if model_management.is_device_cpu(device) else "vram")
+            return selected, info
+        return prepare(tokens, context_budget, max_length, auto_resize)
+
+    def tokenize_video(self, prompt, video, source_fps=24.0, fps=1.0, **kwargs):
+        frames, times = sample_video(video, source_fps, fps)
+        tokenize = getattr(self.tokenizer, "tokenize_video", None)
+        if tokenize is not None:
+            tokens = tokenize(prompt, frames, times, **kwargs)
+        else:
+            if kwargs.get("skip_template") or kwargs.get("audio") is not None:
+                raise ValueError("This model's video-as-images adapter requires the default template and no audio input.")
+            content = [{"type": "text", "text": prompt}]
+            for i, time in enumerate(times):
+                content.extend([{"type": "text", "text": f"\nFrame at {timestamp(time)}: "},
+                                {"type": "image", "data": frames[i:i + 1]}])
+            messages = []
+            if kwargs.get("system_prompt"):
+                messages.append({"role": "system", "content": kwargs["system_prompt"]})
+            messages.append({"role": "user", "content": content})
+            tokens = self.tokenize_chat(messages, thinking=kwargs.get("thinking", False))
+        rows = next(iter(tokens.values())) if isinstance(tokens, dict) and len(tokens) == 1 else tokens
+        image_count = sum(isinstance(entry[0], dict) and entry[0].get("type") == "image" for row in rows for entry in row)
+        if image_count != len(times):
+            raise ValueError("The video tokenizer did not retain every selected frame. Use a complete image-chat model and the default template, or supply matching raw video placeholders.")
+        return tokens, {"source_frames": video.shape[0], "sampled_frames": len(times),
+                        "source_fps": source_fps, "fps": min(fps, source_fps), "frame_timestamps": times}
 
     def add_hooks_to_dict(self, pooled_dict: dict[str]):
         if self.apply_hooks_to_conds:

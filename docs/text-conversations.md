@@ -25,7 +25,7 @@ inputs are optional:
 | --- | --- |
 | `history` | STRING containing version 1 text or version 2 image JSON. Connect `{"version":1,"messages":[]}` to start a conversation. Empty/omitted keeps the existing single-prompt path unless another new control enables conversation mode. |
 | `prompt_content` | Optional STRING JSON array of ordered text/image parts. Requires empty `prompt` and no IMAGE socket. |
-| `context_budget` | Total conversation token ceiling, including generated output. `0` uses the loaded model limit; a positive value enables text/image conversation mode and may only lower that limit. Does not apply to audio/video inputs. |
+| `context_budget` | Total input/output token ceiling. `0` uses the loaded model limit; a positive value enables text/image conversation mode. Also applies to video. With `auto_resize`, available device memory can lower the usable window further. |
 | `history_policy` | `error` (default) or `drop_oldest_turns`. The latter explicitly enables exclusion of complete old user/assistant pairs from this generation. Does not apply to audio/video inputs. |
 
 Conversation mode uses `prompt` as a new user message. `system_prompt`, when
@@ -36,10 +36,13 @@ the current prompt; different turns can have different dimensions. Templated ima
 requests automatically enter history mode, including an image-only first turn.
 Explicit history rejects raw-template bypass and audio/video. With empty `history`
 and `prompt_content`, audio/video inputs automatically select the existing media
-path regardless of `context_budget` or `history_policy`; those conversation-only
-settings are ignored. `max_length` and the model's media-aware context checks still
-apply. For example, MOSS audio with `context_budget=32000` needs no manual history
-mode change. Raw prompts retain their existing behavior when history controls are absent.
+path regardless of `context_budget` or `history_policy`, without enabling history.
+Video now observes `context_budget`; `history_policy` still does not apply to media.
+Legacy audio without `auto_resize` keeps ignoring conversation controls; for
+example, MOSS audio with `context_budget=32000` needs no manual history-mode change.
+Raw prompts retain their existing behavior when history controls are absent.
+See [sampling and memory-aware sizing](text-media-sizing.md) for `fps`, `source_fps`,
+`auto_resize`, supported model limits and result metadata.
 
 Outputs are `generated_text` at 0, `thinking` at 1, `history` at 2 and
 `context_info` at 3, and `raw_text` at 4. Ordinary templated text also returns its first turn as history
@@ -137,11 +140,14 @@ normalized input transcript, including any explicit system replacement and the
 current user message. Generated tokens count the returned model IDs, including
 thinking and any returned stop token. No unreported stop reason or cost is invented.
 
-Context is a logical ceiling, not a memory-readiness guarantee. Native model,
-KV allocation, MTP workspace and offload owners remain unchanged. There is no
+With `auto_resize=false`, context is a logical ceiling, not a memory-readiness guarantee.
+Opt-in `auto_resize` also uses measured device headroom and model-aware estimates
+to choose media sizes and a lower practical window; see [limits and recovery](text-media-sizing.md).
+Native model, KV allocation, MTP workspace and offload owners remain unchanged. There is no
 persistent KV reuse; every turn replays its selected input. Larger output/context
-can require substantially more memory. Do not retry a failed job with different
-budgets or another model without a deliberate new request.
+can require substantially more memory. Only opted-in in-call OOM recovery adjusts
+media automatically; do not resubmit a failed/uncertain queued job or switch models
+without a deliberate new request.
 
 ## API example
 
