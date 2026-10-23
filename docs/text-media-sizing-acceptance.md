@@ -52,3 +52,35 @@ metadata-only exact Gemma4 cache-size comparisons, hybrid/MTP accounting,
 whole-turn exclusion and measured-headroom delegation. No real OOM was deliberately
 forced. Other checkpoints, CPU/RAM placement, audio planning, attention backends,
 long natural videos and full-context quality have no new live acceptance here.
+
+## Minimum short edge acceptance
+
+Serving revision `4348828a8` adds `min_short_edge`, default 256 pixels, including
+OOM replanning. After an idle queue/Workflows5 check and managed restart, live
+discovery reported `auto_resize=true` and the 256-pixel default. Using the same
+Gemma4 int8 fixture, 24 source frames at 24 FPS and `fps=4` retained four frames
+at 0, .25, .5 and .75 seconds, with all 64 output tokens reserved:
+
+| Token cap | Prompt ID | Result |
+| --- | --- | --- |
+| 8192 | `b230ad7d-3b5c-46ab-9fd9-45317ca14d5a` | Four 2112×1200 frames; 4480 input tokens, 47 generated tokens |
+| 384 | `0211aacf-7326-4541-a48a-520e011de659` | Four 480×288 frames; 320 input tokens, 18 generated tokens |
+| 256 | `f3f2c926-a2b4-465c-ae9d-5c1703c998a3` | ContextOverflowError before generation: minimum media needs 320 input + 64 output tokens |
+
+The earlier 384-token result above predates the floor and used a different prompt;
+it does not describe the current default. The 256-token rejection retained the
+floor and advised lower FPS, a shorter clip, fewer text/output tokens or an explicit
+floor override. No real OOM was induced; unit tests verify retries retain the floor
+and stop before another generation when it cannot fit. The combined selected
+text/history/vision/audio/video regressions passed 308 tests with four skips in
+both the task and integration worktrees.
+
+RouterText revision `78fbc3e` also accepted an image call's typed sizing diagnostics,
+reporting 1141 input/12 generated tokens and 64 reserved output tokens under an
+effective 13315-token memory window versus the 131072-token model/request ceiling.
+Prompt `c1979b0b-5118-4314-aada-31d5c94d04dc` returned the fixture's blue circle and
+orange square. RouterText's build, 410 tests (one skip), lint, formatting and API
+freshness checks passed in both worktrees. Exact task-local graphs, receipts,
+context files and the RouterText response are retained under
+`output/text-media-minimum-acceptance/`. These bounded static-image checks do not
+establish natural-video understanding, exact maximum VRAM use or all model families.
