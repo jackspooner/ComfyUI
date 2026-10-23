@@ -2,6 +2,10 @@
 import json
 
 
+class ContextOverflowError(ValueError):
+    pass
+
+
 def read_content(content, images=False):
     if isinstance(content, str):
         return content
@@ -63,7 +67,7 @@ def count_text_tokens(tokens):
     return sum(len(row) for row in rows)
 
 
-def select_context(messages, tokenize, model_limit, context_budget, max_length, history_policy, count_tokens=count_text_tokens):
+def select_context(messages, tokenize, model_limit, context_budget, max_length, history_policy, count_tokens=count_text_tokens, prepare_tokens=None):
     if type(context_budget) is not int or context_budget < 0 or context_budget > model_limit:
         raise ValueError(f"context_budget must be 0 or between 1 and {model_limit} tokens.")
     if type(max_length) is not int or max_length < 0:
@@ -77,20 +81,32 @@ def select_context(messages, tokenize, model_limit, context_budget, max_length, 
     removed = 0
     while True:
         tokens = tokenize(active)
-        count = count_tokens(tokens)
+        media_info = {}
+        overflow = None
+        try:
+            if prepare_tokens is not None:
+                tokens, media_info = prepare_tokens(tokens)
+            count = count_tokens(tokens)
+        except ContextOverflowError as error:
+            overflow = error
+            count = limit + 1
         if count + (max_length or 1) <= limit:
-            return tokens, {
+            info = {
                 "version": 1, "model_context_limit": model_limit, "context_limit": limit,
                 "input_tokens": count, "output_allowance": max_length or limit - count,
+                **media_info,
                 "excluded_message_ranges": excluded,
             }
+            return tokens, info
         if history_policy == "drop_oldest_turns" and len(active) > offset + 2 and active[offset]["role"] == "user" and active[offset + 1]["role"] == "assistant":
             # Half-open ranges refer to the full, normalized input transcript.
             excluded.append([offset + removed, offset + removed + 2])
             del active[offset:offset + 2]
             removed += 2
             continue
-        raise ValueError(f"Context overflow: input uses {count} tokens and needs {max_length or 1} output tokens within {limit}. Shorten input or output, or explicitly select drop_oldest_turns for complete prior turns.")
+        if overflow is not None:
+            raise overflow
+        raise ContextOverflowError(f"Context overflow: input uses {count} tokens and needs {max_length or 1} output tokens within {limit}. Shorten input or output, or explicitly select drop_oldest_turns for complete prior turns.")
 
 
 def write_history(messages):

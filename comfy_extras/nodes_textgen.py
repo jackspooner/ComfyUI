@@ -1,6 +1,7 @@
 from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 import json
+import logging
 from comfy.text_generation import read_history, select_context, write_history, count_text_tokens
 import comfy.model_management
 from comfy_extras.text_history_images import resolve_images, publish_images, fingerprint
@@ -39,9 +40,9 @@ class TextGenerate(io.ComfyNode):
                 io.Clip.Input("clip"),
                 io.String.Input("prompt", multiline=True, dynamic_prompts=True, default=""),
                 io.Image.Input("image", optional=True),
-                io.Image.Input("video", optional=True, tooltip="Video frames as image batch. Assumed to be 24 FPS; subsampled to 1 FPS internally."),
+                io.Image.Input("video", optional=True, tooltip="Video frames as an IMAGE batch. Set source_fps to its playback rate and fps to the number of frames to analyse per second."),
                 io.Audio.Input("audio", optional=True),
-                io.Int.Input("max_length", default=512, min=0, max=1048576, tooltip="Maximum new tokens, including thinking. 0 uses the model's remaining context after the prompt and media. Generation stops at the model's end token; larger budgets require more memory."),
+                io.Int.Input("max_length", default=512, min=0, max=1048576, tooltip="Maximum new tokens, including thinking. 0 uses remaining context after prompt/media (remaining affordable capacity with auto_resize). Use a positive value to reserve useful output before media sizing. Generation stops at the model's end token."),
                 io.DynamicCombo.Input("sampling_mode", options=sampling_options, display_name="Sampling Mode"),
                 io.Boolean.Input("thinking", optional=True, default=False, tooltip="Operate in thinking mode if the model supports it."),
                 io.Boolean.Input("use_default_template", optional=True, default=True, tooltip="Use the built in system prompt/template if the model has one.", advanced=True),
@@ -49,8 +50,11 @@ class TextGenerate(io.ComfyNode):
                 io.String.Input("system_prompt", force_input=True, optional=True, tooltip="Replaces the system prompt in the model's chat template. Ignored when the default template is not used."),
                 io.String.Input("history", force_input=True, optional=True, tooltip='Version 1 text or version 2 image history JSON. Start with {"version":1,"messages":[]}. Empty keeps the existing single prompt path.'),
                 io.String.Input("prompt_content", force_input=True, optional=True, tooltip="Ordered JSON text/image parts for the current user message. Requires empty prompt and no IMAGE input. Local input files or saved image IDs only."),
-                io.Int.Input("context_budget", default=0, min=0, max=1048576, optional=True, tooltip="Total conversation tokens including images and output. 0 uses the model limit. A positive budget enables text/image conversation mode. Does not apply to audio/video inputs."),
+                io.Int.Input("context_budget", default=0, min=0, max=1048576, optional=True, tooltip="Total input and output token ceiling for text/images/video. 0 uses the model limit. With auto_resize, available device memory can lower the usable window further. Audio requires auto_resize and exact model token accounting."),
                 io.Combo.Input("history_policy", options=["error", "drop_oldest_turns"], default="error", optional=True, tooltip="Fail on overflow, or explicitly exclude oldest complete turns from this generation. Returned history stays complete. Does not apply to audio/video inputs."),
+                io.Float.Input("fps", default=1.0, min=0.01, max=1000.0, step=0.01, optional=True, tooltip="Frames to analyse per source second: 4 selects one frame every 0.25 seconds. Never duplicates source frames."),
+                io.Float.Input("source_fps", default=24.0, min=0.01, max=1000.0, step=0.01, optional=True, tooltip="Actual playback rate of the supplied IMAGE batch. IMAGE batches do not retain video FPS metadata."),
+                io.Boolean.Input("auto_resize", default=False, optional=True, tooltip="Maximize supported image/frame sizes within available device memory and the token ceiling, preserving max_length. Uses model-aware memory estimates; native model limits still apply."),
             ],
             outputs=[
                 io.String.Output(display_name="generated_text"),
@@ -68,7 +72,7 @@ class TextGenerate(io.ComfyNode):
         return fingerprint(read_history(history, "", prompt_content=prompt_content))
 
     @classmethod
-    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="") -> io.NodeOutput:
+    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="", fps=1.0, source_fps=24.0, auto_resize=False) -> io.NodeOutput:
 
         mtp = False if mtp == "off" else (True if mtp == "auto" else int(mtp))
 
@@ -76,6 +80,13 @@ class TextGenerate(io.ComfyNode):
         context_info = None
         stored_messages = None
         pending_images = {}
+        video_info = {}
+        unplanned_tokens = None
+
+        def prepare(value):
+            nonlocal unplanned_tokens
+            unplanned_tokens = value
+            return clip.prepare_generation_tokens(value, context_budget, max_length, True, mtp=mtp)
         if prompt_content and (prompt or image is not None):
             raise ValueError("prompt_content requires an empty prompt and no IMAGE input.")
         image_conversation = cls.history_output and use_default_template and image is not None and video is None and audio is None
@@ -89,10 +100,21 @@ class TextGenerate(io.ComfyNode):
             messages, stored_messages, pending_images = resolve_images(messages, image)
             has_images = any(isinstance(m["content"], list) and any(p["type"] == "image" for p in m["content"]) for m in messages)
             counter = clip.count_chat_tokens if has_images else count_text_tokens
-            tokens, context_info = select_context(messages, lambda turns: clip.tokenize_chat(turns, thinking=thinking), clip.get_chat_context_length(), context_budget, max_length, history_policy, counter)
+            tokens, context_info = select_context(messages, lambda turns: clip.tokenize_chat(turns, thinking=thinking), clip.get_chat_context_length(), context_budget, max_length, history_policy, counter, prepare_tokens=prepare if auto_resize else None)
             max_length = context_info["output_allowance"]
         else:
-            tokens = clip.tokenize(prompt, image=image, skip_template=not use_default_template, min_length=1, thinking=thinking, video=video, audio=audio, system_prompt=system_prompt if use_default_template else "")
+            if video is not None:
+                tokens, video_info = clip.tokenize_video(prompt, video, source_fps, fps, audio=audio,
+                                                        skip_template=not use_default_template, min_length=1,
+                                                        thinking=thinking, system_prompt=system_prompt if use_default_template else "")
+            else:
+                tokens = clip.tokenize(prompt, image=image, skip_template=not use_default_template, min_length=1, thinking=thinking, audio=audio, system_prompt=system_prompt if use_default_template else "")
+            if auto_resize or video is not None:
+                if auto_resize:
+                    tokens, context_info = prepare(tokens)
+                else:
+                    tokens, context_info = clip.prepare_generation_tokens(tokens, context_budget, max_length, False, mtp=mtp)
+                max_length = context_info["output_allowance"]
 
         # Get sampling parameters from dynamic combo
         do_sample = sampling_mode.get("sampling_mode") == "on"
@@ -104,19 +126,31 @@ class TextGenerate(io.ComfyNode):
         repetition_penalty = sampling_mode.get("repetition_penalty", 1.0)
         presence_penalty = sampling_mode.get("presence_penalty", 0.0)
 
-        generated_ids = clip.generate(
-            tokens,
-            do_sample=do_sample,
-            max_length=max_length,
-            temperature=temperature,
-            top_k=top_k,
-            top_p=top_p,
-            min_p=min_p,
-            repetition_penalty=repetition_penalty,
-            presence_penalty=presence_penalty,
-            seed=seed,
-            mtp=mtp
-        )
+        retries = 0
+        while True:
+            try:
+                generated_ids = clip.generate(
+                    tokens, do_sample=do_sample, max_length=max_length, temperature=temperature,
+                    top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty,
+                    presence_penalty=presence_penalty, seed=seed, mtp=mtp)
+                break
+            except (comfy.model_management.OOM_EXCEPTION, comfy.model_management.ACCELERATOR_ERROR) as error:
+                if not auto_resize or retries >= 3 or not comfy.model_management.is_oom(error):
+                    raise
+                # Release failed generation frames before replanning; never commit a failed turn.
+                error.__traceback__ = None
+            comfy.model_management.throw_exception_if_processing_interrupted()
+            comfy.model_management.soft_empty_cache()
+            previous = context_info
+            retry_budget = min(previous["memory_budget_bytes"], previous["estimated_working_bytes"])
+            tokens, context_info = clip.prepare_generation_tokens(
+                unplanned_tokens, context_budget, max_length, True,
+                memory_budget=int(retry_budget * 0.5), mtp=mtp)
+            context_info["excluded_message_ranges"] = previous["excluded_message_ranges"]
+            if context_info["image_sizes"] == previous["image_sizes"]:
+                raise RuntimeError("Automatic resizing cannot reduce media further after a device out-of-memory error. Reduce frames, text or max_length.")
+            retries += 1
+            logging.warning("Text generation ran out of memory; retrying with smaller media (%s/3).", retries)
 
         generated_text = clip.decode(generated_ids)
 
@@ -137,6 +171,9 @@ class TextGenerate(io.ComfyNode):
             updated_history = write_history([*(stored_messages if stored_messages is not None else messages), {"role": "assistant", "content": text.strip()}])
         if context_info is not None:
             context_info["generated_tokens"] = len(generated_ids)
+            if auto_resize:
+                context_info["oom_retries"] = retries
+            context_info.update(video_info)
         return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip(), updated_history, json.dumps(context_info) if context_info is not None else "", generated_text)
 
 
@@ -282,7 +319,7 @@ class TextGenerateLTX2Prompt(TextGenerate):
             node_id="TextGenerateLTX2Prompt",
             display_name="Generate LTX2 Prompt",
             category=parent_schema.category,
-            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy", "prompt_content")],
+            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy", "prompt_content", "fps", "source_fps", "auto_resize")],
             outputs=parent_schema.outputs[:2],
             search_aliases=["prompt enhance", "LLM", "gemma"],
         )
