@@ -371,20 +371,9 @@
   comments, but do not disrespect her.
 - Warning and info messages should be short and actionable. Remove noisy or
   misleading messages rather than adding more logging.
-- Documentation and README edits should be concise, factual, and tied to the
-  changed behavior.
 
-## Commit and Review Habits
+## Model behavior review
 
-- If asked to write commit messages, use short direct subjects like the existing
-  history: `Fix ...`, `Add ...`, `Support ...`, `Remove ...`, `Update ...`,
-  `Make ...`, `Use ...`, `Disable ...`, `Bump ...`, or `Revert ...`.
-- Keep PR descriptions short and reviewable. State the problem, the behavioral
-  change, and the tests run; avoid long narrative explanations, implementation
-  diaries, or exhaustive file-by-file summaries unless the reviewer explicitly
-  needs that context.
-- Prefer one coherent behavioral change per commit. Dependency pins, tests, and
-  the code that needs them may be in the same commit when they are inseparable.
 - In reviews, prioritize real user impact: crashes, wrong dtype/device behavior,
   memory regressions, broken model loading, workflow incompatibility, and noisy
   or misleading user-facing output.
@@ -396,8 +385,7 @@ Before integrating a model or converting a checkpoint for native execution, read
 component/loader selection, offline conversion, optimized execution and memory
 ownership, reference/lifecycle acceptance, documentation and activation boundaries.
 Use the existing shared `comfyui` skill for discovery and operating guidance and
-`comfyui-model-runtimes` for native-versus-isolated placement; extend their
-authoritative sources through `shared-agent-skills` when capabilities change.
+`comfyui-model-runtimes` for native-versus-isolated placement.
 
 ## Worktree development
 
@@ -417,8 +405,7 @@ For native PP-OCRv6 work, add `--paddleocr` to the setup command. It checks
 preinstalled OpenCV Python, NumPy and torchvision without installing packages or
 loading models. Run `python -m pytest tests-unit/comfy_test/paddleocr_test.py -q`
 with the prepared interpreter. `docs/paddleocr.md` documents the offline reference
-harness, pinned models, node contracts and acceptance limits. Update the existing
-authoritative `comfyui` and `comfyui-model-runtimes` skills for capability changes.
+harness, pinned models, node contracts and acceptance limits.
 
 ### Optional Trellis2 mesh encoder
 
@@ -426,8 +413,7 @@ For mesh-encoder work, use the same setup command with `--trellis-mesh` and
 `EIGEN_INCLUDE_DIR` pointing at Eigen 3 headers. It builds only a checkout-local
 CPU extension; no downloads or package installs occur. See
 `docs/trellis2-mesh-texturing.md` for compiler/PyTorch prerequisites and tests.
-The shared authoritative `comfyui` skill owns this workflow operating guidance;
-extend it alongside this capability rather than creating a per-model skill.
+The shared authoritative `comfyui` skill owns this workflow operating guidance.
 
 ### Text conversation verification
 
@@ -447,7 +433,7 @@ trimming. Setup must not restart services.
 
 ### Optional native YingMusic
 
-Use `--yingmusic` with the standard worktree setup command to check preinstalled lyric dependencies and espeak-ng. `docs/yingmusic.md` documents local conversion, native loader/node contracts and acceptance status. Run `python -m pytest tests-unit/comfy_test/yingmusic_test.py -q` with the prepared interpreter; real checkpoint comparisons are a separate explicit check. Extend the authoritative shared ComfyUI/model-runtimes guidance alongside reusable changes.
+Use `--yingmusic` with the standard worktree setup command to check preinstalled lyric dependencies and espeak-ng. `docs/yingmusic.md` documents local conversion, native loader/node contracts and acceptance status. Run `python -m pytest tests-unit/comfy_test/yingmusic_test.py -q` with the prepared interpreter; real checkpoint comparisons are a separate explicit check.
 
 ### Optional native SoulX-Singer
 
@@ -455,8 +441,7 @@ Use `--soulx` with the standard setup command to check preinstalled NumPy, SciPy
 librosa and soundfile without installing packages or loading models. See
 `docs/soulx-singer.md` for the pinned offline converter, native SVS/SVC and
 preprocessing contracts, examples, parity commands and acceptance limits. Run
-`python -m pytest tests-unit/comfy_test/soulx_singer_test.py -q`. Extend the existing
-authoritative `comfyui` and `comfyui-model-runtimes` skills with reusable changes. Setup does not activate the service.
+`python -m pytest tests-unit/comfy_test/soulx_singer_test.py -q`. Setup does not activate the service.
 
 ### Optional native Applio / RVC
 
@@ -466,8 +451,7 @@ See `docs/applio.md` for offline conversion, dedicated managed voice/ContentVec
 loading, reused RMVPE and normal-queue workflow operation. Run
 `python -m pytest tests-unit/comfy_test/rvc_test.py tests-unit/comfy_test/soulx_singer_test.py -q`.
 `scripts/check_rvc.py` performs pinned upstream CPU component comparisons separately.
-Update the existing shared ComfyUI/model-runtimes guidance for reusable changes;
-setup and validation do not start live workloads or restart services.
+Setup and validation do not start live workloads or restart services.
 
 ### Native Drama 3
 
@@ -475,8 +459,7 @@ Use the standard worktree setup command. `docs/drama3.md` owns offline FP8-to-NV
 conversion, native node/history contracts, reference verification and acceptance
 limits. Run `python -m pytest tests-unit/comfy_test/drama3_test.py -q`; set
 `DRAMA3_UPSTREAM` to the pinned offline source for independent component checks.
-Keep model files outside Git. Update the authoritative existing ComfyUI and
-model-runtime skills with capability changes.
+Keep model files outside Git.
 
 ### Optional native MOSS SoundEffect
 
@@ -485,8 +468,7 @@ provisioned `requirements-moss-soundeffect.txt` prompt dependencies. Setup insta
 nothing. `docs/moss-soundeffect.md` documents pinned offline conversion, native
 MODEL/CLIP/VAE operation and acceptance limits. Run the prepared interpreter with
 `-m pytest tests-unit/comfy_test/moss_soundeffect_test.py -q`; optional source and
-checkpoint fixtures are documented there. Extend the existing shared ComfyUI and
-model-runtime guidance alongside reusable changes. Do not activate the service.
+checkpoint fixtures are documented there. Do not activate the service.
 
 
 ### Native archive model cache
@@ -498,6 +480,5 @@ existing PyYAML and standard SQLite modules. Run the prepared interpreter with
 `-m pytest tests-unit/comfy_test/model_cache_test.py tests-unit/execution_test tests-unit/folder_paths_test -q`.
 The execution suite requires its declared pytest-asyncio dependency. All cache
 fixtures must use isolated archive/cache directories; never test eviction against
-operator models. Model files remain outside Git. Update the authoritative shared
-`comfyui` skill and its model-cache reference alongside reusable changes. The local
-CLI queues commands; no new HTTP or MCP interface is introduced.
+operator models. Model files remain outside Git. The local CLI queues commands;
+no new HTTP or MCP interface is introduced.
