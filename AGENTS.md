@@ -441,10 +441,7 @@ acceptance uses the normal queue; never interrupt an active prompt to deploy.
 Native text/image TextGenerate history is documented in
 `docs/text-conversations.md`. Use the prepared interpreter to run
 `python -m pytest tests-unit/comfy_test/image_history_test.py tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q`.
-Run broader required checks and report external/runtime limitations. The shared
-`comfyui` skill owns operating guidance; locate its authoritative source with
-`skills show comfyui` and update it alongside capability changes. Reconcile
-discovery after integration; never register task worktrees globally. History is
+The shared `comfyui` skill owns operating guidance. History is
 explicit data, without model-owned sessions, persistent GPU caches or implicit
 trimming. Setup must not restart services.
 
