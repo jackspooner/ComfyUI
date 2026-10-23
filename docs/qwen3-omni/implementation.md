@@ -37,11 +37,6 @@ COMFYUI_PYTHON=/absolute/path/to/prepared/python python3 scripts/setup_worktree.
 
 The runtime needs Python >=3.10, PyTorch, einops and safetensors. Setup checks the
 explicit runtime without installing packages, loading models or starting services.
-Use the GitNexus owner to ensure the exact worktree at its full HEAD, with ordinary
-embedding generation disabled, before graph-dependent implementation. Recover
-pending jobs through the returned ID; owner refusal is not graph readiness.
-The earlier canonical inspection was refused for incomplete authenticated
-database/receipt evidence. Resolve through the owner before relying on graph data.
 
 Do not downgrade serving dependencies for a reference model. If reference
 execution needs incompatible packages, use an isolated, explicitly pinned test
