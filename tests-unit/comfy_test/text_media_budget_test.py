@@ -173,7 +173,8 @@ def test_oom_retry_preserves_output_and_publishes_only_success(monkeypatch):
             return 'caption'
     monkeypatch.setattr('comfy.model_management.soft_empty_cache', lambda: None)
     clip = Clip()
-    result = TextGenerate.execute(clip, 'describe', 128, {'sampling_mode': 'off'}, video=torch.zeros(24, 1, 1, 3), auto_resize=True).result
+    assert next(item for item in TextGenerate.define_schema().inputs if item.id == 'auto_resize').default is True
+    result = TextGenerate.execute(clip, 'describe', 128, {'sampling_mode': 'off'}, video=torch.zeros(24, 1, 1, 3)).result
     assert clip.calls == 2 and clip.budgets == [(128, None), (128, 500)]
     assert result[2] == '' and json.loads(result[3])['oom_retries'] == 1
 

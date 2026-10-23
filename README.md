@@ -311,7 +311,9 @@ Reasoning is separated at `</think>` even when the model omits the opening tag,
 preventing reasoning or duplicate text from leaking into `generated_text`.
 
 This fork adds `fps` (analysed frames per second), `source_fps` (the IMAGE batch's
-actual playback rate), and opt-in `auto_resize` to **Generate Text**. For example,
+actual playback rate), and enabled-by-default `auto_resize` to **Generate Text**. Explicit
+`auto_resize=false` retains model-default sizing, including for adapters without
+automatic planning support. Saved explicit values are preserved. For example,
 `source_fps=24, fps=4` selects frames 0, 6, 12 and 18 in the first second.
 Automatic sizing uses measured device headroom after managed model loading,
 model-aware cache/workspace estimates and the model/user token ceilings while

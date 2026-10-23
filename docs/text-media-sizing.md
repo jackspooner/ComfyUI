@@ -12,7 +12,7 @@ separate checks.
 | --- | --- |
 | `fps` | Frames analysed per source second; default 1. `4` means one frame every 0.25 seconds. |
 | `source_fps` | Actual playback rate of the connected IMAGE frame batch; default 24. IMAGE tensors do not retain FPS metadata. Use the loader's output rate, including upstream resampling. |
-| `auto_resize` | Default false preserves model-default resolution. True selects the largest supported common per-image token ceiling under estimated device memory and token constraints. |
+| `auto_resize` | Default true selects the largest supported common per-image token ceiling under estimated device memory and token constraints. Explicit false preserves model-default resolution. Saved explicit false values remain false; omitted API inputs use true. Adapters without automatic planning support require false. |
 | `max_length` | Output reservation, including thinking. A positive value is preserved even when media shrinks. Zero prioritizes media and uses the remaining affordable output capacity, with at least one token; use a positive reservation for useful captions. |
 | `context_budget` | Optional additional total input/output token cap. Zero uses the model's configured maximum. It cannot raise the model's maximum or supply missing model capability information. |
 

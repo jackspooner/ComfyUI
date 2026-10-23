@@ -54,7 +54,7 @@ class TextGenerate(io.ComfyNode):
                 io.Combo.Input("history_policy", options=["error", "drop_oldest_turns"], default="error", optional=True, tooltip="Fail on overflow, or explicitly exclude oldest complete turns from this generation. Returned history stays complete. Does not apply to audio/video inputs."),
                 io.Float.Input("fps", default=1.0, min=0.01, max=1000.0, step=0.01, optional=True, tooltip="Frames to analyse per source second: 4 selects one frame every 0.25 seconds. Never duplicates source frames."),
                 io.Float.Input("source_fps", default=24.0, min=0.01, max=1000.0, step=0.01, optional=True, tooltip="Actual playback rate of the supplied IMAGE batch. IMAGE batches do not retain video FPS metadata."),
-                io.Boolean.Input("auto_resize", default=False, optional=True, tooltip="Maximize supported image/frame sizes within available device memory and the token ceiling, preserving max_length. Uses model-aware memory estimates; native model limits still apply."),
+                io.Boolean.Input("auto_resize", default=True, optional=True, tooltip="Maximize supported image/frame sizes within available device memory and the token ceiling, preserving max_length. Uses model-aware memory estimates; native model limits still apply."),
             ],
             outputs=[
                 io.String.Output(display_name="generated_text"),
@@ -72,7 +72,7 @@ class TextGenerate(io.ComfyNode):
         return fingerprint(read_history(history, "", prompt_content=prompt_content))
 
     @classmethod
-    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="", fps=1.0, source_fps=24.0, auto_resize=False) -> io.NodeOutput:
+    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="", fps=1.0, source_fps=24.0, auto_resize=True) -> io.NodeOutput:
 
         mtp = False if mtp == "off" else (True if mtp == "auto" else int(mtp))
 
@@ -354,7 +354,7 @@ class TextGenerateLTX2Prompt(TextGenerate):
                 f"<start_of_turn>model\n"
             )
 
-        out = super().execute(clip, formatted_prompt, max_length, sampling_mode, image=image, thinking=thinking, use_default_template=use_default_template, video=video, audio=audio, mtp=mtp)
+        out = super().execute(clip, formatted_prompt, max_length, sampling_mode, image=image, thinking=thinking, use_default_template=use_default_template, video=video, audio=audio, mtp=mtp, auto_resize=False)
 
         # Both system prompts ask for the original prompt back when there is nothing to give; empty conditions on nothing.
         return io.NodeOutput(out.args[0] or prompt, out.args[1])

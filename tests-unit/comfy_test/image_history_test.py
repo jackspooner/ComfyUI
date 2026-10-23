@@ -87,6 +87,7 @@ class Clip:
 
 
 def run(clip, **kwargs):
+    kwargs.setdefault('auto_resize', False)
     return TextGenerate.execute(clip, kwargs.pop('prompt', ''), 16, {'sampling_mode': 'off'}, **kwargs).result
 
 
@@ -329,7 +330,7 @@ def test_cancellation_before_publication_and_ltx_no_writes(storage, monkeypatch)
         run(Clip(), image=torch.rand(1, 32, 32, 3))
     assert not list(storage.parent.rglob('*.safetensors'))
     clip = SimpleNamespace(tokenize=lambda *a, **k: {'text': [[(1, 1)]]}, generate=lambda *a, **k: [1], decode=lambda *a: 'prompt')
-    TextGenerate.execute.__func__(TextGenerateLTX2Prompt, clip, 'Describe motion', 16, {'sampling_mode': 'off'}, image=torch.rand(1, 32, 32, 3))
+    TextGenerate.execute.__func__(TextGenerateLTX2Prompt, clip, 'Describe motion', 16, {'sampling_mode': 'off'}, image=torch.rand(1, 32, 32, 3), auto_resize=False)
     assert not list(storage.parent.rglob('*.safetensors'))
 
 

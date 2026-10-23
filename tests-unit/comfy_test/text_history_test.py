@@ -146,7 +146,7 @@ class Clip:
 
 def test_node_returns_complete_history_and_exact_diagnostics():
     clip = Clip()
-    result = TextGenerate.execute(clip, 'new', 5, {'sampling_mode': 'off'}, history=write_history(transcript()[:-1]), context_budget=13, history_policy='drop_oldest_turns').result
+    result = TextGenerate.execute(clip, 'new', 5, {'sampling_mode': 'off'}, history=write_history(transcript()[:-1]), context_budget=13, history_policy='drop_oldest_turns', auto_resize=False).result
     assert result[:2] == ('final', 'reason')
     history = json.loads(result[2])
     assert history['messages'] == [*transcript(), {'role': 'assistant', 'content': 'final'}]
@@ -157,20 +157,20 @@ def test_node_returns_complete_history_and_exact_diagnostics():
     assert clip.calls[0]['max_length'] == 5
     # The returned full history can branch into another turn without mutation.
     before = result[2]
-    again = TextGenerate.execute(Clip(), 'next', 1, {'sampling_mode': 'off'}, history=before)
+    again = TextGenerate.execute(Clip(), 'next', 1, {'sampling_mode': 'off'}, history=before, auto_resize=False)
     assert json.loads(again.result[2])['messages'][-2]['content'] == 'next'
     assert result[2] == before
 
 
 def test_ordinary_templated_text_outputs_history_for_the_next_node():
     single = SimpleNamespace(tokenize=lambda *a, **kw: [], generate=lambda *a, **kw: [1], decode=lambda _: 'First answer')
-    first = TextGenerate.execute(single, 'My code is BLUE', 64, {'sampling_mode': 'off'})
+    first = TextGenerate.execute(single, 'My code is BLUE', 64, {'sampling_mode': 'off'}, auto_resize=False)
     assert first.result[:2] == ('First answer', '')
     assert first.result[3] == ''  # No counters are invented on the legacy path.
-    second = TextGenerate.execute(Clip(), '?', 1, {'sampling_mode': 'off'}, history=first.result[2])
+    second = TextGenerate.execute(Clip(), '?', 1, {'sampling_mode': 'off'}, history=first.result[2], auto_resize=False)
     assert json.loads(second.result[2])['messages'][:2] == [
         {'role': 'user', 'content': 'My code is BLUE'}, {'role': 'assistant', 'content': 'First answer'}]
-    raw = TextGenerate.execute(single, 'raw prompt', 64, {'sampling_mode': 'off'}, use_default_template=False)
+    raw = TextGenerate.execute(single, 'raw prompt', 64, {'sampling_mode': 'off'}, use_default_template=False, auto_resize=False)
     assert raw.result[2:4] == ('', '')
     assert raw.result[4] == 'First answer'
 
@@ -210,7 +210,7 @@ def test_media_controls_do_not_enable_history(media, controls, use_default_templ
     clip.tokenize_video = tokenize_video
     clip.prepare_generation_tokens = prepare
     result = TextGenerate.execute(clip, 'Describe the media', 32000, {'sampling_mode': 'off'},
-                                  thinking=True, system_prompt='Be precise.', use_default_template=use_default_template,
+                                  thinking=True, system_prompt='Be precise.', use_default_template=use_default_template, auto_resize=False,
                                   **media, **controls).result
     expected = dict(audio=media.get('audio'), skip_template=not use_default_template, min_length=1,
                     thinking=True, system_prompt='Be precise.' if use_default_template else '')
@@ -232,7 +232,7 @@ def test_media_controls_do_not_enable_history(media, controls, use_default_templ
 def test_failure_does_not_append_a_turn():
     history = write_history(transcript()[:-1])
     with pytest.raises(RuntimeError, match='cancelled'):
-        TextGenerate.execute(Clip(fail=True), 'new', 1, {'sampling_mode': 'off'}, history=history)
+        TextGenerate.execute(Clip(fail=True), 'new', 1, {'sampling_mode': 'off'}, history=history, auto_resize=False)
     assert json.loads(history)['messages'] == transcript()[:-1]
 
 
