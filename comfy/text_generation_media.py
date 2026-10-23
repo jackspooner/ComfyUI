@@ -30,13 +30,15 @@ def timestamp(seconds):
 
 
 def prepare_generation_tokens(tokens, model_limit, context_budget, max_length, count_tokens, image_geometry,
-                              auto_resize=False, memory_budget=None, memory_estimate=None):
+                              auto_resize=False, memory_budget=None, memory_estimate=None, min_short_edge=0):
     if type(model_limit) is not int or model_limit <= 0:
         raise ValueError("This model does not expose a supported generation context limit.")
     if type(context_budget) is not int or not 0 <= context_budget <= model_limit:
         raise ValueError(f"context_budget must be 0 or between 1 and {model_limit} tokens.")
     if type(max_length) is not int or max_length < 0:
         raise ValueError("max_length must be a nonnegative integer.")
+    if type(min_short_edge) is not int or min_short_edge < 0:
+        raise ValueError("min_short_edge must be a nonnegative integer.")
     limit = context_budget or model_limit
     reserve = max_length or 1
     if isinstance(tokens, dict):
@@ -81,9 +83,22 @@ def prepare_generation_tokens(tokens, model_limit, context_budget, max_length, c
     budget = None
     if auto_resize and images:
         low, high = 1, limit
+        if min_short_edge:
+            def meets_minimum(ceiling):
+                return all(min(image_geometry(image, ceiling)) >= min_short_edge for _, _, image in images)
+
+            if not meets_minimum(high):
+                raise ContextOverflowError(f"The minimum short edge cannot be reached (min_short_edge={min_short_edge}px) within the image source/model limits and token ceiling. Use larger source images, lower min_short_edge or increase context_budget within the model limit.")
+            floor_high = high
+            while low < floor_high:
+                middle = (low + floor_high) // 2
+                if meets_minimum(middle):
+                    floor_high = middle
+                else:
+                    low = middle + 1
         _, smallest, _, memory = candidate(low)
         if not fits(smallest, memory):
-            raise ContextOverflowError(f"Media cannot fit: minimum image sizes use {smallest} input tokens plus {reserve} output tokens within {limit}; estimated working memory {memory} bytes, available budget {memory_budget}. Reduce frames, text or output tokens.")
+            raise ContextOverflowError(f"Media cannot fit: minimum image sizes (min_short_edge={min_short_edge}px) use {smallest} input tokens plus {reserve} output tokens within {limit}; estimated working memory {memory} bytes, available budget {memory_budget}. Lower fps, shorten the clip, reduce text/output tokens or explicitly lower min_short_edge.")
         # A shared per-image ceiling lets small/source-limited images leave room for larger ones.
         while low < high:
             middle = (low + high + 1) // 2
@@ -124,6 +139,7 @@ def prepare_generation_tokens(tokens, model_limit, context_budget, max_length, c
         "requested_context_limit": limit,
         "input_tokens": count, "output_allowance": output,
         "excluded_message_ranges": [], "auto_resize": auto_resize,
+        "min_short_edge": min_short_edge,
         "image_sizes": sizes, "image_token_ceiling": budget,
         "memory_budget_bytes": memory_budget, "estimated_working_bytes": memory,
         "vram_context_limit": vram_limit,
