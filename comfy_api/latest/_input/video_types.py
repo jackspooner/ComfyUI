@@ -4,6 +4,8 @@ from fractions import Fraction
 from typing import Optional, Union, IO
 import io
 import av
+import torch
+import torch.nn.functional as F
 from .._util import VideoContainer, VideoCodec, VideoComponents, normalize_crop_rect
 
 class VideoInput(ABC):
@@ -20,6 +22,41 @@ class VideoInput(ABC):
             VideoComponents containing images, audio, and frame rate
         """
         pass
+
+    def get_components_selected(
+        self, *, include_images: bool = True, include_audio: bool = True,
+        frame_stride: int = 1, max_size: int = 0, compact: bool = False,
+    ) -> VideoComponents:
+        """Extract selected components; file inputs avoid decoding unused streams.
+
+        Keep every frame_stride-th frame and divide FPS accordingly. max_size
+        limits the longest image edge without enlarging. compact permits 8-bit
+        RGB conversion of 8-bit SDR files. Defaults match get_components().
+        Other implementations retain their existing get_components() signature
+        and use this materializing fallback unless they override it.
+        """
+        if frame_stride < 1 or max_size < 0:
+            raise ValueError("frame_stride must be >= 1 and max_size must be >= 0")
+        components = self.get_components()
+        images = components.images if include_images else torch.zeros(0, 0, 0, 3)
+        alpha = components.alpha if include_images else None
+        if include_images:
+            if frame_stride > 1:
+                images = images[::frame_stride].clone()
+                alpha = alpha[::frame_stride].clone() if alpha is not None else None
+            if max_size and images.shape[0]:
+                height, width = images.shape[1:3]
+                if max(height, width) > max_size:
+                    size = (max(1, round(height * max_size / max(height, width))),
+                            max(1, round(width * max_size / max(height, width))))
+                    images = F.interpolate(images.movedim(-1, 1), size=size, mode="bilinear", align_corners=False, antialias=True).movedim(1, -1)
+                    if alpha is not None:
+                        alpha = F.interpolate(alpha.movedim(-1, 1), size=size, mode="bilinear", align_corners=False, antialias=True).movedim(1, -1)
+        return VideoComponents(
+            images=images, audio=components.audio if include_audio else None,
+            frame_rate=components.frame_rate / frame_stride if include_images else components.frame_rate,
+            alpha=alpha, metadata=components.metadata,
+        )
 
     @abstractmethod
     def save_to(

@@ -16,6 +16,7 @@ import torch
 from .._util import VideoContainer, VideoCodec, VideoComponents, normalize_crop_rect
 import comfy.utils
 import logging
+import torch.nn.functional as F
 
 
 VIDEO_ENCODERS = {
@@ -232,6 +233,48 @@ def webm_streams_compatible(streams) -> bool:
 
 def _rotation_quadrant(frame: av.VideoFrame) -> int:
     return int(round(frame.rotation // 90)) % 4 if frame.rotation else 0
+
+
+class _VideoFrameBuffer:
+    """Fill output storage directly; inaccurate counts spill into additional blocks."""
+
+    def __init__(self, expected_frames: int):
+        self.expected_frames = expected_frames
+        self.blocks = []
+        self.count = 0
+        self.capacity = 0
+
+    def append(self, image: np.ndarray):
+        if not self.blocks:
+            # Reserve at most 2 GiB from a count hint; unknown counts use small blocks.
+            byte_limit = 2 * 1024 ** 3 if self.expected_frames else 64 * 1024 ** 2
+            limit = max(1, byte_limit // (image.size * 4))
+            self.capacity = max(1, min(self.expected_frames or 16, limit))
+        elif image.shape != self.blocks[-1].shape[1:]:
+            raise ValueError("Video frames have incompatible dimensions")
+        offset = self.count % self.capacity
+        if offset == 0:
+            self.blocks.append(torch.empty((self.capacity, *image.shape), dtype=torch.float32, device="cpu").numpy())
+        target = self.blocks[-1][offset]
+        if image.dtype == np.uint8:
+            np.divide(image, np.float32(255), out=target, dtype=np.float32)
+        else:
+            np.copyto(target, image)
+        self.count += 1
+
+    def finish(self, channels: int) -> torch.Tensor:
+        if not self.blocks:
+            return torch.zeros(0, 0, 0, channels)
+        if len(self.blocks) == 1 and self.count == self.capacity:
+            return torch.from_numpy(self.blocks.pop())
+        frames = torch.empty((self.count, *self.blocks[0].shape[1:]), dtype=torch.float32, device="cpu").numpy()
+        for index in range(len(self.blocks)):
+            start = index * self.capacity
+            length = min(self.capacity, self.count - start)
+            frames[start:start + length] = self.blocks[index][:length]
+            self.blocks[index] = None
+        self.blocks.clear()
+        return torch.from_numpy(frames)
 
 
 class VideoFromFile(VideoInput):
@@ -459,43 +502,50 @@ class VideoFromFile(VideoInput):
         with av.open(self.__file, mode='r') as container:
             return container.format.name
 
-    def get_components_internal(self, container: InputContainer) -> VideoComponents:
+    def get_components_internal(
+        self, container: InputContainer, *, include_images: bool = True,
+        include_audio: bool = True, frame_stride: int = 1, max_size: int = 0,
+        compact: bool = False,
+    ) -> VideoComponents:
         video_stream = self._get_first_video_stream(container)
         video_stream.thread_type = "AUTO"
-        start_time, duration = self.get_active_trim_window()
+        start_time, duration = self.get_active_trim_window() if include_images or include_audio else (0.0, 0.0)
 
-        # Get video frames
-        frames = []
+        expected_frames = video_stream.frames
+        if duration and video_stream.average_rate:
+            expected_frames = math.ceil(duration * video_stream.average_rate)
+        frames = _VideoFrameBuffer(math.ceil(expected_frames / frame_stride))
         audio_frames = []
         alphas = None
         start_pts = int(start_time / video_stream.time_base)
         end_pts = int((start_time + duration) / video_stream.time_base)
 
-        if start_pts != 0:
+        if start_pts != 0 and (include_images or include_audio):
             container.seek(start_pts, stream=video_stream)
 
         image_format = 'gbrpf32le'
-        process_image_format = lambda a: a
         align_graph = None
         audio = None
 
-        streams = [video_stream]
+        streams = [video_stream] if include_images else []
         has_first_audio_frame = False
         checked_alpha = False
         crop_rect = None
         crop_resolved = False
 
         # Default to False so we decode until EOF if duration is 0
-        video_done = False
+        video_done = not include_images
         audio_done = True
+        frame_index = 0
 
-        audio_stream = last_decodable_audio_stream(container)
+        audio_stream = last_decodable_audio_stream(container) if include_audio else None
         if audio_stream is not None:
             streams += [audio_stream]
             resampler = av.audio.resampler.AudioResampler(format='fltp')
             audio_done = False
 
-        for packet in container.demux(*streams):
+        packets = container.demux(*streams) if streams else ()
+        for packet in packets:
             if video_done and audio_done:
                 break
 
@@ -509,22 +559,27 @@ class VideoFromFile(VideoInput):
                         if duration and frame.pts >= end_pts:
                             video_done = True
                             break
+                        frame_index += 1
+                        if (frame_index - 1) % frame_stride:
+                            continue
 
                         if not checked_alpha:
                             alpha_channel = False
                             for comp in frame.format.components:
                                 if comp.is_alpha or frame.format.name == "pal8":
-                                    alphas = []
+                                    alphas = _VideoFrameBuffer(math.ceil(expected_frames / frame_stride))
                                     alpha_channel = True
                                     break
-                            if frame.format.name in ("yuvj420p", "yuvj422p", "yuvj444p", "rgb24", "rgba", "pal8"):
-                                process_image_format = lambda a: a.float() / 255.0
+                            compact_sdr = (
+                                compact and video_stream_color_space(video_stream) in (None, "sRGB")
+                                and max(comp.bits for comp in frame.format.components) <= 8
+                            )
+                            if compact_sdr or frame.format.name in ("yuvj420p", "yuvj422p", "yuvj444p", "rgb24", "rgba", "pal8"):
                                 if alpha_channel:
                                     image_format = 'rgba'
                                 else:
                                     image_format = 'rgb24'
                             else:
-                                process_image_format = lambda a: a
                                 if alpha_channel:
                                     image_format = 'gbrapf32le'
                                 else:
@@ -579,11 +634,19 @@ class VideoFromFile(VideoInput):
                             if crop_rect is not None:
                                 cx, cy, cw, ch = crop_rect
                                 img = np.ascontiguousarray(img[cy:cy + ch, cx:cx + cw])
+                        if max_size and max(img.shape[:2]) > max_size:
+                            height, width = img.shape[:2]
+                            size = (max(1, round(height * max_size / max(height, width))),
+                                    max(1, round(width * max_size / max(height, width))))
+                            pixels = torch.from_numpy(img).movedim(-1, 0).unsqueeze(0)
+                            if img.dtype == np.uint8:
+                                pixels = pixels.float().div_(255)
+                            img = F.interpolate(pixels, size=size, mode="bilinear", align_corners=False, antialias=True)[0].movedim(0, -1).numpy()
                         if alphas is None:
-                            frames.append(torch.from_numpy(img))
+                            frames.append(img)
                         else:
-                            frames.append(torch.from_numpy(img[..., :-1]))
-                            alphas.append(torch.from_numpy(img[..., -1:]))
+                            frames.append(img[..., :-1])
+                            alphas.append(img[..., -1:])
                 except av.error.InvalidDataError:
                     logging.info("pyav decode error")
 
@@ -608,12 +671,14 @@ class VideoFromFile(VideoInput):
                     else:
                         audio_frames.append(frame.to_ndarray())
 
-        images = process_image_format(torch.stack(frames)) if len(frames) > 0 else torch.zeros(0, 0, 0, 3)
+        images = frames.finish(3)
         if alphas is not None:
-            alphas = process_image_format(torch.stack(alphas)) if len(alphas) > 0 else torch.zeros(0, 0, 0, 1)
+            alphas = alphas.finish(1)
 
         # Get frame rate
         frame_rate = Fraction(video_stream.average_rate) if video_stream.average_rate else Fraction(1)
+        if include_images:
+            frame_rate /= frame_stride
 
         if len(audio_frames) > 0:
             audio_data = np.concatenate(audio_frames, axis=1)  # shape: (channels, total_samples)
@@ -631,11 +696,23 @@ class VideoFromFile(VideoInput):
 
     def get_components(self) -> VideoComponents:
         if isinstance(self.__file, io.BytesIO):
-            self.__file.seek(0)  # Reset the BytesIO object to the beginning
+            self.__file.seek(0)
         with av.open(self.__file, mode='r') as container:
             return self.get_components_internal(container)
-        raise ValueError(f"No video stream found in file '{self.__file}'")
 
+    def get_components_selected(
+        self, *, include_images: bool = True, include_audio: bool = True,
+        frame_stride: int = 1, max_size: int = 0, compact: bool = False,
+    ) -> VideoComponents:
+        if frame_stride < 1 or max_size < 0:
+            raise ValueError("frame_stride must be >= 1 and max_size must be >= 0")
+        if isinstance(self.__file, io.BytesIO):
+            self.__file.seek(0)  # Reset the BytesIO object to the beginning
+        with av.open(self.__file, mode='r') as container:
+            return self.get_components_internal(
+                container, include_images=include_images, include_audio=include_audio,
+                frame_stride=frame_stride, max_size=max_size, compact=compact,
+            )
     def save_to(
         self,
         path: str | io.BytesIO,

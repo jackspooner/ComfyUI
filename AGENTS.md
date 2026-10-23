@@ -401,6 +401,13 @@ authoritative sources through `shared-agent-skills` when capabilities change.
 
 ## Worktree development
 
+Video extraction uses `VideoInput.get_components_selected()` with an optimized
+file implementation and a materializing fallback for other VIDEO subclasses.
+Preserve the existing `get_components()` signature and default pixel values.
+See `docs/video-extraction.md` for selection, allocation and benchmark contracts;
+run its video regression checks with the configured CPU runtime. Operating
+guidance belongs to the authoritative shared `comfyui` skill.
+
 Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_worktree.py` before editing. The configured Python must be >=3.10 with PyTorch, einops and safetensors installed from the ComfyUI deployment's requirements. The check reuses that explicit runtime without copying dependencies, installing packages, loading models or connecting to a service. It is safe to rerun and leaves tracked files unchanged. GPU validation requires a compatible GPU/runtime and separately provisioned model files; unit tests use isolated fixtures.
 
 Prepare the exact worktree GitNexus index separately after setup with embeddings disabled. The root `.gitnexusignore` excludes local environment, installed-package and disabled-node source trees; their separate owners are outside the core repository graph. Do not hide tracked ComfyUI source to bypass an indexing failure. Operating guidance belongs to the existing shared ComfyUI model-runtimes skill; do not register temporary worktrees as shared skill sources.
