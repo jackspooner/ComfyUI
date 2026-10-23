@@ -319,6 +319,9 @@ preserving a positive `max_length`. It reports the effective window, selected
 sizes and estimates through `context_info`, with bounded smaller-media retries
 on device OOM. This is conservative request-specific planning, not a universal
 maximum-context benchmark. See [media sizing, supported adapters and limits](docs/text-media-sizing.md).
+The [RTX 5090 acceptance record](docs/text-media-sizing-acceptance.md) covers native
+Gemma4 and Qwen3-VL queued runs, memory-derived and explicit token caps, and retained
+output reservations; other models/backends still need separate live acceptance.
 
 The shared Llama/Qwen attention path honors per-module attention preferences in
 prefill and cached decoding. Explicit preferences use masked dispatch for fixed

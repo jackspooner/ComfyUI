@@ -51,9 +51,11 @@ Token limits come from the loaded generative model configuration, not the node's
 UI maximum. Counts include actual formatted text/role/thinking markers and expanded
 visual tokens. With `auto_resize` enabled, the CLIP owner loads through ordinary
 model management, releases idle other models through that owner and measures free
-device memory with the selected weights resident. It subtracts the memory owner's
-existing inference reserve. Quantized or offloaded weights affect this measurement;
-weights, KV caches and execution dtype are separate costs.
+device memory after the selected model's managed loading/staging. It subtracts the
+memory owner's existing inference reserve. Currently resident, quantized or
+offloaded weights affect this measurement; dynamic loading may stage rather than
+fully populate GPU weights, and the existing owner retains eviction/reload policy.
+Weights, KV caches and execution dtype are separate costs.
 
 The model supplies cache/workspace estimates. Standard autoregressive caches,
 Gemma4 sliding/global and shared KV caches, Qwen3.5 hybrid recurrent/full-attention
@@ -119,3 +121,5 @@ memory-constrained sizing, output preservation, fixed-resolution failure, origin
 pixels, metadata-only cache allocation checks, history exclusion and OOM recovery.
 Live model/device acceptance is recorded separately; unit fixtures do not establish
 all checkpoints, attention backends, maximum lengths or caption accuracy.
+See [RTX 5090 acceptance](text-media-sizing-acceptance.md) for the tested revision,
+prompt IDs, measured budgets and remaining coverage limits.
