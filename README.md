@@ -48,12 +48,17 @@ inactivity. SQLite recovery preserves complete copies across restarts, and
 capacity/free-space limits protect the NVMe. A local CLI queues prefetch, pin,
 unpin and eviction requests and reports status.
 
+Staging reuses small RAM buffers and batches persisted copy progress to once per
+second without forcing a disk sync for each progress update. Completion logs separate
+copy/hash, flush and verification times. Full checksum verification and durable
+publication remain required; the default inactivity expiry remains 30 minutes.
+
 Enable with `--model-cache-config /absolute/path/config.yaml`; see
 [configuration, operation and limitations](docs/model-cache.md) and
 [the example configuration](model_cache.example.yaml). It runs inside ComfyUI,
 without an additional daemon or systemd unit. Cleanup occurs while ComfyUI runs
-and on its next start after downtime. The feature is implemented and tested with
-isolated CPU fixtures; it is not enabled in the serving installation by this change.
+and on its next start after downtime. The feature is tested with isolated CPU
+fixtures; activating source changes requires an idle service restart.
 Custom loaders bypassing the common resolver and weight loader, background model
 loads, GGUF and multi-file repositories are outside verified support.
 
