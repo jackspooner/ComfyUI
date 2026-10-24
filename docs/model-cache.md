@@ -105,6 +105,25 @@ writing the same cache. Commands are coordinated through SQLite; only the owner
 copies or removes files. Copy operations are serialized, use 8 MiB buffers, account
 for outstanding copies, and check the free-space reserve while writing.
 
+Copying and checksum verification reuse bounded 8 MiB buffers rather than holding
+whole models in RAM. Linux's file cache also buffers ordinary reads and writes.
+Node progress still reports every chunk, but SQLite copy-byte progress is persisted
+at most once per second during streaming, then exactly when the entry becomes
+ready. Progress-only transactions use SQLite WAL's NORMAL synchronization to avoid
+forcing a disk sync; FULL synchronization is restored before any other write.
+Status can therefore lag behind node progress, and an interrupted copy's
+recorded byte count can lag its partial file or be lost on power failure.
+Recovery discards that partial file; the counter is not a resume offset.
+Durable copying/ready state transitions,
+free-space checks and the default 30-minute expiry are unchanged.
+
+Each completed stage logs total, copy/hash, final flush and destination checksum
+verification seconds. Copy/hash includes source reads, writes, streamed SHA-256,
+progress and any writeback stalls; flush is the final flush/fsync wait. Verification
+may read from Linux's file cache, so these timings are not raw disk benchmarks.
+Use them to identify the slow phase before changing storage or buffering. Warm
+reuse avoids copying; first use after a restart still verifies the saved checksum.
+
 A generation includes source path, device/inode, size, nanosecond mtime and ctime.
 Copying verifies the source remained unchanged, hashes streamed bytes, rereads the
 copy for checksum verification, and validates the safetensors header/offsets.
@@ -160,6 +179,19 @@ LRU, RAM-pressure and no-cache modes. They cover copying, warm reuse, discovery,
 selective release of real mappings, source replacement, checksum failure,
 interrupted copy, concurrent requests, owner locking, disk reserve, pins, queued
 controls and restart/clock recovery.
+
+On 2026-10-24, an isolated 1 GiB safetensors fixture on the local SATA/NTFS3 archive
+drive was staged to private NVMe/ext4 cache directories in three alternating
+baseline/candidate comparisons. Only the fixture's source pages received
+`POSIX_FADV_DONTNEED` between runs; no live model or global page cache was cleared.
+Against baseline `eaa357d32`, total seconds were 31.744/16.351/21.941 before and
+25.223/18.736/10.567 after the progress/buffer changes: medians 21.941 and 18.736
+seconds (about 15% lower). SQLite commits fell from 132 per run to 19/14/7; only
+progress transactions use NORMAL synchronization. Host I/O varied considerably,
+so these small-fixture results do not predict a 40 GB cold-copy time. Destination
+checksum verification remained enabled. The 292 cache/execution/folder-path tests
+passed, including progress-write failure restoration, crash recovery and checksum
+rejection; real power-loss testing remains separate.
 
 Verified scope is safetensors through the common resolver/load_torch_file within
 the normal worker. GGUF, multi-file Hugging Face repositories, custom bypass loaders

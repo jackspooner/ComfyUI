@@ -34,9 +34,11 @@ def fingerprint(path):
 
 def digest(path):
     h = hashlib.sha256()
+    buffer = bytearray(CHUNK)
+    view = memoryview(buffer)
     with path.open("rb") as f:
-        while block := f.read(CHUNK):
-            h.update(block)
+        while count := f.readinto(buffer):
+            h.update(view[:count])
     return h.hexdigest()
 
 
@@ -247,24 +249,39 @@ class ModelCache:
             partial = path.with_suffix(".partial")
             try:
                 copied, checksum = 0, hashlib.sha256()
+                started = last_progress = time.monotonic()
                 logging.info("Staging archive model: %s (%d bytes)", relative, size)
+                buffer = bytearray(CHUNK)
+                view = memoryview(buffer)
                 with source.open("rb") as src, partial.open("xb") as dst:
-                    while block := src.read(CHUNK):
-                        if shutil.disk_usage(self.root).free - len(block) < self.config["reserve_bytes"]:
+                    while count := src.readinto(buffer):
+                        if shutil.disk_usage(self.root).free - count < self.config["reserve_bytes"]:
                             raise CacheError("CACHE_FULL", "Free-space reserve reached while copying.")
+                        block = view[:count]
                         dst.write(block)
                         checksum.update(block)
-                        copied += len(block)
-                        with self.db:
-                            self.db.execute("UPDATE entries SET copied=? WHERE key=?", (copied, key))
+                        copied += count
+                        now = time.monotonic()
+                        # Recovery discards partial copies; progress must not force file writeback.
+                        if now - last_progress >= 1:
+                            self.db.execute("PRAGMA synchronous=NORMAL")
+                            try:
+                                with self.db:
+                                    self.db.execute("UPDATE entries SET copied=? WHERE key=?", (copied, key))
+                            finally:
+                                self.db.execute("PRAGMA synchronous=FULL")
+                            last_progress = now
                         if progress:
                             progress(copied, size)
+                    copied_at = time.monotonic()
                     dst.flush()
                     os.fsync(dst.fileno())
+                flushed_at = time.monotonic()
                 if copied != size or fingerprint(source) != before:
                     raise CacheError("SOURCE_CHANGED", "Source changed during copying; retry after it is stable.")
                 if digest(partial) != checksum.hexdigest():
                     raise CacheError("COPY_CORRUPT", "Copied model checksum failed.")
+                verified_at = time.monotonic()
                 try:
                     with safetensors.safe_open(partial, framework="np"):
                         pass
@@ -274,9 +291,10 @@ class ModelCache:
                 os.replace(partial, path)
                 sync_directory(self.files)
                 with self.db:
-                    self.db.execute("UPDATE entries SET state='ready',digest=? WHERE key=?", (checksum.hexdigest(), key))
+                    self.db.execute("UPDATE entries SET state='ready',digest=?,copied=? WHERE key=?", (checksum.hexdigest(), copied, key))
                 self.verified[key] = fingerprint(path)
                 self.touch({key})
+                logging.info("Staged archive model: %s (%.2fs total: copy/hash %.2fs, flush %.2fs, verify %.2fs)", relative, time.monotonic() - started, copied_at - started, flushed_at - copied_at, verified_at - flushed_at)
                 return str(path), key
             except BaseException:
                 partial.unlink(missing_ok=True)
