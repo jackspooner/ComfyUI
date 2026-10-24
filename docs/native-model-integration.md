@@ -207,8 +207,8 @@ and update its consumers and required checks together.
 Provide an editable workflow in the configured user workflow library and, when
 useful, a matching API graph. Discover actual filenames and live node schemas;
 do not invent a loader selector or claim a newly merged node is already running.
-Review the cumulative diff, run required checks and graph change analysis, then
-commit, push, integrate and clean up through repository policy.
+Review the cumulative diff and run required checks, then commit, push, integrate
+and clean up through repository policy.
 
 Report source integration, conversion, candidate inference, quality acceptance
 and serving activation separately. Integration does not itself authorize a
