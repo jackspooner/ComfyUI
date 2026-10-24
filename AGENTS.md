@@ -424,9 +424,9 @@ Use metadata-only shape probes for planning, preserve the requested output budge
 and keep loading/offload and queue ownership in the existing facilities. GPU
 acceptance uses the normal queue; never interrupt an active prompt to deploy.
 
-Native text/image TextGenerate history is documented in
+Native text/image TextGenerate history and prompt-level `json_schema` output are documented in
 `docs/text-conversations.md`. Use the prepared interpreter to run
-`python -m pytest tests-unit/comfy_test/image_history_test.py tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q`.
+`python -m pytest tests-unit/comfy_test/image_history_test.py tests-unit/comfy_test/text_history_test.py tests-unit/comfy_test/text_generation_length_test.py tests-unit/comfy_test/text_structured_output_test.py tests-unit/comfy_test/moss_audio_test.py tests-unit/comfy_test/moss_audio_reference_test.py tests-unit/comfy_test/qwen_vl_image_channels_test.py -q`.
 The shared `comfyui` skill owns operating guidance. History is
 explicit data, without model-owned sessions, persistent GPU caches or implicit
 trimming. Setup must not restart services.
