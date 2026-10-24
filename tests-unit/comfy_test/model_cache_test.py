@@ -97,6 +97,55 @@ def test_copy_failure_leaves_no_ready_file(cache):
     assert original.exists()
 
 
+def test_copy_batches_persisted_progress_but_reports_every_chunk(cache, monkeypatch):
+    original = model(cache)
+    monkeypatch.setattr(store, 'CHUNK', 1024)
+    clock = [0.0]
+    monkeypatch.setattr(store.time, 'monotonic', lambda: clock[0])
+    persisted = []
+    commits = []
+    cache.db.set_trace_callback(lambda sql: commits.append(sql) if sql == 'COMMIT' else None)
+
+    def progress(done, total):
+        persisted.append((done, cache.db.execute('SELECT copied FROM entries').fetchone()[0]))
+        assert cache.db.execute('PRAGMA synchronous').fetchone()[0] == 2
+        assert total == original.stat().st_size
+        clock[0] += 0.4
+
+    target, key = cache.stage(original, progress)
+    assert persisted == [(1024, 0), (2048, 0), (3072, 0), (4096, 4096), (original.stat().st_size, 4096)]
+    assert len(commits) == 4  # copying, periodic progress, ready (including final byte count), touch
+    assert cache.db.execute('SELECT copied FROM entries WHERE key=?', (key,)).fetchone()[0] == original.stat().st_size
+    assert Path(target).read_bytes() == original.read_bytes()
+
+
+def test_progress_failure_restores_durable_state_writes(cache, monkeypatch):
+    original = model(cache)
+    monkeypatch.setattr(store, 'CHUNK', 1024)
+    clock = [0.0]
+    monkeypatch.setattr(store.time, 'monotonic', lambda: clock[0])
+    cache.db.execute("CREATE TRIGGER fail_progress BEFORE UPDATE OF copied ON entries BEGIN SELECT RAISE(ABORT, 'progress failed'); END")
+
+    def progress(done, total):
+        clock[0] += 2
+
+    with pytest.raises(store.sqlite3.IntegrityError, match='progress failed'):
+        cache.stage(original, progress)
+    assert cache.db.execute('PRAGMA synchronous').fetchone()[0] == 2
+    assert not list(cache.files.iterdir())
+    assert cache.db.execute('SELECT COUNT(*) FROM entries').fetchone()[0] == 0
+
+
+def test_destination_checksum_still_required(cache, monkeypatch):
+    original = model(cache)
+    monkeypatch.setattr(store, 'digest', lambda path: 'corrupt')
+    with pytest.raises(store.CacheError, match='COPY_CORRUPT'):
+        cache.stage(original)
+    assert not list(cache.files.iterdir())
+    assert cache.db.execute('SELECT COUNT(*) FROM entries').fetchone()[0] == 0
+    assert original.exists()
+
+
 def test_capacity_and_pins(cache):
     original = model(cache)
     cache.config['max_bytes'] = 1
