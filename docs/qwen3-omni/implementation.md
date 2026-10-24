@@ -13,7 +13,7 @@ implemented; full-model and installation acceptance remain pending. See
 
 | Milestone | Work | Exit evidence |
 | --- | --- | --- |
-| M0: preparation | Pin checkpoint and reference implementation; establish task worktree/runtime; recover exact-checkout graph readiness | Reproducible environment, source inventory and current graph or explicit blocker |
+| M0: preparation | Pin checkpoint and reference implementation; establish task worktree/runtime | Reproducible environment and source inventory |
 | M1: quantization gate | Run the small projection/expert experiment in the quantization document | Written supported-path decision with numerical, timing and memory results |
 | M2: converter | Implement checked, bounded-memory conversion and asset packaging | Inventory/checksum manifest, negative tests and exact representation comparisons |
 | M3: Thinker integration | Port native MoE language model, tokenization, generation and loader detection | Text reference comparisons and existing-loader regression checks |
@@ -51,7 +51,7 @@ before any separately authorized service restart or deployment.
 ## Review and release
 
 Review the cumulative diff and numerical evidence. Run targeted unit/reference
-tests, the modality matrix, other-loader regressions and owner graph change checks.
+tests, the modality matrix and other-loader regressions.
 Record precise test commands once implemented; no fictitious commands or scripts
 are supplied here. Update root README and operating guidance in the same
 implementation change. The existing shared `comfyui-model-runtimes` skill owns
@@ -62,4 +62,4 @@ Commit only task-owned files, push the task branch to the authenticated personal
 fork, recheck main/concurrent work and integrate safely. Preserve pushed commits
 when unrelated dirty files or serving safety block integration. Source merge
 does not authorize restart. Cleanup only a clean unused task worktree after
-verified integration and index retirement; otherwise report its retained path.
+verified integration; otherwise report its retained path.

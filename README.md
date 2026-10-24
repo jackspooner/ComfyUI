@@ -403,8 +403,8 @@ in a linked worktree with `COMFYUI_PYTHON=/path/to/prepared/python python3
 scripts/setup_worktree.py`; it checks Python >=3.10, PyTorch, einops and safetensors
 without installing packages or starting workloads. Use that interpreter for tests.
 The root `.gitnexusignore` keeps local environments, installed node packages and
-disabled third-party node sources outside the core code graph. Index those
-separately owned sources in their repositories when they are relevant.
+disabled third-party node sources outside the core code graph. Those sources
+belong to separately owned repositories.
 
 ## Get Started
 
