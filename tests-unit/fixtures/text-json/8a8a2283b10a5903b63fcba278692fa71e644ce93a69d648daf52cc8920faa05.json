@@ -1,0 +1,54 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "complete_coverage": {
+      "type": "boolean"
+    },
+    "coverage_comparison": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "next_prompt": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "next_task": {
+      "enum": [
+        "ground_single",
+        "ground_text"
+      ]
+    },
+    "original_target_preserved": {
+      "type": "boolean"
+    },
+    "reason": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "target_matches": {
+      "type": "boolean"
+    },
+    "tight_bounds": {
+      "type": "boolean"
+    },
+    "verdict": {
+      "enum": [
+        "accept",
+        "reject",
+        "uncertain"
+      ]
+    }
+  },
+  "required": [
+    "verdict",
+    "reason",
+    "target_matches",
+    "tight_bounds",
+    "complete_coverage",
+    "next_prompt",
+    "next_task",
+    "original_target_preserved",
+    "coverage_comparison"
+  ],
+  "type": "object"
+}

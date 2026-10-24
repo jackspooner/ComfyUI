@@ -270,6 +270,8 @@ class CLIP:
         params['model_options'] = model_options
 
         self.cond_stage_model = clip(**(params))
+        self.generation_missing_keys = None
+        self.generation_load_scope = None
 
         for dt in self.cond_stage_model.dtypes:
             if not model_management.supports_cast(load_device, dt):
@@ -321,6 +323,8 @@ class CLIP:
         n = CLIP(no_init=True)
         n.patcher = self.patcher.clone(disable_dynamic=disable_dynamic)
         n.cond_stage_model = self.cond_stage_model
+        n.generation_missing_keys = None if self.generation_missing_keys is None else self.generation_missing_keys.copy()
+        n.generation_load_scope = self.generation_load_scope
         n.tokenizer = self.tokenizer
         n.layer_idx = self.layer_idx
         n.tokenizer_options = self.tokenizer_options.copy()
@@ -506,7 +510,7 @@ class CLIP:
 
     def load_sd(self, sd, full_model=False):
         if full_model:
-            return self.cond_stage_model.load_state_dict(sd, strict=False, assign=self.patcher.is_dynamic())
+            result = self.cond_stage_model.load_state_dict(sd, strict=False, assign=self.patcher.is_dynamic())
         else:
             can_assign = self.patcher.is_dynamic()
             self.cond_stage_model.can_assign_sd = can_assign
@@ -518,7 +522,15 @@ class CLIP:
             for m in self.cond_stage_model.modules():
                 m.can_assign_sd = can_assign
 
-            return self.cond_stage_model.load_sd(sd)
+            result = self.cond_stage_model.load_sd(sd)
+        missing = set(result[0])
+        # Full-wrapper and transformer-only loads report different key namespaces.
+        if self.generation_load_scope != full_model or self.generation_missing_keys is None:
+            self.generation_missing_keys = missing
+        else:
+            self.generation_missing_keys.intersection_update(missing)
+        self.generation_load_scope = full_model
+        return result
 
     def get_sd(self):
         sd_clip = self.cond_stage_model.state_dict()
@@ -544,7 +556,23 @@ class CLIP:
     def get_key_patches(self):
         return self.patcher.get_key_patches()
 
-    def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True):
+    def prepare_structured_output(self, schema_text, thinking=False, mtp=True):
+        from comfy.text_json import StructuredOutputError
+        if mtp:
+            raise StructuredOutputError("mtp", "Select mtp=off for native structured output.")
+        if self.generation_missing_keys is None or self.generation_missing_keys:
+            raise StructuredOutputError("capability", "Generation weights were not completely loaded; conditioning-only or partial packages are not admitted.")
+        prepare = getattr(self.cond_stage_model, "prepare_structured_output", None)
+        tokenizer = getattr(self.tokenizer, "structured_output_tokenizer", None)
+        if prepare is None or tokenizer is None:
+            raise StructuredOutputError("capability", "This model/tokenizer family does not support native structured output.")
+        return prepare(tokenizer(), schema_text, thinking)
+
+    def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True, constraint=None):
+        if constraint is not None and mtp:
+            raise ValueError("structured_output.mtp: Select mtp=off for constrained generation.")
+        if constraint is not None:
+            constraint.prepared.check_prompt(tokens)
         self.cond_stage_model.reset_clip_options()
 
         estimate = getattr(self.cond_stage_model, "generation_memory_estimation_function", None)
@@ -568,7 +596,8 @@ class CLIP:
         self.cond_stage_model.set_clip_options({"execution_device": device})
 
         with model_management.cuda_device_context(device), comfy.ops.use_quantized_matmul(self.cond_stage_model, device):
-            return self.cond_stage_model.generate(tokens, do_sample=do_sample, max_length=max_length, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty, seed=seed, presence_penalty=presence_penalty, mtp=mtp)
+            extra = {"constraint": constraint} if constraint is not None else {}
+            return self.cond_stage_model.generate(tokens, do_sample=do_sample, max_length=max_length, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty, seed=seed, presence_penalty=presence_penalty, mtp=mtp, **extra)
 
     def generate_audio_codes(self, tokens, max_length=1000, seed=0, **sampling):
         generate = getattr(self.cond_stage_model, 'generate_audio_codes', None)

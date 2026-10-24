@@ -1,0 +1,1224 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "audio_reconciliation": {
+      "additionalProperties": false,
+      "properties": {
+        "asr_evidence": {
+          "type": "string"
+        },
+        "audio_model_evidence": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "consistent",
+            "conflicting",
+            "insufficient",
+            "resolved_by_audio_model"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "asr_evidence",
+        "audio_model_evidence",
+        "explanation"
+      ],
+      "type": "object"
+    },
+    "brands": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ]
+          },
+          "evidence": {
+            "enum": [
+              "visible",
+              "transcript",
+              "both"
+            ]
+          },
+          "first_observed_seconds": {
+            "minimum": 0,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "advertised",
+              "retailer",
+              "incidental",
+              "uncertain"
+            ]
+          },
+          "timing_note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "evidence",
+          "frame_indices",
+          "first_observed_seconds",
+          "timing_note",
+          "confidence"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "characters": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ]
+          },
+          "continuity_note": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "role",
+          "frame_indices",
+          "continuity_note",
+          "confidence"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "field_quality": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "note": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "sampled",
+              "unreadable",
+              "conflicting",
+              "missing",
+              "inferred"
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "status",
+          "frame_indices",
+          "note"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "frame_observations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "brand",
+              "product",
+              "presenter",
+              "text",
+              "cta"
+            ]
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "frameIndex": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "locate_prompt": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityId",
+          "category",
+          "frameIndex",
+          "locate_prompt"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "interpretations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ]
+          },
+          "destination": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "product_claim",
+              "testimonial",
+              "slogan",
+              "offer",
+              "instruction",
+              "interface_label",
+              "explicit_cta",
+              "other"
+            ]
+          },
+          "literal_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "requested_action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "literal_ids",
+          "frame_indices",
+          "kind",
+          "requested_action",
+          "destination",
+          "confidence"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "literal_observations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "end_seconds": {
+            "minimum": 0,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "legibility": {
+            "enum": [
+              "clear",
+              "partial",
+              "uncertain",
+              "not_applicable"
+            ]
+          },
+          "source": {
+            "enum": [
+              "visible",
+              "transcript"
+            ]
+          },
+          "start_seconds": {
+            "minimum": 0,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "source",
+          "frame_indices",
+          "start_seconds",
+          "end_seconds",
+          "legibility"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "messaging": {
+      "additionalProperties": false,
+      "properties": {
+        "claims": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "confidence": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "unknown"
+                ]
+              },
+              "frame_indices": {
+                "items": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "frame_indices",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "ctas": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "confidence": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "unknown"
+                ]
+              },
+              "frame_indices": {
+                "items": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "frame_indices",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "offers": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "confidence": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "unknown"
+                ]
+              },
+              "frame_indices": {
+                "items": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "frame_indices",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "product_category": {
+          "additionalProperties": false,
+          "properties": {
+            "confidence": {
+              "enum": [
+                "high",
+                "medium",
+                "low",
+                "unknown"
+              ]
+            },
+            "frame_indices": {
+              "items": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text",
+            "frame_indices",
+            "confidence"
+          ],
+          "type": "object"
+        },
+        "product_names": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "confidence": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "unknown"
+                ]
+              },
+              "frame_indices": {
+                "items": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "frame_indices",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "product_category",
+        "product_names",
+        "claims",
+        "offers",
+        "ctas"
+      ],
+      "type": "object"
+    },
+    "on_screen_text": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "brand",
+              "claim",
+              "offer",
+              "cta",
+              "other"
+            ]
+          },
+          "legibility": {
+            "enum": [
+              "clear",
+              "partial",
+              "uncertain"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "kind",
+          "frame_indices",
+          "legibility"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "persuasion_timeline": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ]
+          },
+          "end_seconds": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "labels": {
+            "items": {
+              "enum": [
+                "hook",
+                "problem",
+                "demonstration",
+                "benefit",
+                "proof",
+                "offer",
+                "closing_action",
+                "unclear"
+              ]
+            },
+            "type": "array"
+          },
+          "primary_label": {
+            "enum": [
+              "hook",
+              "problem",
+              "demonstration",
+              "benefit",
+              "proof",
+              "offer",
+              "closing_action",
+              "unclear"
+            ]
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "start_seconds": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "labels",
+          "start_seconds",
+          "end_seconds",
+          "frame_indices",
+          "rationale",
+          "confidence",
+          "primary_label"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "reinspection_requests": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "end_seconds": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "modality": {
+            "enum": [
+              "visual",
+              "audio",
+              "both"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "start_seconds": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "reason",
+          "start_seconds",
+          "end_seconds",
+          "modality"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "scenes": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "boundary_precision": {
+            "const": "sampled_approximate"
+          },
+          "description": {
+            "type": "string"
+          },
+          "end_seconds": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "start_seconds": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "start_seconds",
+          "end_seconds",
+          "description",
+          "frame_indices",
+          "boundary_precision"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "synopsis": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "unknown"
+          ]
+        },
+        "frame_indices": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "frame_indices",
+        "confidence"
+      ],
+      "type": "object"
+    },
+    "taxonomy": {
+      "additionalProperties": false,
+      "properties": {
+        "finish": {
+          "additionalProperties": false,
+          "properties": {
+            "labels": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low",
+                      "unknown"
+                    ]
+                  },
+                  "frame_indices": {
+                    "items": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "label": {
+                    "enum": [
+                      "polished",
+                      "creator",
+                      "observational"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "frame_indices",
+                  "confidence",
+                  "note"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "primary": {
+              "enum": [
+                "polished",
+                "creator",
+                "observational",
+                null
+              ]
+            },
+            "unknown_reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "primary",
+            "labels",
+            "unknown_reason"
+          ],
+          "type": "object"
+        },
+        "medium": {
+          "additionalProperties": false,
+          "properties": {
+            "labels": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low",
+                      "unknown"
+                    ]
+                  },
+                  "frame_indices": {
+                    "items": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "label": {
+                    "enum": [
+                      "live_action",
+                      "animation_2d",
+                      "animation_3d",
+                      "stop_motion",
+                      "motion_graphics",
+                      "screen_recording",
+                      "still_image"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "frame_indices",
+                  "confidence",
+                  "note"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "primary": {
+              "enum": [
+                "live_action",
+                "animation_2d",
+                "animation_3d",
+                "stop_motion",
+                "motion_graphics",
+                "screen_recording",
+                "still_image",
+                null
+              ]
+            },
+            "unknown_reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "primary",
+            "labels",
+            "unknown_reason"
+          ],
+          "type": "object"
+        },
+        "objective": {
+          "additionalProperties": false,
+          "properties": {
+            "labels": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low",
+                      "unknown"
+                    ]
+                  },
+                  "frame_indices": {
+                    "items": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "label": {
+                    "enum": [
+                      "awareness",
+                      "consideration",
+                      "conversion",
+                      "retention"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "frame_indices",
+                  "confidence",
+                  "note"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "primary": {
+              "enum": [
+                "awareness",
+                "consideration",
+                "conversion",
+                "retention",
+                null
+              ]
+            },
+            "unknown_reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "primary",
+            "labels",
+            "unknown_reason"
+          ],
+          "type": "object"
+        },
+        "presentation": {
+          "additionalProperties": false,
+          "properties": {
+            "labels": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low",
+                      "unknown"
+                    ]
+                  },
+                  "frame_indices": {
+                    "items": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "label": {
+                    "enum": [
+                      "presenter",
+                      "testimonial",
+                      "interview",
+                      "product_demo",
+                      "product_beauty",
+                      "performance",
+                      "text_led"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "frame_indices",
+                  "confidence",
+                  "note"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "primary": {
+              "enum": [
+                "presenter",
+                "testimonial",
+                "interview",
+                "product_demo",
+                "product_beauty",
+                "performance",
+                "text_led",
+                null
+              ]
+            },
+            "unknown_reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "primary",
+            "labels",
+            "unknown_reason"
+          ],
+          "type": "object"
+        },
+        "register": {
+          "additionalProperties": false,
+          "properties": {
+            "labels": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low",
+                      "unknown"
+                    ]
+                  },
+                  "frame_indices": {
+                    "items": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "label": {
+                    "enum": [
+                      "cinematic",
+                      "naturalistic",
+                      "graphic"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "frame_indices",
+                  "confidence",
+                  "note"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "primary": {
+              "enum": [
+                "cinematic",
+                "naturalistic",
+                "graphic",
+                null
+              ]
+            },
+            "unknown_reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "primary",
+            "labels",
+            "unknown_reason"
+          ],
+          "type": "object"
+        },
+        "structure": {
+          "additionalProperties": false,
+          "properties": {
+            "labels": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low",
+                      "unknown"
+                    ]
+                  },
+                  "frame_indices": {
+                    "items": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "label": {
+                    "enum": [
+                      "lifestyle_narrative",
+                      "problem_solution",
+                      "comparison",
+                      "explainer",
+                      "vignette",
+                      "feature_list",
+                      "association"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "frame_indices",
+                  "confidence",
+                  "note"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "primary": {
+              "enum": [
+                "lifestyle_narrative",
+                "problem_solution",
+                "comparison",
+                "explainer",
+                "vignette",
+                "feature_list",
+                "association",
+                null
+              ]
+            },
+            "unknown_reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "primary",
+            "labels",
+            "unknown_reason"
+          ],
+          "type": "object"
+        },
+        "tone": {
+          "additionalProperties": false,
+          "properties": {
+            "labels": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "confidence": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low",
+                      "unknown"
+                    ]
+                  },
+                  "frame_indices": {
+                    "items": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "label": {
+                    "enum": [
+                      "humorous",
+                      "informational",
+                      "inspirational",
+                      "urgent",
+                      "dramatic"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "frame_indices",
+                  "confidence",
+                  "note"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "primary": {
+              "enum": [
+                "humorous",
+                "informational",
+                "inspirational",
+                "urgent",
+                "dramatic",
+                null
+              ]
+            },
+            "unknown_reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "primary",
+            "labels",
+            "unknown_reason"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "medium",
+        "finish",
+        "presentation",
+        "structure",
+        "register",
+        "tone",
+        "objective"
+      ],
+      "type": "object"
+    },
+    "unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "synopsis",
+    "scenes",
+    "characters",
+    "brands",
+    "on_screen_text",
+    "messaging",
+    "taxonomy",
+    "unknowns",
+    "reinspection_requests",
+    "literal_observations",
+    "interpretations",
+    "persuasion_timeline",
+    "frame_observations",
+    "field_quality",
+    "audio_reconciliation"
+  ],
+  "type": "object"
+}

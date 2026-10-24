@@ -431,6 +431,13 @@ The shared `comfyui` skill owns operating guidance. History is
 explicit data, without model-owned sessions, persistent GPU caches or implicit
 trimming. Setup must not restart services.
 
+Optional native JSON uses `requirements-text-json.txt`; readiness is the same
+setup command with `--text-json`. It checks installed pins without installing or
+loading models. Run `python -m pytest tests-unit/comfy_test/text_json_native_test.py -q`
+and the above regressions; `docs/text-json.md` documents tokenizer-only fixtures,
+the exact subset/evidence contract and pending GPU acceptance. The shared skill
+owner is unchanged.
+
 ### Optional native YingMusic
 
 Use `--yingmusic` with the standard worktree setup command to check preinstalled lyric dependencies and espeak-ng. `docs/yingmusic.md` documents local conversion, native loader/node contracts and acceptance status. Run `python -m pytest tests-unit/comfy_test/yingmusic_test.py -q` with the prepared interpreter; real checkpoint comparisons are a separate explicit check.
