@@ -36,12 +36,11 @@ Local source inspected directly:
 These links are source evidence, not proof that a running service contains those
 versions. The initial canonical GitNexus ensure was refused with
 `validation-refused`: candidate analysis lacked a complete authenticated database
-and receipt. No graph completeness claim is made here; owner recovery is required
-before graph-dependent implementation. During document preparation, the separate
-task worktree's owner ensure successfully reused an authenticated index at the
-baseline commit, with embeddings disabled and no model requests. This does not
+and receipt. No graph completeness claim is made here. During document preparation,
+the separate task worktree's owner ensure successfully reused an authenticated
+index at the baseline commit, with embeddings disabled and no model requests. This does not
 retroactively certify the earlier canonical checkout or a future implementation
-checkout; ensure each exact checkout again before graph use.
+checkout.
 
 ## Decisions
 

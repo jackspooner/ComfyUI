@@ -13,11 +13,10 @@ environment and custom nodes. Preserve the `models` symlink, external weights,
 disabled nodes, private configuration and all uncommitted work. Never stash/reset
 the deleted tracked model placeholders as if they were ordinary source edits.
 
-Prepare a task worktree from committed `main` with the repository's setup command,
-then prepare its exact GitNexus graph with embeddings disabled. Merge only the
-stable tag and review the combined memory-loading changes. Run pinned-memory,
-prefetch, H3 VAE, relevant node/API and installed Sol-H3 integration checks before
-activation. The frontend, templates and docs packages must satisfy the tag's
+Prepare a task worktree from committed `main` with the repository's setup command.
+Merge only the stable tag and review the combined memory-loading changes. Run
+pinned-memory, prefetch, H3 VAE, relevant node/API and installed Sol-H3 integration
+checks before activation. The frontend, templates and docs packages must satisfy the tag's
 requirements. Preserve the compatible CUDA PyTorch/Triton/Comfy Kitchen, CUTLASS,
 GGUF and separately managed speech runtimes through explicit constraints.
 
