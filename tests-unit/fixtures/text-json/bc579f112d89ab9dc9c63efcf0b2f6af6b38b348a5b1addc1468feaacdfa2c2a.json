@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "decisions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "frameIndex": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "sceneBoundary": {
+            "type": "boolean"
+          },
+          "verdict": {
+            "enum": [
+              "accept",
+              "reject",
+              "uncertain"
+            ]
+          }
+        },
+        "required": [
+          "frameIndex",
+          "verdict",
+          "reason",
+          "sceneBoundary"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "overview": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "decisions",
+    "overview"
+  ],
+  "type": "object"
+}

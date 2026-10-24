@@ -789,6 +789,8 @@ class Qwen35(BaseLlama, BaseGenerate, torch.nn.Module):
 
     def generate(self, embeds=None, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.9, min_p=0.0, repetition_penalty=1.0, seed=42, stop_tokens=None, **kwargs):
         mtp = kwargs.pop("mtp", True)
+        if kwargs.get("constraint") is not None and mtp:
+            raise ValueError("structured_output.mtp: Select mtp=off for constrained generation.")
         if self.mtp is None or not mtp or kwargs.get("initial_input_ids") is not None:
             return super().generate(embeds=embeds, do_sample=do_sample, max_length=max_length, temperature=temperature,
                                     top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty,

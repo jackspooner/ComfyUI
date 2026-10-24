@@ -1,0 +1,189 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "corrections": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "previous": {
+            "type": "string"
+          },
+          "proposed": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "previous",
+          "proposed",
+          "frame_indices",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "field_quality": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "note": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "sampled",
+              "unreadable",
+              "conflicting",
+              "missing",
+              "inferred"
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "status",
+          "frame_indices",
+          "note"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "frame_observations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "brand",
+              "product",
+              "presenter",
+              "text",
+              "cta"
+            ]
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "frameIndex": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "locate_prompt": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityId",
+          "category",
+          "frameIndex",
+          "locate_prompt"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "literal_observations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "end_seconds": {
+            "minimum": 0,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "frame_indices": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "legibility": {
+            "enum": [
+              "clear",
+              "partial",
+              "uncertain",
+              "not_applicable"
+            ]
+          },
+          "source": {
+            "enum": [
+              "visible",
+              "transcript"
+            ]
+          },
+          "start_seconds": {
+            "minimum": 0,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "source",
+          "frame_indices",
+          "start_seconds",
+          "end_seconds",
+          "legibility"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "unresolved": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "summary",
+    "literal_observations",
+    "frame_observations",
+    "field_quality",
+    "corrections",
+    "unresolved"
+  ],
+  "type": "object"
+}

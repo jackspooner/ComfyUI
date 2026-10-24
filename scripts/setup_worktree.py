@@ -10,6 +10,8 @@ if not runtime or not Path(runtime).is_file():
     sys.exit("Set COMFYUI_PYTHON to the Python executable of a prepared ComfyUI environment (Python >=3.10, torch, einops, safetensors). This command never modifies that environment or starts ComfyUI.")
 check = "import sys, torch, einops, safetensors, sqlite3, yaml; assert sys.version_info >= (3,10), 'Python >=3.10 required'; print('Ready:', sys.version.split()[0], 'torch', torch.__version__, 'einops', einops.__version__, 'safetensors', safetensors.__version__)"
 subprocess.run([runtime, "-c", check], check=True)
+if "--text-json" in sys.argv:
+    subprocess.run([runtime, "-c", "import llguidance, importlib.metadata; assert llguidance.__version__ == '1.9.1'; assert importlib.metadata.version('jsonschema') == '4.26.0'; print('Optional text JSON prerequisites ready: llguidance 1.9.1, jsonschema 4.26.0')"], check=True)
 if "--moss-soundeffect" in sys.argv:
     subprocess.run([runtime, "-c", "import ftfy, wcwidth; print('MOSS SoundEffect prompt prerequisites ready:', ftfy.__version__)"], check=True)
 if "--applio" in sys.argv:

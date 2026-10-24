@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "audible_words": {
+      "type": "string"
+    },
+    "languages": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "music": {
+      "type": "string"
+    },
+    "reliability_note": {
+      "type": "string"
+    },
+    "sound_effects": {
+      "type": "string"
+    },
+    "speech_presence": {
+      "enum": [
+        "present",
+        "not_detected",
+        "uncertain"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "vocal_content": {
+      "enum": [
+        "speech",
+        "singing",
+        "wordless_vocals",
+        "mixed",
+        "none_detected",
+        "uncertain"
+      ]
+    },
+    "vocal_delivery": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "summary",
+    "music",
+    "sound_effects",
+    "vocal_delivery",
+    "speech_presence",
+    "languages",
+    "unknowns",
+    "vocal_content",
+    "audible_words",
+    "reliability_note"
+  ],
+  "type": "object"
+}

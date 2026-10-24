@@ -1232,11 +1232,13 @@ class BaseGenerate:
     def init_kv_cache(self, batch, max_cache_len, device, execution_dtype):
         return self.model.init_kv_cache(batch, max_cache_len, device, execution_dtype)
 
-    def generate(self, embeds=None, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.9, min_p=0.0, repetition_penalty=1.0, seed=42, stop_tokens=None, initial_tokens=[], execution_dtype=None, min_tokens=0, presence_penalty=0.0, initial_input_ids=None, position_ids=None, deepstack_embeds=None, visual_pos_masks=None, embeds_info=None):
+    def generate(self, embeds=None, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.9, min_p=0.0, repetition_penalty=1.0, seed=42, stop_tokens=None, initial_tokens=[], execution_dtype=None, min_tokens=0, presence_penalty=0.0, initial_input_ids=None, position_ids=None, deepstack_embeds=None, visual_pos_masks=None, embeds_info=None, constraint=None):
         device = embeds.device
 
         if stop_tokens is None:
             stop_tokens = self.model.config.stop_tokens
+        if constraint is not None and tuple(stop_tokens) != constraint.stop_tokens:
+            raise ValueError("Structured generation stop tokens differ from preparation.")
 
         if execution_dtype is None:
             if comfy.model_management.should_use_bf16(device):
@@ -1305,7 +1307,8 @@ class BaseGenerate:
                     penalty_mask = torch.zeros((logits.shape[-1],), dtype=torch.bool, device=device)
                     if len(initial_tokens) > 0:
                         penalty_mask.index_fill_(0, torch.tensor(initial_tokens, device=device), True)
-                next_token = self.sample_token(logits, temperature, top_k, top_p, min_p, repetition_penalty, [], generator, do_sample=do_sample, presence_penalty=presence_penalty, penalty_mask=penalty_mask)
+                allowed = constraint.allowed_mask(logits) if constraint is not None else None
+                next_token = self.sample_token(logits, temperature, top_k, top_p, min_p, repetition_penalty, [], generator, do_sample=do_sample, presence_penalty=presence_penalty, penalty_mask=penalty_mask, allowed_mask=allowed)
 
                 decode_tokens.copy_(next_token)
                 if penalty_mask is not None:
@@ -1316,6 +1319,7 @@ class BaseGenerate:
 
                 token_id = decode_tokens[0].item()
                 generated_token_ids.append(token_id)
+                complete = constraint.commit(token_id) if constraint is not None else False
 
                 if step == 0 and hasattr(self.model.embed_tokens, "_v"):
                     # prefill's transients can evict body pages and lower the VBAR watermark: let the decode fault them back
@@ -1327,14 +1331,14 @@ class BaseGenerate:
                     next_pos += 1
                 pbar.update(1)
 
-                if token_id in stop_tokens:
+                if complete or token_id in stop_tokens:
                     break
         finally:
             comfy.model_prefetch.cleanup_prefetch_queues()
 
         return generated_token_ids
 
-    def processed_probs(self, logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, presence_penalty=0.0, penalty_mask=None):
+    def processed_probs(self, logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, presence_penalty=0.0, penalty_mask=None, allowed_mask=None):
         # returns (probs, indices); penalty_mask [vocab] bool stands in for token_history
         if penalty_active(repetition_penalty, presence_penalty):
             if penalty_mask is not None:
@@ -1346,10 +1350,16 @@ class BaseGenerate:
         if temperature != 1.0:
             logits = logits / temperature
 
+        if allowed_mask is not None:
+            logits = logits.masked_fill(~allowed_mask, -float("inf"))
+            self.check_constrained_logits(logits)
+
         top_indices = None
         if top_k > 0:
             top_k = min(top_k, logits.shape[-1])
             logits, top_indices = torch.topk(logits, top_k)
+            if allowed_mask is not None:
+                allowed_mask = allowed_mask.gather(1, top_indices)
 
         if min_p > 0.0:
             probs_before_filter = torch.nn.functional.softmax(logits, dim=-1)
@@ -1367,14 +1377,24 @@ class BaseGenerate:
             indices_to_remove.scatter_(1, sorted_indices, sorted_indices_to_remove)
             logits[indices_to_remove] = torch.finfo(logits.dtype).min
 
+        if allowed_mask is not None:
+            logits = logits.masked_fill(~allowed_mask, -float("inf"))
+            self.check_constrained_logits(logits)
         return torch.nn.functional.softmax(logits, dim=-1), top_indices
 
-    def sample_token(self, logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, generator, do_sample=True, presence_penalty=0.0, penalty_mask=None):
+    def check_constrained_logits(self, logits):
+        if torch.isnan(logits).any() or torch.isposinf(logits).any() or not torch.isfinite(logits).any(dim=-1).all():
+            raise ValueError("structured_output.logits: No usable legal logits; no unconstrained fallback.")
+
+    def sample_token(self, logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, generator, do_sample=True, presence_penalty=0.0, penalty_mask=None, allowed_mask=None):
 
         if not do_sample or temperature == 0.0:
+            if allowed_mask is not None:
+                logits = logits.masked_fill(~allowed_mask, -float("inf"))
+                self.check_constrained_logits(logits)
             return torch.argmax(logits, dim=-1, keepdim=True)
 
-        probs, top_indices = self.processed_probs(logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, presence_penalty=presence_penalty, penalty_mask=penalty_mask)
+        probs, top_indices = self.processed_probs(logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, presence_penalty=presence_penalty, penalty_mask=penalty_mask, allowed_mask=allowed_mask)
         next_token = torch.multinomial(probs, num_samples=1, generator=generator)
         if top_indices is not None:
             return top_indices.gather(1, next_token)
