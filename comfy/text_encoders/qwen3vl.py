@@ -133,13 +133,15 @@ def _make_qwen3vl_model(model_type):
 
 
 class Qwen3VLClipModel(sd1_clip.SDClipModel):
+    structured_output_family = "qwen3vl"
+
     def __init__(self, device="cpu", layer="hidden", layer_idx=-1, dtype=None, attention_mask=True, model_options={}, model_type="qwen3vl_8b"):
         super().__init__(device=device, layer=layer, layer_idx=layer_idx, textmodel_json_config={},
                          dtype=dtype, special_tokens={"pad": 151643}, layer_norm_hidden_state=False,
                          model_class=_make_qwen3vl_model(model_type), enable_attention_masks=attention_mask,
                          return_attention_masks=attention_mask, model_options=model_options)
 
-    def generate(self, tokens, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, presence_penalty=0.0, mtp=True):
+    def generate(self, tokens, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, presence_penalty=0.0, mtp=True, constraint=None):
         if isinstance(tokens, dict):
             tokens = next(iter(tokens.values()))
         tokens_only = [[t[0] for t in b] for b in tokens]
@@ -147,7 +149,7 @@ class Qwen3VLClipModel(sd1_clip.SDClipModel):
         position_ids, visual_pos_masks, deepstack = self.transformer.build_image_inputs(embeds, embeds_info)
         return self.transformer.generate(embeds, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed,
                                          presence_penalty=presence_penalty, position_ids=position_ids,
-                                         visual_pos_masks=visual_pos_masks, deepstack_embeds=deepstack)
+                                         visual_pos_masks=visual_pos_masks, deepstack_embeds=deepstack, constraint=constraint)
 
 
 class Qwen3VLTEModel(sd1_clip.SD1ClipModel):
