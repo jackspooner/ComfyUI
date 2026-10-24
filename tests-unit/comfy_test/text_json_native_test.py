@@ -108,6 +108,9 @@ def test_independent_final_validator_is_not_matcher_state(prepared):
 
 
 def test_schema_resource_limits():
+    with pytest.raises(StructuredOutputError) as invalid:
+        admit_schema('{"type":"object",')
+    assert invalid.value.stage == "schema"
     with pytest.raises(StructuredOutputError, match="128 KiB"):
         admit_schema(" " * 131073)
     nested = {"type": "string"}

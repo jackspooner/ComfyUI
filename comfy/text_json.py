@@ -65,11 +65,14 @@ def admit_schema(text):
         raise StructuredOutputError("schema", "Schema contains an unpaired Unicode surrogate.") from error
     if not isinstance(text, str) or not text.strip() or size > 131072:
         raise StructuredOutputError("schema", "Schema must be a JSON string of at most 128 KiB.")
-    schema = strict_json(text)
+    try:
+        schema = strict_json(text)
+    except StructuredOutputError as error:
+        raise StructuredOutputError("schema", "Schema must be one strict JSON document.") from error
     _, validator = dependencies()
     try:
         validator.Draft202012Validator.check_schema(schema)
-    except validator.SchemaError as error:
+    except (validator.SchemaError, RecursionError) as error:
         raise StructuredOutputError("schema", "Invalid draft 2020-12 schema.") from error
     counts = [0, 0]
 
