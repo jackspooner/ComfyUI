@@ -27,6 +27,7 @@ inputs are optional:
 | `prompt_content` | Optional STRING JSON array of ordered text/image parts. Requires empty `prompt` and no IMAGE socket. |
 | `context_budget` | Total input/output token ceiling. `0` uses the loaded model limit; a positive value enables text/image conversation mode. Also applies to video. With `auto_resize`, available device memory can lower the usable window further. |
 | `history_policy` | `error` (default) or `drop_oldest_turns`. The latter explicitly enables exclusion of complete old user/assistant pairs from this generation. Does not apply to audio/video inputs. |
+| `json_schema` | Optional JSON Schema. When non-empty, adds a JSON-output instruction to the system prompt and returns the first JSON object/array from the answer as `generated_text`. Requires `use_default_template=true`. |
 
 Conversation mode uses `prompt` as a new user message. `system_prompt`, when
 nonempty, replaces the leading system message; otherwise an existing one is
@@ -52,6 +53,29 @@ also returns memory-planning diagnostics. Raw-prompt and audio/video paths retur
 history. Templated image paths return reusable history and exact context_info. Supply the empty envelope or a positive budget to budget the first turn
 exactly. The specialized Generate LTX2 Prompt node retains its original inputs
 and two outputs, and never snapshots images.
+
+### Structured JSON output
+
+`json_schema` is prompt-level JSON mode, not constrained decoding. The schema is
+parsed and compacted into an instruction appended to the system message, after
+`system_prompt` or an existing history system message. `generated_text` is the
+first JSON object or array found in the post-thinking answer; surrounding prose
+and Markdown fences are discarded. `raw_text` and the returned `history` retain
+the model's decoded answer. A non-JSON answer raises an error before any history
+or image attachments are committed. The instruction applies to this generation
+only and is not written into the returned history. When `system_prompt` is empty
+the instruction becomes the system prompt; templates with a default system prompt
+(for example MOSS-Audio and Gemma 3) replace it, matching the existing
+`system_prompt` behavior.
+
+The node verifies JSON syntax only. Schema conformance remains model-dependent;
+this version does not mask logits or retry. `{}` accepts any JSON value, while an
+empty string disables the feature. The schema consumes input-context tokens, so
+include it in `context_budget`. Thinking is supported: reasoning is split before
+extraction. Scalar-root schemas are supported only when the whole answer is that
+scalar. `use_default_template=false` is rejected because raw templates do not
+have a system message to extend. The specialized Generate LTX2 Prompt node does
+not expose this input.
 
 ## History and state
 

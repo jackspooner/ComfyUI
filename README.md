@@ -181,7 +181,10 @@ the configured system-user `text_history/images` directory;
 replay needs both the JSON and attachments. Saving history belongs to the caller.
 Audio/video inputs automatically use the single-prompt media path when no history
 or structured content is supplied. Video respects its token cap and optional memory-aware sizing without enabling
-conversation history; legacy audio retains its existing budget behavior. See
+conversation history; legacy audio retains its existing budget behavior.
+**Generate Text** also accepts an optional `json_schema`; this prompt-level JSON
+mode extracts and syntax-checks the first JSON object or array, while schema conformance
+remains model-dependent. See
 [native text conversations](docs/text-conversations.md) for prerequisites,
 contracts, examples, limits and verification. This source capability requires
 deployment before it appears in a running ComfyUI process. The

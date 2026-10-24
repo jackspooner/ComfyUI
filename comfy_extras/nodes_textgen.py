@@ -2,9 +2,73 @@ from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 import json
 import logging
+import re
 from comfy.text_generation import read_history, select_context, write_history, count_text_tokens
 import comfy.model_management
 from comfy_extras.text_history_images import resolve_images, publish_images, fingerprint
+
+_JSON_FENCE = re.compile(r"^```[ \t]*(?:json)?[ \t]*\r?\n(.*?)\r?\n?```$", re.DOTALL | re.IGNORECASE)
+
+
+def _reject_json_constant(value):
+    raise json.JSONDecodeError(f"{value} is not valid JSON", "", 0)
+
+
+def _strict_json_loads(text):
+    return json.loads(text, parse_constant=_reject_json_constant)
+
+
+def _json_instruction(schema_text):
+    try:
+        schema = _strict_json_loads(schema_text)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"json_schema is not valid JSON: {error}") from error
+    if not isinstance(schema, dict):
+        raise ValueError("json_schema must be a JSON object.")
+    compact = json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
+    return ("Return exactly one JSON value and nothing else. Do not use Markdown code fences, "
+            "preambles or commentary. The value must conform to this JSON Schema:\n" + compact)
+
+
+def _add_json_instruction(messages, instruction):
+    if messages and messages[0]["role"] == "system":
+        content = messages[0]["content"]
+        messages[0]["content"] = f"{content.rstrip()}\n\n{instruction}" if content.strip() else instruction
+    else:
+        messages.insert(0, {"role": "system", "content": instruction})
+
+
+def _extract_json(text):
+    stripped = text.strip()
+    if stripped:
+        try:
+            _strict_json_loads(stripped)
+            return stripped
+        except json.JSONDecodeError:
+            pass
+
+        fenced = _JSON_FENCE.match(stripped)
+        if fenced is not None:
+            inner = fenced.group(1).strip()
+            try:
+                _strict_json_loads(inner)
+                return inner
+            except json.JSONDecodeError:
+                pass
+
+        decoder = json.JSONDecoder(parse_constant=_reject_json_constant)
+        for index, char in enumerate(stripped):
+            if char not in "{[":
+                continue
+            try:
+                _, end = decoder.raw_decode(stripped, index)
+            except json.JSONDecodeError:
+                continue
+            return stripped[index:end]
+
+    detail = f" Response starts with {stripped[:120]!r}." if stripped else ""
+    raise ValueError("The model did not return a JSON value for json_schema." + detail)
+
 
 class TextGenerate(io.ComfyNode):
     history_output = True
@@ -48,6 +112,7 @@ class TextGenerate(io.ComfyNode):
                 io.Boolean.Input("use_default_template", optional=True, default=True, tooltip="Use the built in system prompt/template if the model has one.", advanced=True),
                 io.Combo.Input("mtp", options=["auto", "off", "2", "3", "4", "5"], default="auto", optional=True, tooltip="Speculative decoding with the checkpoint's multi-token-prediction head. No effect without MTP weights. auto adapts the draft depth; 2-5 pins it. Sampled output stays correctly distributed but differs from non-MTP output for the same seed."),
                 io.String.Input("system_prompt", force_input=True, optional=True, tooltip="Replaces the system prompt in the model's chat template. Ignored when the default template is not used."),
+                io.String.Input("json_schema", multiline=True, default="", tooltip="Optional JSON Schema. Adds a JSON-output instruction to the system prompt and returns the first JSON object or array from the answer. JSON syntax is verified; schema conformance is not enforced. Requires the default template."),
                 io.String.Input("history", force_input=True, optional=True, tooltip='Version 1 text or version 2 image history JSON. Start with {"version":1,"messages":[]}. Empty keeps the existing single prompt path.'),
                 io.String.Input("prompt_content", force_input=True, optional=True, tooltip="Ordered JSON text/image parts for the current user message. Requires empty prompt and no IMAGE input. Local input files or saved image IDs only."),
                 io.Int.Input("context_budget", default=0, min=0, max=1048576, optional=True, tooltip="Total input and output token ceiling for text/images/video. 0 uses the model limit. With auto_resize, available device memory can lower the usable window further. Audio requires auto_resize and exact model token accounting."),
@@ -73,9 +138,18 @@ class TextGenerate(io.ComfyNode):
         return fingerprint(read_history(history, "", prompt_content=prompt_content))
 
     @classmethod
-    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="", fps=1.0, source_fps=24.0, auto_resize=True, min_short_edge=256) -> io.NodeOutput:
+    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="", fps=1.0, source_fps=24.0, auto_resize=True, min_short_edge=256, json_schema="") -> io.NodeOutput:
 
         mtp = False if mtp == "off" else (True if mtp == "auto" else int(mtp))
+        system_prompt = system_prompt or ""
+        json_schema = json_schema or ""
+        json_instruction = ""
+        effective_system_prompt = system_prompt
+        if json_schema.strip():
+            if not use_default_template:
+                raise ValueError("json_schema requires use_default_template enabled.")
+            json_instruction = _json_instruction(json_schema)
+            effective_system_prompt = f"{system_prompt.rstrip()}\n\n{json_instruction}" if system_prompt.strip() else json_instruction
 
         messages = None
         context_info = None
@@ -99,6 +173,8 @@ class TextGenerate(io.ComfyNode):
                 raise ValueError("Conversation history does not support video or audio inputs. Use the existing single prompt media path.")
             messages = read_history(history, prompt, system_prompt, prompt_content)
             messages, stored_messages, pending_images = resolve_images(messages, image)
+            if json_instruction:
+                _add_json_instruction(messages, json_instruction)
             has_images = any(isinstance(m["content"], list) and any(p["type"] == "image" for p in m["content"]) for m in messages)
             counter = clip.count_chat_tokens if has_images else count_text_tokens
             tokens, context_info = select_context(messages, lambda turns: clip.tokenize_chat(turns, thinking=thinking), clip.get_chat_context_length(), context_budget, max_length, history_policy, counter, prepare_tokens=prepare if auto_resize else None)
@@ -107,9 +183,9 @@ class TextGenerate(io.ComfyNode):
             if video is not None:
                 tokens, video_info = clip.tokenize_video(prompt, video, source_fps, fps, audio=audio,
                                                         skip_template=not use_default_template, min_length=1,
-                                                        thinking=thinking, system_prompt=system_prompt if use_default_template else "")
+                                                        thinking=thinking, system_prompt=effective_system_prompt if use_default_template else "")
             else:
-                tokens = clip.tokenize(prompt, image=image, skip_template=not use_default_template, min_length=1, thinking=thinking, audio=audio, system_prompt=system_prompt if use_default_template else "")
+                tokens = clip.tokenize(prompt, image=image, skip_template=not use_default_template, min_length=1, thinking=thinking, audio=audio, system_prompt=effective_system_prompt if use_default_template else "")
             if auto_resize or video is not None:
                 if auto_resize:
                     tokens, context_info = prepare(tokens)
@@ -163,19 +239,21 @@ class TextGenerate(io.ComfyNode):
             if not prompt_ids or not clip.decode(prompt_ids[-4:]).rstrip().endswith("<think>"):
                 reasoning, text = "", generated_text
 
+        answer = text.strip()
+        output_text = _extract_json(text) if json_instruction else answer
         updated_history = ""
         if messages is None and cls.history_output and use_default_template and image is None and video is None and audio is None:
             messages = read_history("", prompt, system_prompt)
         if messages is not None:
             comfy.model_management.throw_exception_if_processing_interrupted()
             publish_images(pending_images)
-            updated_history = write_history([*(stored_messages if stored_messages is not None else messages), {"role": "assistant", "content": text.strip()}])
+            updated_history = write_history([*(stored_messages if stored_messages is not None else messages), {"role": "assistant", "content": answer}])
         if context_info is not None:
             context_info["generated_tokens"] = len(generated_ids)
             if auto_resize:
                 context_info["oom_retries"] = retries
             context_info.update(video_info)
-        return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip(), updated_history, json.dumps(context_info) if context_info is not None else "", generated_text)
+        return io.NodeOutput(output_text, reasoning.replace("<think>", "", 1).strip(), updated_history, json.dumps(context_info) if context_info is not None else "", generated_text)
 
 
 LTX2_T2V_SYSTEM_PROMPT = """You are a Creative Assistant. Given a user's raw input prompt describing a scene or concept, expand it into a detailed video generation prompt with specific visuals and integrated audio to guide a text-to-video model.
@@ -320,7 +398,7 @@ class TextGenerateLTX2Prompt(TextGenerate):
             node_id="TextGenerateLTX2Prompt",
             display_name="Generate LTX2 Prompt",
             category=parent_schema.category,
-            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy", "prompt_content", "fps", "source_fps", "auto_resize", "min_short_edge")],
+            inputs=[item for item in parent_schema.inputs if item.id not in ("history", "context_budget", "history_policy", "prompt_content", "fps", "source_fps", "auto_resize", "min_short_edge", "json_schema")],
             outputs=parent_schema.outputs[:2],
             search_aliases=["prompt enhance", "LLM", "gemma"],
         )
