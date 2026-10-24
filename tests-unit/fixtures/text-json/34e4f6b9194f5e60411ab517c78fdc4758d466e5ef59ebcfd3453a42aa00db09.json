@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "audio_status": {
+      "enum": [
+        "consistent",
+        "conflicting",
+        "insufficient",
+        "no_audio_stream",
+        "resolved_by_audio_model"
+      ]
+    },
+    "proposed_corrections": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "string"
+          },
+          "proposed": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "previous",
+          "proposed",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "unresolved": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "verification": {
+      "const": "model_review_not_independent_verification"
+    }
+  },
+  "required": [
+    "summary",
+    "audio_status",
+    "proposed_corrections",
+    "unresolved",
+    "verification"
+  ],
+  "type": "object"
+}

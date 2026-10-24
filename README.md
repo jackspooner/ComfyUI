@@ -184,7 +184,11 @@ or structured content is supplied. Video respects its token cap and optional mem
 conversation history; legacy audio retains its existing budget behavior.
 **Generate Text** also accepts an optional `json_schema`; this prompt-level JSON
 mode extracts and syntax-checks the first JSON object or array, while schema conformance
-remains model-dependent. See
+remains model-dependent. Opt-in `response_format=json_schema` adds native
+llguidance token constraints and independent schema validation on supported
+complete MOSS/Qwen3-VL packages; it requires optional dependencies and `mtp=off`.
+See [native constrained JSON](docs/text-json.md) for the exact subset, support
+matrix and CPU-only acceptance limits (no full-model/GPU activation claimed). See
 [native text conversations](docs/text-conversations.md) for prerequisites,
 contracts, examples, limits and verification. This source capability requires
 deployment before it appears in a running ComfyUI process. The

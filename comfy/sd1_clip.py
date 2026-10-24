@@ -79,6 +79,19 @@ class ClipTokenWeightEncoder:
         return r
 
 class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
+    structured_output_family = None
+
+    def prepare_structured_output(self, tokenizer, schema_text, thinking):
+        from comfy.text_json import PreparedJSON, StructuredOutputError
+        if self.structured_output_family is None:
+            raise StructuredOutputError("capability", "This model family is not admitted for native structured output.")
+        config = self.transformer.model.config
+        # Qwen3-VL 4B legitimately uses tied embedding/output weights. The
+        # conditioning-only 32B export omits the final norm as well as the head.
+        if not config.final_norm or self.transformer.model.norm is None:
+            raise StructuredOutputError("capability", "A complete generative Qwen package with final norm and separate or tied language head is required.")
+        return PreparedJSON(tokenizer, schema_text, config.vocab_size, config.stop_tokens, self.structured_output_family, thinking)
+
     LAYERS = [
         "last",
         "pooled",
@@ -706,6 +719,9 @@ class SDTokenizer:
         return self.tokenizer.decode(token_ids, skip_special_tokens=skip_special_tokens)
 
 class SD1Tokenizer:
+    def structured_output_tokenizer(self):
+        return getattr(self, self.clip).tokenizer
+
     def __init__(self, embedding_directory=None, tokenizer_data={}, clip_name="l", tokenizer=SDTokenizer, name=None):
         if name is not None:
             self.clip_name = name
@@ -736,6 +752,9 @@ class SD1CheckpointClipModel(SDClipModel):
         super().__init__(device=device, return_projected_pooled=False, dtype=dtype, model_options=model_options)
 
 class SD1ClipModel(torch.nn.Module):
+    def prepare_structured_output(self, tokenizer, schema_text, thinking):
+        return getattr(self, self.clip).prepare_structured_output(tokenizer, schema_text, thinking)
+
     def __init__(self, device="cpu", dtype=None, model_options={}, clip_name="l", clip_model=SD1CheckpointClipModel, name=None, **kwargs):
         super().__init__()
 
@@ -777,8 +796,9 @@ class SD1ClipModel(torch.nn.Module):
     def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False, **kwargs):
         return getattr(self, self.clip).prepare_generation_tokens(tokens, context_budget, max_length, auto_resize, **kwargs)
 
-    def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True):
-        return getattr(self, self.clip).generate(tokens, do_sample=do_sample, max_length=max_length, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty, seed=seed, presence_penalty=presence_penalty, mtp=mtp)
+    def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True, constraint=None):
+        extra = {"constraint": constraint} if constraint is not None else {}
+        return getattr(self, self.clip).generate(tokens, do_sample=do_sample, max_length=max_length, temperature=temperature, top_k=top_k, top_p=top_p, min_p=min_p, repetition_penalty=repetition_penalty, seed=seed, presence_penalty=presence_penalty, mtp=mtp, **extra)
 
     def get_dynamic_vram__units(self):
         # forward to the inner transformer so ModelPatcher can register vbar units (graph decode)

@@ -56,7 +56,12 @@ and two outputs, and never snapshots images.
 
 ### Structured JSON output
 
-`json_schema` is prompt-level JSON mode, not constrained decoding. The schema is
+With the default `response_format=text`, `json_schema` is prompt-level JSON mode,
+not constrained decoding. Opt-in `response_format=json_schema` instead uses the
+[native constrained JSON path](text-json.md), with optional dependencies,
+`mtp=off`, a restricted schema/family matrix and token-aware reasoning. Its strict
+answer and enforcement evidence are validated before successful publication.
+The following describes only the backward-compatible prompt-level mode. The schema is
 parsed and compacted into an instruction appended to the system message, after
 `system_prompt` or an existing history system message. `generated_text` is the
 first JSON object or array found in the post-thinking answer; surrounding prose

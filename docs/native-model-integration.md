@@ -17,6 +17,11 @@ This guide adds no model support or deployment. Examples below describe existing
 ports or explicitly labelled scoping decisions. Hardware acceptance is specific
 to the tested checkpoint, precision, inputs and device.
 
+For the optional native text constraint path, see [constrained JSON](text-json.md).
+Its loader coverage/family checks distinguish complete generative packages from
+conditioning-only exports, including tied output heads; token-level enforcement
+and full-package acceptance remain separate claims.
+
 ## 1. Establish the inference target
 
 Inspect upstream code, model files and configuration before deciding what to
