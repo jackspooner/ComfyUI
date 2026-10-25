@@ -188,7 +188,8 @@ replay needs both the JSON and attachments. Saving history belongs to the caller
 Audio/video inputs automatically use the single-prompt media path when no history
 or structured content is supplied. Video respects its token cap and optional memory-aware sizing without enabling
 conversation history; legacy audio retains its existing budget behavior.
-**Generate Text** also accepts an optional `json_schema`; this prompt-level JSON
+**Generate Text** also accepts an optional `json_schema` (legacy API prompts may
+omit it, including MOSS audio calls); this prompt-level JSON
 mode extracts and syntax-checks the first JSON object or array, while schema conformance
 remains model-dependent. Opt-in `response_format=json_schema` adds native
 llguidance token constraints and independent schema validation on supported
