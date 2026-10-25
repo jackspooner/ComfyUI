@@ -31,6 +31,10 @@ and no reasoning-close token is forced.
 
 `response_format="text"` remains the default, including the existing prompt-only
 behavior of a nonempty `json_schema`; it does **not** imply native enforcement.
+Existing API prompts may omit both JSON controls, including raw-template MOSS
+audio calls. `json_schema` is optional at prompt admission; selecting native JSON
+still requires a nonempty valid schema at execution. Native prompt-validation
+regressions cover omission, linked audio and ordinary required-input rejection.
 `json_object` and unknown formats are rejected, not downgraded. The specialized
 Generate LTX2 Prompt node does not expose these controls.
 
