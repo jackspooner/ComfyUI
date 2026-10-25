@@ -38,12 +38,21 @@ class PaddleOCR(io.ComfyNode):
                                  io.Combo.Input('preprocessing', options=list(PREPROCESSING), default='no_enlargement'),
                                  io.Float.Input('threshold', default=0.3, min=0, max=1, step=0.01, advanced=True),
                                  io.Float.Input('box_threshold', default=0.6, min=0, max=1, step=0.01, advanced=True),
-                                 io.Float.Input('unclip_ratio', default=1.5, min=0, max=10, step=0.1, advanced=True)],
+                                 io.Float.Input('unclip_ratio', default=1.5, min=0, max=10, step=0.1, advanced=True),
+                                 io.Int.Input('detector_batch_size', default=1, min=1, max=64, optional=True, advanced=True),
+                                 io.Int.Input('recognition_batch_size', default=1, min=1, max=64, optional=True, advanced=True),
+                                 io.Autogrow.Input('additional_images', template=io.Autogrow.TemplatePrefix(
+                                     io.Image.Input('image'), prefix='image', min=0, max=100), optional=True)],
                          outputs=[io.String.Output(display_name='text'), io.String.Output(display_name='regions_json')])
 
     @classmethod
-    def execute(cls, model, images, operation, preprocessing, threshold, box_threshold, unclip_ratio):
-        result = model.recognize(images, operation, preprocessing, threshold, box_threshold, unclip_ratio)
+    def execute(cls, model, images, operation, preprocessing, threshold, box_threshold, unclip_ratio,
+                detector_batch_size=1, recognition_batch_size=1, additional_images=None):
+        frames = list(images)
+        for name in sorted(additional_images or {}, key=lambda name: int(name.removeprefix('image'))):
+            frames.extend(additional_images[name])
+        result = model.recognize(frames, operation, preprocessing, threshold, box_threshold, unclip_ratio,
+                                 detector_batch_size=detector_batch_size, recognition_batch_size=recognition_batch_size)
         return io.NodeOutput(plain_text(result), json.dumps(result, ensure_ascii=False, allow_nan=False))
 
 

@@ -154,6 +154,10 @@ FP32 models. Outputs include text, region geometry, model scores and preprocessi
 transforms; independent batch images remain separate. Default preprocessing avoids
 enlargement, with an explicit upstream-resize comparison mode. See
 [model setup, node contracts and measured limits](docs/paddleocr.md).
+Optional detector-frame and recognition-crop microbatches now group identical
+prepared shapes into real batched forwards. Defaults remain one; extra image
+sockets accept different source dimensions without resizing them together.
+CPU batching parity passes; GPU throughput and serving activation remain pending.
 Worktree preparation for this optional capability uses the normal setup command
 with `--paddleocr` to check its preinstalled OpenCV/torchvision prerequisites.
 Source integration requires activation before new nodes appear in a running
