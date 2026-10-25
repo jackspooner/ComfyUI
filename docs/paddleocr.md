@@ -89,6 +89,62 @@ contract and are quantized to 8-bit pixels; alpha is ignored. Pixel hashes are n
 original-file hashes. Callers retain original file hashes, crop offsets, frame
 timestamps, queue IDs and downstream provenance.
 
+## Native inference batching
+
+Optional advanced controls `detector_batch_size` and `recognition_batch_size`
+default to **1**, preserving old prompts. These are actual forward-batch limits,
+not simultaneous ComfyUI jobs. Start a measured GPU trial with 2 detector frames
+and 8 recognition crops; this is a trial configuration, not a proven optimum.
+
+- Detection prepares a bounded window of frames, groups identical prepared
+  `(C,H,W)` shapes and concatenates only the batch dimension for each forward.
+- Recognition prepares a bounded window of text crops across those frames,
+  grouping identical prepared `(3,48,W)` shapes. A text-heavy single image can
+  benefit from crop batching even when detector batching stays at one.
+- In `recognize_lines`, the recognition control sets the source-image window;
+  detector batch size is irrelevant. Partial final windows are processed.
+- Different prepared widths are **not** padded together. Additional padding
+  changes the recognizer's attention and squeeze-excitation calculations.
+  Heterogeneous sizes can consequently yield smaller batches or singletons.
+- All entries retain their original image/region position, dimensions, pixel
+  hash and transforms. No detections remains an empty entry, not a dropped image.
+
+The primary `images` socket still accepts standard BHWC IMAGE batches. Optional
+Autogrow `additional_images` sockets accept further IMAGE batches, including
+different dimensions. API fields are `additional_images.image0`,
+`additional_images.image1`, etc. (up to the framework's 100-socket limit). The
+execution order is primary frames first, then additional sockets in numeric
+order, then frames within each socket. Do not resize independent source frames
+merely to concatenate them before OCR. A bare HWC tensor is not the IMAGE contract.
+
+Workspace admission scales with the actual forward batch. There is no automatic
+precision reduction, silent batch fallback, retry, persistent tensor cache or
+queue-policy change. Failure/interruption fails the node without publishing a
+partial success. Callers that collect errors must attribute the failure to every
+frame in that submitted batch and retain their slot map; never zip filtered
+successes against the original source list. Source/region pixels and probabilities
+are bounded to the current windows; raw JSON results accumulate for the request.
+
+### Batching verification and activation
+
+The 47 focused CPU tests pass, including real pinned FP32 checkpoint batch versus
+concatenated singleton forwards (rtol 1e-4/atol 1e-5, exact recognizer CTC IDs),
+small-architecture upstream comparisons, mixed shapes, tails, blank frames,
+identity order, crop batching, old node calls, cancellation and batch workspace.
+To include the two opt-in checkpoint cases, set `PADDLEOCR_BATCH_MODELS` to a
+local directory containing `PP-OCRv6_medium_det` and `PP-OCRv6_medium_rec` when
+running the test command below. Without it those two tests skip. No downloads
+or GPU inference occur in these tests.
+
+These checks do **not** establish GPU parity, peak-memory safety, OCR accuracy or
+an end-to-end speedup. The serving process still needs an idle-window activation.
+Discover the new sockets before updating imported workflows. Through the normal
+queue, compare matching singleton/batched source-frame sets, including mixed
+sizes, a final singleton and a blank frame; retain outputs, prompt IDs, timings
+and peak memory. Test cancellation and recovery. Only then update pinned workflow
+references. Existing admitted runs retain their original definitions; this change
+does not upgrade the in-flight revision-53 advertising corpus.
+
 ## Preprocessing and limitations
 
 `no_enlargement` white-pads detector images on the right/bottom to multiples of

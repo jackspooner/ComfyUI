@@ -7,6 +7,7 @@ https://www.apache.org/licenses/LICENSE-2.0
 import hashlib
 import json
 import math
+from itertools import islice
 from pathlib import Path
 
 import cv2
@@ -193,11 +194,11 @@ def decode_ctc(probabilities, vocabulary):
 
 
 def workspace_bytes(kind, shape):
-    _, _, h, w = shape
+    batch, _, h, w = shape
     if kind == 'detector':
-        return 64 * 1024 ** 2 + h * w * 1024
+        return 64 * 1024 ** 2 + batch * h * w * 1024
     sequence = max(1, w // 4)
-    return 32 * 1024 ** 2 + sequence * 18710 * 4 + 8 * sequence * sequence * 4 + h * w * 256
+    return 32 * 1024 ** 2 + batch * (sequence * 18710 * 4 + 8 * sequence * sequence * 4 + h * w * 256)
 
 
 class PaddleOCRModel:
@@ -214,43 +215,81 @@ class PaddleOCRModel:
         required = workspace_bytes(kind, pixels.shape)
         mm.load_models_gpu([patcher], memory_required=required, force_full_load=True)
         if not mm.is_device_cpu(patcher.load_device) and mm.get_free_memory(patcher.load_device) < required + mm.extra_reserved_memory():
-            raise RuntimeError(f'PaddleOCR {kind} has insufficient free workspace after model admission; reduce the input dimensions.')
+            raise RuntimeError(f'PaddleOCR {kind} has insufficient free workspace after model admission; reduce input dimensions or batch size.')
         mm.throw_exception_if_processing_interrupted()
         with comfy.model_prefetch.malloc_graph_scope(patcher.load_device):
             output = patcher.model(pixels.to(patcher.load_device))
         return output.detach().cpu()
 
-    def recognize(self, images, operation='detect_and_recognize', preprocessing='no_enlargement', threshold=0.3, box_threshold=0.6, unclip_ratio=1.5):
+    def recognize(self, images, operation='detect_and_recognize', preprocessing='no_enlargement', threshold=0.3, box_threshold=0.6, unclip_ratio=1.5,
+                  detector_batch_size=1, recognition_batch_size=1):
         if operation not in OPERATIONS or preprocessing not in PREPROCESSING:
             raise ValueError('Unsupported PaddleOCR operation or preprocessing mode.')
+        if any(type(size) is not int or size < 1 for size in (detector_batch_size, recognition_batch_size)):
+            raise ValueError('PaddleOCR batch sizes must be positive integers.')
         results = []
         progress = comfy.utils.ProgressBar(len(images))
-        for index, image in enumerate(images):
-            mm.throw_exception_if_processing_interrupted()
-            pixels = (image[..., :3].detach().cpu() * 255).round().to(torch.uint8).movedim(-1, 0)
-            _, h, w = pixels.shape
-            array = pixels.movedim(0, -1).numpy()
-            if operation == 'detect_and_recognize':
-                inputs, detector_transform = prepare_detector(pixels, preprocessing)
-                prediction = self.infer(self.detector, inputs, 'detector')[0, 0].numpy()
-                regions = detection_regions(prediction, detector_transform, preprocessing, threshold, box_threshold, unclip_ratio)
-            else:
-                detector_transform = None
-                regions = [{'corners': [[0, 0], [w, 0], [w, h], [0, h]], 'detection_score': None}]
-            for region in regions:
+        source = iter(enumerate(images))
+        frame_window_size = detector_batch_size if operation == 'detect_and_recognize' else recognition_batch_size
+        while window := list(islice(source, frame_window_size)):
+            frames = []
+            for index, image in window:
                 mm.throw_exception_if_processing_interrupted()
-                if operation == 'detect_and_recognize':
-                    crop, rectification = rectify(array, region['corners'])
-                else:
-                    crop, rectification = pixels, None
-                inputs, recognition_transform = prepare_recognizer(crop, preprocessing)
-                probabilities = self.infer(self.recognizer, inputs, 'recognizer')[0]
-                text, score = decode_ctc(probabilities, self.vocabulary)
-                region.update(text=text, recognition_score=score, rectification=rectification, recognition_transform=recognition_transform)
-            results.append({'image_index': index, 'width': w, 'height': h, 'pixel_sha256': hashlib.sha256(array.tobytes()).hexdigest(),
-                            'detector_transform': detector_transform, 'regions': regions})
-            progress.update(1)
+                pixels = (image[..., :3].detach().cpu() * 255).round().to(torch.uint8).movedim(-1, 0)
+                _, h, w = pixels.shape
+                array = pixels.movedim(0, -1).numpy()
+                record = {'image_index': index, 'width': w, 'height': h, 'pixel_sha256': hashlib.sha256(array.tobytes()).hexdigest(),
+                          'detector_transform': None, 'regions': []}
+                frames.append((pixels, array, record))
+                if operation == 'recognize_lines':
+                    record['regions'] = [{'corners': [[0, 0], [w, 0], [w, h], [0, h]], 'detection_score': None}]
+            if operation == 'detect_and_recognize':
+                self.detect_frames(frames, preprocessing, threshold, box_threshold, unclip_ratio)
+
+            crops = self.recognition_inputs(frames, operation, preprocessing)
+            while crop_window := list(islice(crops, recognition_batch_size)):
+                self.recognize_crops(crop_window)
+                del crop_window
+            results.extend(record for _, _, record in frames)
+            progress.update(len(frames))
+        mm.throw_exception_if_processing_interrupted()
         return {'version': 1, 'operation': operation, 'preprocessing': preprocessing, 'models': self.identity, 'images': results}
+
+    def detect_frames(self, frames, preprocessing, threshold, box_threshold, unclip_ratio):
+        buckets = {}
+        for pixels, _, record in frames:
+            mm.throw_exception_if_processing_interrupted()
+            inputs, transform = prepare_detector(pixels, preprocessing)
+            record['detector_transform'] = transform
+            buckets.setdefault(tuple(inputs.shape[1:]), []).append((inputs, record))
+        for bucket in buckets.values():
+            predictions = self.infer(self.detector, torch.cat([entry[0] for entry in bucket]), 'detector')
+            for prediction, (_, record) in zip(predictions, bucket, strict=True):
+                mm.throw_exception_if_processing_interrupted()
+                record['regions'] = detection_regions(prediction[0].numpy(), record['detector_transform'], preprocessing, threshold, box_threshold, unclip_ratio)
+            del predictions, prediction
+
+    def recognize_crops(self, crop_window):
+        buckets = {}
+        for inputs, region in crop_window:
+            # Extra width padding changes attention and squeeze-excitation math.
+            buckets.setdefault(tuple(inputs.shape[1:]), []).append((inputs, region))
+        for bucket in buckets.values():
+            predictions = self.infer(self.recognizer, torch.cat([entry[0] for entry in bucket]), 'recognizer')
+            for probabilities, (_, region) in zip(predictions, bucket, strict=True):
+                mm.throw_exception_if_processing_interrupted()
+                text, score = decode_ctc(probabilities, self.vocabulary)
+                region.update(text=text, recognition_score=score)
+            del predictions, probabilities
+
+    def recognition_inputs(self, frames, operation, preprocessing):
+        for pixels, array, record in frames:
+            for region in record['regions']:
+                mm.throw_exception_if_processing_interrupted()
+                crop, rectification = rectify(array, region['corners']) if operation == 'detect_and_recognize' else (pixels, None)
+                inputs, transform = prepare_recognizer(crop, preprocessing)
+                region.update(rectification=rectification, recognition_transform=transform)
+                yield inputs, region
 
 
 def plain_text(result):
