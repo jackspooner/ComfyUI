@@ -1,6 +1,9 @@
 import copy
 import hashlib
 import json
+import os
+from pathlib import Path
+import weakref
 
 import numpy as np
 import pytest
@@ -39,18 +42,22 @@ def config(kind):
 
 
 @pytest.mark.parametrize('kind', ['detector', 'recognizer'])
-def test_native_math_matches_reference(kind):
+@pytest.mark.parametrize('batch_size', [1, 3])
+def test_native_math_matches_reference(kind, batch_size):
     torch.manual_seed(11)
     cfg = config(kind)
     cls, refcls, cfgcls, shape = (Detector, PPOCRV6MediumDetForObjectDetection, PPOCRV6MediumDetConfig, (1, 3, 64, 96)) if kind == 'detector' else (Recognizer, PPOCRV6SmallRecForTextRecognition, PPOCRV6SmallRecConfig, (1, 3, 48, 128))
     reference = refcls(cfgcls(**copy.deepcopy(cfg))).eval()
     native = cls(cfg, manual_cast, device='cpu', dtype=torch.float32).eval()
     native.load_state_dict(reference.state_dict(), strict=True)
-    pixels = torch.randn(shape)
+    pixels = torch.randn((batch_size, *shape[1:]))
     actual, expected = native(pixels), reference(pixels).last_hidden_state
     torch.testing.assert_close(actual, expected, rtol=1e-4, atol=1e-5)
+    singleton = torch.cat([native(pixels[i:i + 1]) for i in range(batch_size)])
+    torch.testing.assert_close(actual, singleton, rtol=1e-4, atol=1e-5)
     if kind == 'recognizer':
         assert torch.equal(actual.argmax(-1), expected.argmax(-1))
+        assert torch.equal(actual.argmax(-1), singleton.argmax(-1))
 
 
 @pytest.mark.parametrize('h,w', [(77, 84), (720, 576), (1, 1), (49, 19), (31, 401)])
@@ -208,7 +215,7 @@ def test_fp32_recognizer_with_kitchen_attention(monkeypatch):
     import comfy.ldm.paddleocr as native
     from comfy.ldm.modules.attention import attention_comfy_kitchen_int8
     monkeypatch.setattr(native, 'optimized_attention', attention_comfy_kitchen_int8)
-    test_native_math_matches_reference('recognizer')
+    test_native_math_matches_reference('recognizer', 3)
 
 
 def test_cancellation_before_model_execution(monkeypatch):
@@ -235,3 +242,140 @@ def test_insufficient_gpu_workspace_stops_before_forward(monkeypatch):
     with pytest.raises(RuntimeError, match='insufficient'):
         PaddleOCRModel.__new__(PaddleOCRModel).infer(patcher, torch.zeros(1, 3, 48, 320), 'recognizer')
     assert events == ['admit']
+
+
+def fake_batched_model(monkeypatch):
+    model = PaddleOCRModel.__new__(PaddleOCRModel)
+    model.identity = {}
+    model.vocabulary = ['', 'A', 'B']
+    model.detector = model.recognizer = object()
+    calls, outputs = [], []
+
+    def infer(patcher, pixels, kind):
+        # No probability view from the previous forward should survive here.
+        assert all(ref() is None for ref in outputs)
+        calls.append((kind, tuple(pixels.shape)))
+        n, _, h, w = pixels.shape
+        if kind == 'detector':
+            prediction = torch.zeros(n, 1, h, w)
+            prediction[:, :, 10:25, 20:60] = 0.8
+        else:
+            prediction = torch.tensor([[[0., 1., 0.]]]).expand(n, -1, -1).clone()
+        outputs.append(weakref.ref(prediction))
+        return prediction
+
+    monkeypatch.setattr(model, 'infer', infer)
+    return model, calls, outputs
+
+
+@pytest.mark.parametrize('preprocessing', ['no_enlargement', 'official'])
+def test_detector_buckets_tails_and_identity(monkeypatch, preprocessing):
+    model, calls, outputs = fake_batched_model(monkeypatch)
+    frames = [torch.full((h, w, 3), i / 5) for i, (h, w) in enumerate([(64, 96), (64, 128), (64, 96), (64, 96), (32, 64)])]
+    batched = model.recognize(frames, preprocessing=preprocessing, detector_batch_size=3, recognition_batch_size=8)
+    detection_calls = [shape for kind, shape in calls if kind == 'detector']
+    assert [shape[0] for shape in detection_calls] == [2, 1, 1, 1]
+    assert all(ref() is None for ref in outputs)
+    calls.clear()
+    singleton = model.recognize(frames, preprocessing=preprocessing)
+    assert batched == singleton
+    assert [record['image_index'] for record in batched['images']] == list(range(5))
+    assert len({record['pixel_sha256'] for record in batched['images']}) == 5
+
+
+def test_recognize_lines_batches_independently_of_detector_setting(monkeypatch):
+    model, calls, _ = fake_batched_model(monkeypatch)
+    # Prepared widths 320, 640, 320, 320, 640: no extra padding to 640.
+    frames = [torch.zeros(48, w, 3) for w in [200, 640, 200, 200, 640]]
+    batched = model.recognize(frames, operation='recognize_lines', recognition_batch_size=3)
+    assert calls == [('recognizer', (2, 3, 48, 320)), ('recognizer', (1, 3, 48, 640)),
+                     ('recognizer', (1, 3, 48, 320)), ('recognizer', (1, 3, 48, 640))]
+    assert batched == model.recognize(frames, operation='recognize_lines')
+
+
+def test_multiple_regions_batch_within_single_image(monkeypatch):
+    import comfy.paddleocr as ocr
+    model, calls, _ = fake_batched_model(monkeypatch)
+    monkeypatch.setattr(ocr, 'detection_regions', lambda *args: [
+        {'corners': [[0, 0], [20, 0], [20, 15], [0, 15]], 'detection_score': 0.8} for _ in range(5)])
+    result = model.recognize(torch.zeros(1, 64, 96, 3), recognition_batch_size=3)
+    assert [shape[0] for kind, shape in calls if kind == 'recognizer'] == [3, 2]
+    assert len(result['images'][0]['regions']) == 5
+
+
+def test_blank_frames_stay_in_place(monkeypatch):
+    import comfy.paddleocr as ocr
+    model, calls, _ = fake_batched_model(monkeypatch)
+    monkeypatch.setattr(ocr, 'detection_regions', lambda *args: [])
+    result = model.recognize(torch.zeros(3, 64, 96, 3), detector_batch_size=2, recognition_batch_size=4)
+    assert [record['regions'] for record in result['images']] == [[], [], []]
+    assert all(kind == 'detector' for kind, shape in calls)
+    assert model.recognize([])['images'] == []
+
+
+@pytest.mark.parametrize('kind,fixed', [('detector', 64 * 1024 ** 2), ('recognizer', 32 * 1024 ** 2)])
+def test_workspace_scales_with_batch(kind, fixed):
+    assert workspace_bytes(kind, (4, 3, 48, 320)) == fixed + 4 * (workspace_bytes(kind, (1, 3, 48, 320)) - fixed)
+
+
+def test_batched_decode_honours_cancellation(monkeypatch):
+    import comfy.paddleocr as ocr
+    import comfy.model_management as mm
+    model, _, _ = fake_batched_model(monkeypatch)
+    stopped = False
+
+    def decode(*args):
+        nonlocal stopped
+        stopped = True
+        return 'A', 1.
+
+    def interrupt():
+        if stopped:
+            raise mm.InterruptProcessingException()
+
+    monkeypatch.setattr(ocr, 'decode_ctc', decode)
+    monkeypatch.setattr(mm, 'throw_exception_if_processing_interrupted', interrupt)
+    with pytest.raises(mm.InterruptProcessingException):
+        model.recognize(torch.zeros(3, 15, 20, 3), operation='recognize_lines', recognition_batch_size=3)
+
+
+@pytest.mark.parametrize('value', [0, -1, 1.5, True])
+def test_invalid_batch_control_fails_before_inference(monkeypatch, value):
+    model, calls, _ = fake_batched_model(monkeypatch)
+    with pytest.raises(ValueError, match='positive integers'):
+        model.recognize(torch.zeros(1, 15, 20, 3), detector_batch_size=value)
+    assert calls == []
+
+
+def test_node_autogrow_numeric_order_and_legacy_call(monkeypatch):
+    from comfy_extras.nodes_paddleocr import PaddleOCR
+    model, _, _ = fake_batched_model(monkeypatch)
+    primary = torch.zeros(2, 15, 20, 3)
+    second = torch.ones(1, 16, 21, 3)
+    tenth = torch.zeros(1, 17, 22, 3)
+    old = PaddleOCR.execute(model, primary, 'recognize_lines', 'official', 0.3, 0.6, 1.5)
+    new = PaddleOCR.execute(model, primary, 'recognize_lines', 'official', 0.3, 0.6, 1.5,
+                            recognition_batch_size=4, additional_images={'image10': tenth, 'image2': second})
+    old_records, new_records = json.loads(old.result[1])['images'], json.loads(new.result[1])['images']
+    assert new_records[:2] == old_records
+    assert [(record['image_index'], record['height'], record['width']) for record in new_records] == [
+        (0, 15, 20), (1, 15, 20), (2, 16, 21), (3, 17, 22)]
+    schema = PaddleOCR.define_schema()
+    assert [entry.id for entry in schema.inputs][-3:] == ['detector_batch_size', 'recognition_batch_size', 'additional_images']
+
+
+@pytest.mark.parametrize('kind,shape', [('detector', (3, 3, 64, 96)), ('recognizer', (3, 3, 48, 320))])
+def test_full_checkpoint_batch_parity(kind, shape):
+    root = os.environ.get('PADDLEOCR_BATCH_MODELS')
+    if not root:
+        pytest.skip('Set PADDLEOCR_BATCH_MODELS to the local folder containing the two pinned model directories.')
+    root = Path(root)
+    model = PaddleOCRModel(root / 'PP-OCRv6_medium_det/model.safetensors', root / 'PP-OCRv6_medium_rec/model.safetensors')
+    torch.manual_seed(17)
+    pixels = torch.randn(shape)
+    patcher = getattr(model, kind)
+    actual = model.infer(patcher, pixels, kind)
+    expected = torch.cat([model.infer(patcher, pixels[i:i + 1], kind) for i in range(shape[0])])
+    torch.testing.assert_close(actual, expected, rtol=1e-4, atol=1e-5)
+    if kind == 'recognizer':
+        assert torch.equal(actual.argmax(-1), expected.argmax(-1))
