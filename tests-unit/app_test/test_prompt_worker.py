@@ -81,6 +81,9 @@ class Executor:
     def execute(self, *args, **kwargs) -> None:
         return None
 
+    def maintain_model_cache(self) -> None:
+        return None
+
 
 class ExecuteFailureExecutor(Executor):
     def execute(self, *args, **kwargs) -> None:
