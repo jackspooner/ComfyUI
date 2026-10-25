@@ -157,7 +157,9 @@ enlargement, with an explicit upstream-resize comparison mode. See
 Optional detector-frame and recognition-crop microbatches now group identical
 prepared shapes into real batched forwards. Defaults remain one; extra image
 sockets accept different source dimensions without resizing them together.
-CPU batching parity passes; GPU throughput and serving activation remain pending.
+CPU batching parity passes. RTX 5090 activation and a bounded 14-frame GPU trial
+passed, with about 2.1× lower warm queue execution time at 2-frame/8-crop batching.
+CUDA results can change numerically; this is not a whole-workflow speed guarantee.
 Worktree preparation for this optional capability uses the normal setup command
 with `--paddleocr` to check its preinstalled OpenCV/torchvision prerequisites.
 Source integration requires activation before new nodes appear in a running

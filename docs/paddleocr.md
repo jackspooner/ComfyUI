@@ -136,14 +136,24 @@ local directory containing `PP-OCRv6_medium_det` and `PP-OCRv6_medium_rec` when
 running the test command below. Without it those two tests skip. No downloads
 or GPU inference occur in these tests.
 
-These checks do **not** establish GPU parity, peak-memory safety, OCR accuracy or
-an end-to-end speedup. The serving process still needs an idle-window activation.
-Discover the new sockets before updating imported workflows. Through the normal
-queue, compare matching singleton/batched source-frame sets, including mixed
-sizes, a final singleton and a blank frame; retain outputs, prompt IDs, timings
-and peak memory. Test cancellation and recovery. Only then update pinned workflow
-references. Existing admitted runs retain their original definitions; this change
-does not upgrade the in-flight revision-53 advertising corpus.
+On 25 October, the RTX 5090 serving process was activated at `7d1038360` and
+advert-frame queue tests exercised detector batches of two and recognizer batches
+of eight. A warm 14-frame comparison returned 80 regions in both modes, identical
+recognized strings and one changed region geometry. Queue execution decreased
+from 3.348 to 1.576 seconds (about 2.1×); sampled device memory reached 3,400 MiB.
+The earlier smaller comparison also exposed a text difference, so CUDA batching
+is a numerical change, not an output-identical optimization. These are model-output
+comparisons, not independent reading of source text, guaranteed peak-memory safety
+or whole-workflow throughput measurements.
+
+WF5 paired-frame acceptance additionally covered a singleton tail, a blank frame,
+empty input and a failed pair followed by a successful tail. Both failed source
+positions remain represented in errors. Detailed receipts are in the LAMBDA
+project's `data/lambda/annotations-v09-streamlined/dispatch/2026-10-25-r54-batched-ocr/`.
+Discover sockets and benchmark the selected device before increasing batch sizes.
+Existing admitted workflows retain their pinned definitions; updating native code
+does not upgrade historical or in-flight corpus outputs. GPU pressure and batched
+cancellation beyond the existing CPU cancellation tests remain unverified.
 
 ## Preprocessing and limitations
 
