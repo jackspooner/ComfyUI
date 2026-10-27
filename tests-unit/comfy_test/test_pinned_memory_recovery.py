@@ -31,7 +31,7 @@ class View:
 @pytest.fixture
 def state(monkeypatch):
     buf = Buffer()
-    module = SimpleNamespace(_pin_state={'weights': (buf, [], [0], [0], [0], {})})
+    module = SimpleNamespace(_pin_state={'writable': False, 'weights': (buf, [], [0], [0], [0], {})})
     mm = pm.comfy.model_management
     monkeypatch.setattr(mm, 'DISABLE_PINNED_MEMORY', False)
     monkeypatch.setattr(mm, 'TOTAL_PINNED_MEMORY', 0)

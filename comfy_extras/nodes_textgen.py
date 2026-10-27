@@ -110,7 +110,7 @@ class TextGenerate(io.ComfyNode):
                 io.DynamicCombo.Input("sampling_mode", options=sampling_options, display_name="Sampling Mode"),
                 io.Boolean.Input("thinking", optional=True, default=False, tooltip="Operate in thinking mode if the model supports it."),
                 io.Boolean.Input("use_default_template", optional=True, default=True, tooltip="Use the built in system prompt/template if the model has one.", advanced=True),
-                io.Combo.Input("mtp", options=["auto", "off", "2", "3", "4", "5"], default="auto", optional=True, tooltip="Speculative decoding with the checkpoint's multi-token-prediction head. No effect without MTP weights. auto adapts the draft depth; 2-5 pins it. Sampled output stays correctly distributed but differs from non-MTP output for the same seed."),
+                io.Combo.Input("mtp", options=["auto", "off", "2", "3", "4", "5", "tree2s1", "tree2s2", "tree3s1", "tree4s1m8"], default="auto", optional=True, tooltip="Speculative decoding with the checkpoint's multi-token-prediction head. No effect without MTP weights. auto adapts the draft depth and breadth to observed token matches and execution cost; 2-5 pins a constant draft depth; tree modes pin both breadth and depth. Sampled output stays correctly distributed but differs from non-MTP output for the same seed."),
                 io.String.Input("system_prompt", force_input=True, optional=True, tooltip="Replaces the system prompt in the model's chat template. Ignored when the default template is not used."),
                 io.String.Input("json_schema", multiline=True, default="", optional=True, tooltip="JSON Schema; requires the default template. With response_format=text, uses legacy prompt guidance and syntax extraction only. With response_format=json_schema, required and strictly enforced for the comfy-json-v1 subset."),
                 io.Combo.Input("response_format", options=["text", "json_schema"], default="text", optional=True, tooltip="text preserves legacy behavior (including prompt-only json_schema). json_schema enables native token constraints and strict final validation on supported complete models. Requires mtp=off. json_object is not yet supported."),
@@ -141,7 +141,7 @@ class TextGenerate(io.ComfyNode):
     @classmethod
     def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", history="", context_budget=0, history_policy="error", prompt_content="", fps=1.0, source_fps=24.0, auto_resize=True, min_short_edge=256, json_schema="", response_format="text") -> io.NodeOutput:
 
-        mtp = False if mtp == "off" else (True if mtp == "auto" else int(mtp))
+        mtp = {"off": False, "auto": True}.get(mtp, mtp)
         system_prompt = system_prompt or ""
         json_schema = json_schema or ""
         if response_format not in ("text", "json_schema"):

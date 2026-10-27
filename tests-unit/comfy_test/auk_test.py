@@ -134,6 +134,8 @@ def test_helper_native_generation_and_transcript_preserved():
             assert payload['reference_transcript'] == '  Exact transcript.\n'
             assert kwargs['audio']['sample_rate'] == 16000
             return prompt
+        def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize, **kwargs):
+            return tokens, {"output_allowance": max_length}
         def generate(self, tokens, **kwargs):
             assert not kwargs['do_sample']
             return [1]

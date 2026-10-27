@@ -1,9 +1,11 @@
 # Native Fibo 2.0
 
-This fork selectively backports upstream commit
+This fork originally backported upstream commit
 `87ed5a066d9c4660ef42100fd01a888da6994856`
 ([PR #17240](https://github.com/Comfy-Org/ComfyUI/pull/17240), Jukka Seppänen)
-onto v0.42.1; it does not require the later upstream master or a package upgrade.
+onto v0.42.1. The v0.43.0 stable merge adds upstream NTK-aware RoPE scaling and
+negative-prompt chat wrapping. Use that release's Kitchen/allocator requirements;
+the historical acceptance below applies to the original backport.
 Existing fork CLIP selectors and enum values are preserved; FIBO2 is 43 here.
 The model uses native ComfyUI patching, optimized attention, prefetch and queue
 ownership. It performs no model downloads or external prompt rewriting at runtime.
