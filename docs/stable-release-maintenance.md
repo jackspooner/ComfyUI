@@ -2,9 +2,9 @@
 
 Deploy published non-draft, non-prerelease tags from the actual configured GitHub
 remote, retaining the fork's local memory-recovery patch. Do not deploy a later
-branch tip or downgrade a checkout containing the stable tag. The 19 October 2026
-release is [v0.42.1](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.42.1),
-release commit `63be2f9b82ad0dac88a7ceaa28a9cf3154125a18`.
+branch tip or downgrade a checkout containing the stable tag. The 27 October 2026
+release is [v0.43.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.43.0),
+release commit `426f5eea52a7ece1dd599fff4cb6cd1f352ddd24`.
 
 Before changing source or packages, save Git revision/diffs, custom-node revisions,
 package inventory/constraints, service configuration, workflows and baseline
@@ -80,3 +80,24 @@ acceptance does not verify these new weights or large/complex remeshing.
 The shared general ComfyUI skill owns detailed operating guidance; this release
 adds no MCP service or router profile. Record baseline warnings and failed past
 requests separately from new startup/import/inference regressions.
+
+The v0.43.0 merge requires frontend 1.57.4, workflow templates 0.11.97,
+embedded docs 0.5.15, Kitchen 0.2.40 and allocator 0.6.0. Writable runtime
+weights/KV storage depend on the matching allocator and pin-state contract;
+preserve the pinned-registration retry and partial-prefetch recovery tests.
+Qwen adaptive tree MTP adds `tree2s1`, `tree2s2`, `tree3s1` and `tree4s1m8` to
+Generate Text. Forward those modes unchanged; constrained JSON still requires
+`mtp=off`. Preserve automatic output-length resolution before allocating caches.
+
+Fibo uses upstream NTK-aware RoPE and negative-prompt chat wrapping, while the
+fork retains its CLIP enum identities, native history and optional schema inputs.
+The Flux2 VAE fused path and MOSS reference/control additions require their own
+checkpoint acceptance; an H3 smoke test does not certify them. The optional local
+agent host remains disabled without its explicit flag and separately provisioned
+package. No agent package is required for ordinary generation.
+
+The fork excludes upstream cloud deployment routes, installation-snapshot upload
+code, builder URL configuration and the persistent headless-use marker. CLI
+feature overrides cannot advertise that excluded path. Existing partner nodes
+remain their own explicit external integrations; no cloud deployment is activated
+by release maintenance. Upstream attribution and release ancestry are preserved.
