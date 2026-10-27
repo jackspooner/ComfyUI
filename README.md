@@ -1,3 +1,19 @@
+## Local maintenance fencing in this fork
+
+This fork adds opt-in local operator maintenance: persistently fence new native
+prompt admission, drain all accepted pending/running prompts, and retain bounded
+non-executable completion receipts across restart. The server starts still fenced
+until the owning operation explicitly resumes. It does not pause tensors, restore
+unfinished prompts, deploy code, or release GPU holds. Crashed unfinished work is
+reported as interrupted/unknown, not replayed or declared safe.
+
+Set both `COMFYUI_MAINTENANCE_DIR` and `COMFYUI_MAINTENANCE_TOKEN_FILE` at startup;
+see [authentication, exact API, recovery and rollout limits](docs/maintenance.md).
+Without that configuration, ordinary queue behavior is unchanged. Source and
+isolated CPU/HTTP tests are available; serving activation is a separate operation.
+This extends [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI) without changing
+its model executor; upstream usage and attribution remain below.
+
 ## Efficient video extraction in this fork
 
 **Get Video Components** retains its existing outputs and precision by default,

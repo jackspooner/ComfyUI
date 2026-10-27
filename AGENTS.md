@@ -505,3 +505,16 @@ The execution suite requires its declared pytest-asyncio dependency. All cache
 fixtures must use isolated archive/cache directories; never test eviction against
 operator models. Model files remain outside Git. The local CLI queues commands;
 no new HTTP or MCP interface is introduced.
+
+### Local maintenance owner
+
+`app/maintenance_store.py`, `app/maintenance_queue.py` and
+`app/maintenance_http.py` own durable receipts, the server queue adapter and the
+local operator boundary respectively; shared `PromptExecutor` has no operator or
+HTTP identity. Read `docs/maintenance.md` for the wire contract, fail-closed
+recovery and deployment limitations. Tests use temporary stores and loopback
+fixture servers, never serving state or real prompts. Run
+`tests-unit/app_test/test_maintenance.py`, `tests-unit/app_test/test_prompt_worker.py`,
+`tests-unit/execution_test` and `tests-unit/jobs_cancel_test` with the prepared
+interpreter, CPU mode and the declared `tests-unit/requirements.txt` dependencies.
+Shared operating skill maintenance remains with the authoritative `comfyui` owner.
