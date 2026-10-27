@@ -66,6 +66,8 @@ from app.model_manager import ModelFileManager
 from app.custom_node_manager import CustomNodeManager
 from app.subgraph_manager import SubgraphManager
 from app.node_replace_manager import NodeReplaceManager
+from app import maintenance_http
+from app.maintenance_queue import MaintenanceQueue
 from typing import TYPE_CHECKING, Optional, Union
 from api_server.routes.internal.internal_routes import InternalRoutes
 from protocol import BinaryEventTypes
@@ -269,13 +271,16 @@ class PromptServer():
         self.node_replace_manager = NodeReplaceManager()
         self.internal_routes = InternalRoutes(self)
         self.supports = ["custom_nodes_from_web"]
-        self.prompt_queue = execution.PromptQueue(self)
+        maintenance_store, maintenance_token = maintenance_http.configured_store()
+        self.prompt_queue = MaintenanceQueue(self, maintenance_store) if maintenance_store else execution.PromptQueue(self)
         self.loop = loop
         self.messages = asyncio.Queue()
         self.client_session:Optional[aiohttp.ClientSession] = None
         self.number = 0
 
         middlewares = [cache_control, deprecation_warning]
+        if maintenance_store:
+            middlewares.insert(0, maintenance_http.middleware(self.prompt_queue, maintenance_token))
         if args.enable_compress_response_body:
             middlewares.append(compress_body)
 
@@ -326,6 +331,8 @@ class PromptServer():
             emit("assets.enabled", hashing_enabled=args.enable_asset_hashing)
         routes = web.RouteTableDef()
         self.routes = routes
+        if maintenance_store:
+            maintenance_http.add_routes(routes, self.prompt_queue)
         self.last_node_id = None
         self.client_id = None
         self.workflow_metadata = {}
