@@ -69,7 +69,7 @@ def test_mtp_resolves_auto_before_allocating_cache():
         raise CacheReached
     model.init_kv_cache = capture
     with pytest.raises(CacheReached):
-        Qwen35._generate_mtp(model, torch.zeros(1, 3, 2), 0, [99])
+        Qwen35._generate_mtp(model, torch.zeros(1, 3, 2), 0, [99], True)
 
 
 def test_node_accepts_auto_and_larger_explicit_budgets():
