@@ -417,6 +417,11 @@ to implemented ports. Its Applio example describes scoping only; it adds no Appl
 support. Prepare a development worktree as documented below; GPU acceptance needs
 separately provisioned checkpoints and a compatible runtime.
 
+`SaveMoGeDepthPNG` converts native MoGe output to the same 16-bit grayscale
+format and depth-range metadata used by RuntimeHost. See
+[MoGe metric depth PNG](docs/moge-depth.md) for encoding, workflow and recovery
+details.
+
 ## Local stable-release maintenance
 
 The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).
