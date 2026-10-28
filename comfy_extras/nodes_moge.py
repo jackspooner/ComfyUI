@@ -1,8 +1,16 @@
 """ComfyUI nodes for the native MoGe (Monocular Geometry Estimation) integration."""
 
 
-import torch
+import json
 import math
+import os
+from pathlib import Path
+
+import numpy as np
+import torch
+from PIL import Image
+from PIL.PngImagePlugin import PngInfo
+from tqdm.auto import tqdm
 
 import comfy.utils
 import folder_paths
@@ -14,7 +22,6 @@ from comfy.ldm.moge.model import MoGeModel
 from comfy.ldm.moge.geometry import triangulate_grid_mesh
 from comfy.ldm.moge.panorama import get_panorama_cameras, split_panorama_image, merge_panorama_depth, spherical_uv_to_directions, _uv_grid
 import comfy.model_management
-from tqdm.auto import tqdm
 
 MoGeModelType = io.Custom("MOGE_MODEL")
 MoGeGeometry = io.Custom("MOGE_GEOMETRY")
@@ -59,6 +66,25 @@ def _normalize_disparity(depth: torch.Tensor) -> torch.Tensor:
         norm = ((disp - lo) / scale).clamp(0.0, 1.0)
         out[i] = torch.where(valid, norm, torch.zeros_like(norm))
     return out
+
+
+def _encode_metric_depth(depth: torch.Tensor, mask: torch.Tensor) -> tuple[np.ndarray, float, float]:
+    """Encode one metric-scale depth map using the RuntimeHost image-depth contract."""
+    values = depth.detach().float().cpu().numpy()
+    valid = mask.detach().cpu().numpy().astype(bool) & np.isfinite(values) & (values > 0)
+    if not valid.any():
+        raise ValueError("MoGe returned no valid depth pixels")
+
+    minimum = float(values[valid].min())
+    maximum = float(values[valid].max())
+    encoded = np.zeros(values.shape, dtype=np.uint16)
+    if maximum == minimum:
+        encoded[valid] = 1
+    else:
+        encoded[valid] = 1 + np.rint(
+            (values[valid] - minimum) * (65534 / (maximum - minimum))
+        ).astype(np.uint16)
+    return encoded, minimum, maximum
 
 
 class LoadMoGeModel(io.ComfyNode):
@@ -335,6 +361,89 @@ class MoGeRender(io.ComfyNode):
         return io.NodeOutput(result)
 
 
+class SaveMoGeDepthPNG(io.ComfyNode):
+    """Save metric-scale depth as the RuntimeHost-compatible 16-bit grayscale PNG."""
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="SaveMoGeDepthPNG",
+            search_aliases=["moge", "depth", "depth map", "16-bit png", "runtime host"],
+            display_name="Save MoGe Depth (16-bit PNG)",
+            category="image/geometry estimation",
+            description="Save one MoGe depth map as a 16-bit grayscale PNG with recoverable depth bounds.",
+            inputs=[
+                MoGeGeometry.Input("moge_geometry"),
+                io.String.Input("filename_prefix", default="moge_depth/runtime"),
+            ],
+            outputs=[],
+            is_output_node=True,
+        )
+
+    @classmethod
+    def execute(cls, moge_geometry, filename_prefix):
+        depth = moge_geometry.get("depth")
+        mask = moge_geometry.get("mask")
+        if depth is None or mask is None:
+            raise ValueError("moge_geometry must contain depth and mask")
+        if depth.shape[0] != 1:
+            raise ValueError(f"SaveMoGeDepthPNG takes one image (got batch of {depth.shape[0]})")
+
+        encoded, minimum, maximum = _encode_metric_depth(depth[0], mask[0])
+        height, width = encoded.shape
+        output_dir = folder_paths.get_output_directory()
+        directory, filename, counter, subfolder, _ = folder_paths.get_save_image_path(
+            filename_prefix, output_dir, width, height
+        )
+        png_name = f"{filename}_{counter:05}_.png"
+        png_path = Path(directory) / png_name
+        sidecar_path = png_path.with_suffix(".json")
+
+        metadata = PngInfo()
+        metadata.add_text("moge_depth_min", format(minimum, ".17g"))
+        metadata.add_text("moge_depth_max", format(maximum, ".17g"))
+        metadata.add_text(
+            "moge_depth_encoding",
+            "0=invalid;1..65535=linear metric-scale depth between moge_depth_min and moge_depth_max",
+        )
+        Image.fromarray(encoded).save(png_path, pnginfo=metadata, compress_level=4)
+
+        sidecar = {
+            "format": "moge-depth-v1",
+            "png": png_name,
+            "width": width,
+            "height": height,
+            "min": minimum,
+            "max": maximum,
+            "dtype": "uint16",
+            "invalid_value": 0,
+            "encoding": "nonzero_linear",
+        }
+        temporary_sidecar = sidecar_path.with_name(sidecar_path.name + ".tmp")
+        temporary_sidecar.write_text(json.dumps(sidecar, separators=(",", ":")), encoding="utf-8")
+        os.replace(temporary_sidecar, sidecar_path)
+
+        image_result = {
+            "filename": png_name,
+            "subfolder": subfolder,
+            "type": "output",
+        }
+        return io.NodeOutput(
+            ui={
+                "images": [image_result],
+                "moge_depth": [{
+                    **image_result,
+                    "min": minimum,
+                    "max": maximum,
+                    "width": width,
+                    "height": height,
+                    "sidecar": sidecar_path.name,
+                    "encoding": "0=invalid;1..65535=linear",
+                }],
+            }
+        )
+
+
 class MoGePointMapToMesh(io.ComfyNode):
     """Triangulate one image of a MoGe point map into a Types.MESH (UVs + texture)."""
 
@@ -448,7 +557,15 @@ class MoGeGeometryToFOV(io.ComfyNode):
 class MoGeExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [LoadMoGeModel, MoGeInference, MoGePanoramaInference, MoGeRender, MoGePointMapToMesh, MoGeGeometryToFOV]
+        return [
+            LoadMoGeModel,
+            MoGeInference,
+            MoGePanoramaInference,
+            MoGeRender,
+            SaveMoGeDepthPNG,
+            MoGePointMapToMesh,
+            MoGeGeometryToFOV,
+        ]
 
 
 async def comfy_entrypoint() -> MoGeExtension:
