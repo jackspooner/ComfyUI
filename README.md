@@ -139,9 +139,11 @@ acceptance remains unrun while unrelated generation occupies the queue.
 
 ## Stable release maintenance in this fork
 
-This fork merges upstream stable [v0.42.1](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.42.1)
+This fork merges upstream stable [v0.43.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.43.0)
 while retaining its native model, conversation and memory-recovery changes.
-Upstream adds MOSS-Image, Qwen decode improvements and solid mesh remeshing;
+Upstream adds adaptive Qwen MTP trees, writable KV storage, fused Flux2 VAE
+operations and Fibo/MOSS-Image fixes. Cloud-deployment uploads and their persistent
+headless-use marker are excluded under this fork's no-internet policy;
 source support does not establish local checkpoint or quality acceptance.
 Use the release's pinned frontend, templates and Comfy Kitchen alongside a
 compatible GPU runtime. See [maintenance, verification and rollback](docs/stable-release-maintenance.md).
@@ -424,10 +426,9 @@ details.
 
 ## Local stable-release maintenance
 
-The selected upstream stable version is [v0.41.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.41.0).
-It adds Flux3 image models, H3 LightVAE loading and a default-workflow API;
-weights and end-to-end acceptance for these new model variants are separate
-requirements. Existing H3 inference is the local release acceptance workflow.
+The selected upstream stable version is linked in [stable release maintenance](#stable-release-maintenance-in-this-fork).
+Existing H3 inference is the local release acceptance workflow; new model variants
+need their own weights and end-to-end acceptance.
 
 This fork retains the upstream node engine, inference APIs and model support
 attributed above, plus local pinned-memory and partial-prefetch recovery fixes.
@@ -465,7 +466,7 @@ See what ComfyUI can do with the [newer template workflows](https://comfy.org/wo
 - Reusable subgraphs, workflow templates, App Mode, and a local API for integrating workflows into applications.
 - Efficient local execution with asynchronous queueing, partial graph re-execution, smart VRAM and RAM management, model offloading, and support for quantized models.
 - Broad native model support. This is a representative list; browse the [workflow library](https://comfy.org/workflows/) for maintained, ready-to-run templates.
-  - [Image generation](https://comfy.org/workflows/tag/text-to-image/): Stable Diffusion 1.5, SDXL, SD3.5, Flux.1, Flux.2, Qwen Image, Z-Image, Hunyuan Image 2.1, HiDream, Lumina Image 2.0, Chroma, Anima, LongCat Image, Ideogram 4, Krea 2, MageFlow, Microsoft Lens, PixelDiT, Kandinsky 5, and Ernie Image.
+  - [Image generation](https://comfy.org/workflows/tag/text-to-image/): Stable Diffusion 1.5, SDXL, SD3.5, Flux.1, Flux.2, Qwen Image, Z-Image, Hunyuan Image 2.1, HiDream, Lumina Image 2.0, Chroma, Anima, LongCat Image, Ideogram 4, Krea 2, MageFlow, Microsoft Lens, PixelDiT, Kandinsky 5, Ernie Image and Moss Image.
   - [Image editing](https://comfy.org/workflows/tag/image-edit/): Flux Kontext, Flux.2 Klein, Qwen Image Edit, HiDream E1.1 and O1, OmniGen2, Boogu, JoyImage Edit, MageFlow Edit, and LongCat Image Edit.
   - [Video generation](https://comfy.org/workflows/tag/video-generation/): Wan 2.1 and 2.2, LTX-Video 2 and 2.3, HunyuanVideo 1.5, Kandinsky 5 Video, CogVideoX, Cosmos Predict2, Bernini-R, SCAIL 2, and Mochi.
   - [Audio and video generation](https://comfy.org/workflows/): MiniMax H3 and LTX-AV.
@@ -689,9 +690,9 @@ You can install ComfyUI in Apple Mac silicon (M1, M2, M3 or M4) with any recent 
 
 > **Note**: Remember to add your models, VAE, LoRAs etc. to the corresponding Comfy folders, as discussed in [ComfyUI manual installation](#manual-install-windows-linux).
 
-#### Ascend NPUs
+#### Huawei Ascend NPUs
 
-For models compatible with Ascend Extension for PyTorch (torch_npu). To get started, ensure your environment meets the prerequisites outlined on the [installation](https://ascend.github.io/docs/sources/ascend/quick_install.html) page. Here's a step-by-step guide tailored to your platform and installation method:
+For models compatible with Huawei Ascend Extension for PyTorch (torch_npu). To get started, ensure your environment meets the prerequisites outlined on the [installation](https://ascend.github.io/docs/sources/ascend/quick_install.html) page. Here's a step-by-step guide tailored to your platform and installation method:
 
 1. Begin by installing the recommended or newer kernel version for Linux as specified in the Installation page of torch-npu, if necessary.
 2. Proceed with the installation of Ascend Basekit, which includes the driver, firmware, and CANN, following the instructions provided for your specific platform.
