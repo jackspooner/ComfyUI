@@ -5,6 +5,9 @@ patch order, preserving control weights and cleanup while keeping the control
 stream dense. See [checkpoint representations, guides, inpainting and LanPaint
 extension composition](docs/h3-control-editing.md). CPU regression coverage is
 separate from real-model acceptance and serving activation.
+Control residuals update target video rows only, leaving reference/keyframe and
+audio rows unchanged (`minimax_h3_control_target_only` feature). Repeated native
+sparse nodes retain one prepare callback and a stable composed fallback chain.
 
 ## H3 Contact Sheet in this fork
 
