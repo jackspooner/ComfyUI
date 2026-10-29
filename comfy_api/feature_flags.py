@@ -119,6 +119,7 @@ _CORE_FEATURE_FLAGS: dict[str, Any] = {
     "supports_model_type_tags": True,
     # Native fractional mask transport and timestep semantics, not output quality.
     "minimax_h3_fractional_masks": True,
+    "minimax_h3_control_target_only": True,
     "max_upload_size": args.max_upload_size * 1024 * 1024, # Convert MB to bytes
     "extension": {"manager": {"supports_v4": True}},
     "node_replacements": True,
