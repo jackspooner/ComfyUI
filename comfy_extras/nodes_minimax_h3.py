@@ -511,8 +511,9 @@ class MiniMaxH3FunControlPatch:
         self.control_stream, skip = self.model_patch.model.step(
             control_index, self.control_stream, args["t_emb"], args["mod_segments"], args["rope_freqs"],
             transformer_options=args["transformer_options"])
-        skip[args["layout"].audio_pos.to(skip.device)] = 0
-        out["img"].add_(skip, alpha=self.strength)
+        for start, end, kind in args["layout"].segments:
+            if kind == "video":
+                out["img"][start:end].add_(skip[start:end], alpha=self.strength)
         return out
 
     def to(self, device_or_dtype):

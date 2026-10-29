@@ -8,6 +8,19 @@ sparse routing. Apply sparse before control on older deployments. This does not
 certify third-party sparse patches; SolAttn Morton token reordering must remain
 disabled for raster-order control injection.
 
+Repeated native sparse nodes compose in node order: the outer node tries its
+policy first and delegates ineligible calls through its predecessor. Only the
+outer node reinstalls attention at prepare time, so repeated sampling does not
+grow the chain. Each patch retains its own cleanup callback; obsolete attention
+closures are weakly tracked. Dense backend overrides remain opaque callables.
+
+Control residuals are added only to packed target `video` rows. Text,
+keyframe/reference image, reference audio and target audio rows receive no direct
+residual. `/features` advertises `minimax_h3_control_target_only: true` for this
+contract. This permits a compiler to preserve reference conditioning while
+adding structural control; it does not certify RefMod workflow execution or
+visual quality. Base/control AdaLN width matching still applies.
+
 ## Checkpoint and guide selection
 
 The [Alibaba Union 2.0 model card](https://huggingface.co/alibaba-pai/MiniMax-H3-Fun-Controlnet-Union-2.0)
@@ -62,6 +75,13 @@ mask keeps the picture during final blending. Cutlery's `CutleryVideoEditMasks`
 can prepare these from explicit intensity masks, admitted per-frame PNGs and
 audio intervals without the interactive editor. Do not use image alpha as the
 regeneration mask. Preserve the source timing and frame identity in the caller.
+The upstream pin above point-samples masks and can lose single-frame strokes.
+The separately maintained coverage fix max-pools all source cells intersecting
+each normalized latent bin, then retains the existing two-slice temporal dilation.
+It preserves soft maxima and narrow spatial strokes, including first/last frames;
+it does not claim an exact causal-VAE receptive field. Keep the original masks
+for final blending. Confirm that extension revision independently before relying
+on sparse painted frames; a core feature does not identify extension code.
 
 The upstream decoder truncates to the shorter source/decoded length. For 24 fps
 off-grid inputs, `CutleryH3PadEditSource` pads picture, soundtrack and masks to the

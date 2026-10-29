@@ -37,6 +37,7 @@ class TestFeatureFlags:
         assert "supports_model_type_tags" in features
         assert features["supports_model_type_tags"] is True
         assert features["minimax_h3_fractional_masks"] is True
+        assert features["minimax_h3_control_target_only"] is True
         assert "max_upload_size" in features
         assert isinstance(features["max_upload_size"], (int, float))
 

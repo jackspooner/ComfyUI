@@ -51,7 +51,7 @@ class SparseAttnPatch:
         self.dense_blocks = dense_blocks
         self.sink_conditioning = sink_conditioning
         self.verbose = verbose
-        self.installed = set()    # the override closures this patch has put on the hook
+        self.installed = weakref.WeakSet()  # do not retain overrides replaced by later patches
         self.reset()
 
     def reset(self):
@@ -351,6 +351,9 @@ def apply_block_sparse_attention(model, *, tau, topk_ratio, vsa, start_percent, 
                             sink_conditioning=sink_conditioning, extra_tokens=extra_tokens, verbose=verbose)
     m = model.clone()
     install_override(patch, m.model_options["transformer_options"])
+    # Only the outer sparse node reinstalls the composed chain. Multiple prepare
+    # callbacks would wrap one another again on every denoising step.
+    m.remove_callbacks_with_key(comfy.patcher_extension.CallbacksMP.ON_PREPARE_STATE, "block_sparse_attention")
     m.add_callback_with_key(comfy.patcher_extension.CallbacksMP.ON_PREPARE_STATE, "block_sparse_attention",
                             lambda model_patcher, timestep, model_options: install_override(patch, model_options["transformer_options"]))
     m.add_callback_with_key(comfy.patcher_extension.CallbacksMP.ON_CLEANUP,
