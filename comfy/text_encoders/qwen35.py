@@ -1294,6 +1294,12 @@ class Qwen35TEModel(sd1_clip.SD1ClipModel):
     def get_chat_context_length(self):
         return getattr(self, self.clip).transformer.model.config.max_position_embeddings
 
+    def generation_memory_estimation_function(self, tokens, max_length, device):
+        model = getattr(self, self.clip).transformer
+        count = model.count_chat_tokens(tokens)
+        output = model.resolve_max_length(max_length, count)
+        return model.generation_memory(tokens, count, output, device)
+
     def __init__(self, device="cpu", dtype=None, model_options={}, model_type="qwen35_2b", mtp=False):
         clip_model = lambda **kw: Qwen35ClipModel(**kw, model_type=model_type, mtp=mtp)
         super().__init__(device=device, dtype=dtype, name=model_type, clip_model=clip_model, model_options=model_options)
