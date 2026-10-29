@@ -2,9 +2,11 @@ import json
 import torch
 from enum import Enum
 import logging
+from contextlib import contextmanager
 
 from comfy import model_management
 from comfy.text_generation_media import sample_video, timestamp
+from comfy.text_encoders.vision_features import VisionFeatures
 from comfy.utils import ProgressBar
 from .ldm.models.autoencoder import AutoencoderKL, AutoencodingEngine
 from .ldm.cascade.stage_a import StageA
@@ -253,6 +255,7 @@ def load_bypass_lora_for_models(model, clip, lora, strength_model, strength_clip
 
 class CLIP:
     def __init__(self, target=None, embedding_directory=None, no_init=False, tokenizer_data={}, parameters=0, state_dict=[], model_options={}, disable_dynamic=False):
+        self._vision_features = None
         if no_init:
             return
         params = target.params.copy()
@@ -412,6 +415,19 @@ class CLIP:
             pooled_dict["hooks"] = self.apply_hooks_to_conds
         return pooled_dict
 
+    @contextmanager
+    def vision_encode_scope(self, max_entries=16, max_bytes=256 * 1024 * 1024):
+        """Reuse Qwen3-VL image features within one conditioning preparation."""
+        previous = self._vision_features
+        features = VisionFeatures(max_entries, max_bytes)
+        self._vision_features = features
+        try:
+            yield
+        finally:
+            features.clear()
+            self._vision_features = previous
+            self.cond_stage_model.set_clip_options({"vision_feature_cache": None})
+
     def encode_from_tokens_scheduled(self, tokens, unprojected=False, add_dict: dict[str]={}, show_pbar=True):
         all_cond_pooled: list[tuple[torch.Tensor, dict[str]]] = []
         all_hooks = self.patcher.forced_hooks
@@ -487,6 +503,9 @@ class CLIP:
         self.load_model(tokens)
         device = self.patcher.load_device
         self.cond_stage_model.set_clip_options({"execution_device": device})
+        if self._vision_features is not None:
+            features = self._vision_features if self._vision_features.accepts(self) else None
+            self.cond_stage_model.set_clip_options({"vision_feature_cache": features})
 
         with model_management.cuda_device_context(device):
             o = self.cond_stage_model.encode_token_weights(tokens)

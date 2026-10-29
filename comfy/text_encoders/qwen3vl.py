@@ -70,12 +70,16 @@ class Qwen3VL(BaseLlama, BaseQwen3, BaseGenerate, torch.nn.Module):
         vision_config = {**QWEN3VL_VISION_COMMON, **QWEN3VL_VISION[self.model_type], "out_hidden_size": config.hidden_size}
         self.visual = Qwen3VLVisionModel(vision_config, device=device, dtype=dtype, ops=operations)
         self.dtype = dtype
+        self.vision_feature_cache = None
 
     def preprocess_embed(self, embed, device):
         if embed["type"] == "image":
             # Qwen3-VL normalizes to [-1, 1] (mean/std 0.5), unlike Qwen2.5-VL's CLIP normalization.
             image, grid = comfy.text_encoders.qwen_vl.process_qwen2vl_images(embed["data"], patch_size=16, image_mean=[0.5, 0.5, 0.5], image_std=[0.5, 0.5, 0.5])
-            merged, deepstack = self.visual(image.to(device, dtype=torch.float32), grid)
+            if self.vision_feature_cache is None:
+                merged, deepstack = self.visual(image.to(device, dtype=torch.float32), grid)
+            else:
+                merged, deepstack = self.vision_feature_cache.encode(self.visual, image, grid, device, self.dtype)
             return merged, {"grid": grid, "deepstack": deepstack}
         return None, None
 
@@ -134,6 +138,15 @@ def _make_qwen3vl_model(model_type):
 
 class Qwen3VLClipModel(sd1_clip.SDClipModel):
     structured_output_family = "qwen3vl"
+
+    def set_clip_options(self, options):
+        super().set_clip_options(options)
+        if "vision_feature_cache" in options:
+            self.transformer.vision_feature_cache = options["vision_feature_cache"]
+
+    def reset_clip_options(self):
+        super().reset_clip_options()
+        self.transformer.vision_feature_cache = None
 
     def __init__(self, device="cpu", layer="hidden", layer_idx=-1, dtype=None, attention_mask=True, model_options={}, model_type="qwen3vl_8b"):
         super().__init__(device=device, layer=layer, layer_idx=layer_idx, textmodel_json_config={},
