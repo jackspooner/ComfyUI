@@ -56,6 +56,12 @@ Old outputs referencing already-deleted temporary inputs are not repaired.
 
 ## MiniMax H3 blueprints in this fork
 
+Native H3 fractional video/audio denoise masks retain a 1/4096 token grid and
+FP32 condition transport, including with BF16/FP16 model compute. Only fully
+generated rows bypass mask timing; near-one values remain conditioning. Running
+support is advertised by `GET /features` as `minimax_h3_fractional_masks: true`. See
+[mask precision, validation and activation limits](docs/h3-mask-precision.md).
+
 **MiniMax H3 - Ref2V** and **MiniMax H3 - FL2V** provide editable video/audio
 subgraphs with distillation and attention dropdowns, preset attention defaults,
 an optional step-count override, duration in seconds, prompt, width and height.
