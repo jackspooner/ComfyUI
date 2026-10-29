@@ -6,6 +6,14 @@ stream dense. See [checkpoint representations, guides, inpainting and LanPaint
 extension composition](docs/h3-control-editing.md). CPU regression coverage is
 separate from real-model acceptance and serving activation.
 
+## H3 Contact Sheet in this fork
+
+Native [Contact Sheet nodes](docs/h3-contact-sheet.md) jointly generate five
+Turnaround views and decode them independently, returning ordered images and a
+horizontal contact sheet. They require the separate MiniMax-licensed Turnaround
+LoRA and native H3 components. Views are uncalibrated and require visual review;
+source and CPU fixture support do not establish serving or GPU acceptance.
+
 ## Local maintenance fencing in this fork
 
 This fork adds opt-in local operator maintenance: persistently fence new native
