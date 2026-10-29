@@ -53,7 +53,8 @@ Use the normal noise, guider, sampler and sigmas; the custom sampler also takes
 and `LanPaint_Info`. The encode output is a nested video/audio LATENT with nested
 noise masks. The decode node takes the same original VIDEO and masks, plus
 `blend_overlap` (odd pixels, default 11) and `audio_crossfade` (seconds, default .02),
-and returns VIDEO and AUDIO. Source audio is required by AVEncode.
+and returns VIDEO and AUDIO. AVEncode requires a soundtrack; Cutlery's source
+preparation helper supplies explicit silence when the source has none.
 
 The spatial mask is `[frames,height,width]`, and the audio mask is `[frames]`
 at source frame rate. A zero audio mask keeps the soundtrack; a zero spatial
@@ -62,8 +63,12 @@ can prepare these from explicit intensity masks, admitted per-frame PNGs and
 audio intervals without the interactive editor. Do not use image alpha as the
 regeneration mask. Preserve the source timing and frame identity in the caller.
 
-The upstream decoder truncates to the shorter source/decoded length; route inputs
-must therefore match H3's 24 fps, `17*n+5` frame grid when exact duration matters.
+The upstream decoder truncates to the shorter source/decoded length. For 24 fps
+off-grid inputs, `CutleryH3PadEditSource` pads picture, soundtrack and masks to the
+next `17*n+5` grid before encode. Decode against its original-length source output
+and the unpadded masks to recover original duration. It supplies silence for a
+source without audio; omit the synthetic soundtrack on export when no audio edits
+were requested. Arbitrary-FPS joint retiming is not supplied by that helper.
 Boundary blending changes nearby pixels/samples, and lossy output encoding can
 change even preserved regions. Use lossless decoded comparisons for preservation
 checks; no byte-exact preservation claim follows from successful generation.
