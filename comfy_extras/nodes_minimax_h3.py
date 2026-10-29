@@ -678,7 +678,7 @@ class MiniMaxH3ContactSheetDecode(io.ComfyNode):
             # Two identical latent tokens put each still on the legal VAE grid.
             # Decoding the whole five-slot timeline blends neighbouring views.
             frames = vae.decode(torch.cat((slot, slot), dim=2))
-            views.append(frames[0, 0] if frames.ndim == 5 else frames[0])
+            views.append((frames[0, 0] if frames.ndim == 5 else frames[0]).clone())
         images = torch.stack(views)
         return io.NodeOutput(images, torch.cat(views, dim=1).unsqueeze(0))
 
