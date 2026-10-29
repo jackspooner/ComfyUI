@@ -621,6 +621,68 @@ class MiniMaxH3FunControlNetApply(io.ComfyNode):
         return io.NodeOutput(model_patched)
 
 
+class MiniMaxH3ContactSheet(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MiniMaxH3ContactSheet",
+            display_name="MiniMax H3 Contact Sheet",
+            category="model/conditioning/minimax",
+            description="Five jointly denoised stills. Requires a Turnaround LoRA and independent Contact Sheet Decode; these are not calibrated camera views.",
+            inputs=[io.Clip.Input("clip"), io.Vae.Input("vae"), io.Image.Input("reference"),
+                    io.String.Input("prompt", multiline=True, default="The camera orbits the subject of <Picture 1> ninety degrees clockwise."),
+                    io.Int.Input("size", default=512, min=32, max=nodes.MAX_RESOLUTION, step=32)],
+            outputs=[io.Conditioning.Output(), io.Latent.Output()],
+        )
+
+    @classmethod
+    def execute(cls, clip, vae, reference, prompt, size):
+        # Contact-Sheet packing follows matlowai/ComfyUI-H3-ContactSheet (GPL-3.0),
+        # adapted 2026-10-29 to the native H3 node and VAE contracts.
+        h, w = reference.shape[1:3]
+        scale = min(1.0, math.sqrt(size * size / (w * h)))
+        width = max(32, round(w * scale / 32) * 32)
+        height = max(32, round(h * scale / 32) * 32)
+        image = _resize(reference[:1], width, height, "disabled")
+        encoded = vae.encode(image)
+        tokens = clip.tokenize(prompt, minimax_ref_items=[{"type": "image", "data": image}])
+        conditioning = node_helpers.conditioning_set_values(clip.encode_from_tokens_scheduled(tokens), {
+            "minimax_refs": [{"kind": "image", "latent_h": height // 16, "latent_w": width // 16, "latent": encoded}],
+        })
+        device = comfy.model_management.intermediate_device()
+        # Five independent image slots use the model's normal timeline RoPE;
+        # the training recipe carries 17 frames / 24 fps of audio bookkeeping.
+        video = torch.zeros((1, 24, 5, size // 16, size // 16), device=device)
+        audio = torch.zeros((1, 32, 2, 28), device=device)
+        return io.NodeOutput(conditioning, {"samples": comfy.nested_tensor.NestedTensor((video, audio))})
+
+
+class MiniMaxH3ContactSheetDecode(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MiniMaxH3ContactSheetDecode", display_name="MiniMax H3 Contact Sheet Decode",
+            category="latent/minimax",
+            inputs=[io.Vae.Input("vae"), io.Latent.Input("samples")],
+            outputs=[io.Image.Output(display_name="views"), io.Image.Output(display_name="contact_sheet")],
+        )
+
+    @classmethod
+    def execute(cls, vae, samples):
+        video, _ = samples["samples"].unbind()
+        if video.shape[0] != 1 or video.shape[2] != 5:
+            raise ValueError("Contact Sheet Decode requires one packed five-view latent.")
+        views = []
+        for index in range(5):
+            slot = video[:, :, index:index + 1]
+            # Two identical latent tokens put each still on the legal VAE grid.
+            # Decoding the whole five-slot timeline blends neighbouring views.
+            frames = vae.decode(torch.cat((slot, slot), dim=2))
+            views.append((frames[0, 0] if frames.ndim == 5 else frames[0]).clone())
+        images = torch.stack(views)
+        return io.NodeOutput(images, torch.cat(views, dim=1).unsqueeze(0))
+
+
 class MiniMaxH3Extension(ComfyExtension):
     async def get_node_list(self):
         return [
@@ -630,6 +692,8 @@ class MiniMaxH3Extension(ComfyExtension):
             MiniMaxH3ReferenceToVideo,
             MiniMaxH3SigmaShift,
             MiniMaxH3FunControlNetApply,
+            MiniMaxH3ContactSheet,
+            MiniMaxH3ContactSheetDecode,
             ]
 
 

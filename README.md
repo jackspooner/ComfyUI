@@ -6,6 +6,14 @@ stream dense. See [checkpoint representations, guides, inpainting and LanPaint
 extension composition](docs/h3-control-editing.md). CPU regression coverage is
 separate from real-model acceptance and serving activation.
 
+## H3 Contact Sheet in this fork
+
+Native [Contact Sheet nodes](docs/h3-contact-sheet.md) jointly generate five
+Turnaround views and decode them independently, returning ordered images and a
+horizontal contact sheet. They require the separate MiniMax-licensed Turnaround
+LoRA and native H3 components. Views are uncalibrated and require visual review;
+source and CPU fixture support do not establish serving or GPU acceptance.
+
 ## Local maintenance fencing in this fork
 
 This fork adds opt-in local operator maintenance: persistently fence new native
@@ -55,6 +63,12 @@ URL/inline bytes through `/upload/image`; imported inputs persist until deleted.
 Old outputs referencing already-deleted temporary inputs are not repaired.
 
 ## MiniMax H3 blueprints in this fork
+
+Native H3 fractional video/audio denoise masks retain a 1/4096 token grid and
+FP32 condition transport, including with BF16/FP16 model compute. Only fully
+generated rows bypass mask timing; near-one values remain conditioning. Running
+support is advertised by `GET /features` as `minimax_h3_fractional_masks: true`. See
+[mask precision, validation and activation limits](docs/h3-mask-precision.md).
 
 **MiniMax H3 - Ref2V** and **MiniMax H3 - FL2V** provide editable video/audio
 subgraphs with distillation and attention dropdowns, preset attention defaults,

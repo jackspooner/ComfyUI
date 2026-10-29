@@ -117,6 +117,8 @@ _CORE_FEATURE_FLAGS: dict[str, Any] = {
     "external_image_paths": args.allow_external_image_paths,
     "supports_preview_metadata": True,
     "supports_model_type_tags": True,
+    # Native fractional mask transport and timestep semantics, not output quality.
+    "minimax_h3_fractional_masks": True,
     "max_upload_size": args.max_upload_size * 1024 * 1024, # Convert MB to bytes
     "extension": {"manager": {"supports_v4": True}},
     "node_replacements": True,
