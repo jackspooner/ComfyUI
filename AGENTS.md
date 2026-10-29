@@ -405,6 +405,11 @@ Use the existing shared `comfyui` skill for discovery and operating guidance and
 
 ## Worktree development
 
+The optional `CLIP.vision_encode_scope()` contract and restrictions are in
+[scoped vision features](docs/vision-feature-reuse.md). Focused CPU validation is
+`python -m pytest tests-unit/comfy_test/vision_features_test.py -q` with the
+prepared interpreter; GPU model acceptance remains separate.
+
 Video extraction uses `VideoInput.get_components_selected()` with an optimized
 file implementation and a materializing fallback for other VIDEO subclasses.
 Preserve the existing `get_components()` signature and default pixel values.
