@@ -70,6 +70,8 @@ class MiniMaxH3FunControl(torch.nn.Module):
 
     def step(self, index, c, t_emb, mod_segments, rope_freqs, transformer_options):
         block = self.control_blocks[index]
+        # The base stream's sparse routing/statistics do not describe the control stream.
+        transformer_options = {k: v for k, v in transformer_options.items() if k != "optimized_attention_override"}
         c = DiTBlock.forward(block, c, t_emb, mod_segments, rope_freqs, transformer_options=transformer_options)
         return c, block.after_proj(c)
 
