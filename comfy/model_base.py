@@ -172,6 +172,8 @@ def convert_tensor(extra, dtype, device):
 
 
 class BaseModel(torch.nn.Module):
+    extra_conds_dtypes = {}
+
     def __init__(self, model_config, model_type=ModelType.EPS, device=None, unet_model=UNetModel):
         super().__init__()
 
@@ -238,13 +240,14 @@ class BaseModel(torch.nn.Module):
         extra_conds = {}
         for o in kwargs:
             extra = kwargs[o]
+            extra_dtype = self.extra_conds_dtypes.get(o, dtype)
 
             if hasattr(extra, "dtype"):
-                extra = convert_tensor(extra, dtype, device)
+                extra = convert_tensor(extra, extra_dtype, device)
             elif isinstance(extra, list):
                 ex = []
                 for ext in extra:
-                    ex.append(convert_tensor(ext, dtype, device))
+                    ex.append(convert_tensor(ext, extra_dtype, device))
                 extra = ex
             extra_conds[o] = extra
 
@@ -2192,6 +2195,9 @@ class Hunyuan3Dv2_1(BaseModel):
         return out
 
 class MiniMaxH3(BaseModel):
+    # Mask values also select row timesteps; BF16 can round near-one values to one.
+    extra_conds_dtypes = {"denoise_mask": torch.float32, "audio_denoise_mask": torch.float32}
+
     def __init__(self, model_config, model_type=ModelType.FLOW_AV, device=None):
         super().__init__(model_config, model_type, device=device, unet_model=comfy.ldm.minimax.model.MiniMaxH3Model)
 
@@ -2287,16 +2293,16 @@ class MiniMaxH3(BaseModel):
 
     def _token_grid_masks(self, denoise_mask, latent_shapes):
         masks = utils.unpack_latents(denoise_mask, latent_shapes)
-        return [torch.ceil(mask * 256.0) / 256.0 for mask in self._pool_masks_to_token_grid(masks)]
+        return [torch.ceil(mask.float() * 4096.0) / 4096.0 for mask in self._pool_masks_to_token_grid(masks)]
 
     def _denoise_mask_values(self, denoise_mask, latent_shapes):
         if latent_shapes is None or len(latent_shapes) < 2:
             return {}
         masks = self._token_grid_masks(denoise_mask, latent_shapes)
         out = {}
-        if torch.amin(masks[0]).item() < 1.0 - 1e-3:
+        if torch.amin(masks[0]).item() < 1.0:
             out['denoise_mask'] = masks[0][:1, :1].clone()
-        if torch.amin(masks[1]).item() < 1.0 - 1e-3:
+        if torch.amin(masks[1]).item() < 1.0:
             out['audio_denoise_mask'] = masks[1][:1].amax(dim=1, keepdim=True)
         return out
 

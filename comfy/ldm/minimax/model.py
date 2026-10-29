@@ -80,7 +80,7 @@ def mask_row_values(mask, latent_t, lat_h, lat_w):
     m = torch.nn.functional.pad(mask, (0, lat_w - mask.shape[-1], 0, lat_h - mask.shape[-2]), mode="replicate")
     m = m.reshape(latent_t, lat_h // 2, 2, lat_w // 2, 2).amax(dim=(2, 4))
     values = m.reshape(-1)
-    if bool((values >= 1.0 - 1e-3).all()):
+    if bool((values >= 1.0).all()):
         return None
     return values
 
@@ -698,7 +698,7 @@ class MiniMaxH3Model(nn.Module):
                     video_rows_t = rows_t
         if audio_denoise_mask is not None:
             m = audio_denoise_mask[0, 0].to(torch.float32).reshape(-1)
-            if not bool((m >= 1.0 - 1e-3).all()):
+            if not bool((m >= 1.0).all()):
                 sigma_a = 1.0 - t_a
                 rows_t = (1.0 - m * sigma_a).clamp(max=t_pin_a)
                 if rows_t.unique().numel() == 1:
