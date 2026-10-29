@@ -837,6 +837,12 @@ This approach allows you to easily switch between the stable fortnightly release
 
 ## Worktree development
 
+This fork also provides [scoped Qwen3-VL image-feature reuse](docs/vision-feature-reuse.md)
+for paired conditioning encodes. The optional bounded scope preserves independent
+text passes, private DeepStack outputs and ordinary execution outside the scope;
+CPU fixtures cover its lifecycle and parity, while real-model GPU acceptance is
+separate.
+
 Run `COMFYUI_PYTHON=/path/to/prepared/comfyui/python python3 scripts/setup_worktree.py` before editing. The configured Python must be >=3.10 with PyTorch, einops and safetensors installed from the ComfyUI deployment's requirements. The check reuses that explicit runtime without copying dependencies, installing packages, loading models or connecting to a service. It is safe to rerun and leaves tracked files unchanged. GPU validation requires a compatible GPU/runtime and separately provisioned model files; unit tests use isolated fixtures.
 
 ## Local fork: pinned-memory and prefetch recovery
