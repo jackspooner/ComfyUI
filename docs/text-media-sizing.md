@@ -58,6 +58,22 @@ offloaded weights affect this measurement; dynamic loading may stage rather than
 fully populate GPU weights, and the existing owner retains eviction/reload policy.
 Weights, KV caches and execution dtype are separate costs.
 
+For text-only planning with a positive output reservation, adapters that expose
+the generation-memory estimate now pass it to ordinary model loading before
+measuring headroom. Qwen3.5/3.8 supplies that estimate for its hybrid cache and
+workspace, including supported MTP state. This lets the existing offload owner
+make room instead of rejecting a request solely because weights were loaded
+without its output budget. The inference reserve remains separate, and planning
+still rejects a request when measured space is insufficient. Raw media and
+automatic output (`max_length=0`) retain their existing sizing order; their full
+unplanned estimate is not reserved before sizing. Qwen generation also uses the
+existing final working-memory check after sizing.
+
+Isolated tests cover the 7,723-input / 20,000-output admission regression and
+both successful and unavailable owner reservations. They do not establish that
+the corresponding live Context-IR request fits the installed GPU; activation
+and explicit model acceptance remain separate.
+
 The model supplies cache/workspace estimates. Standard autoregressive caches,
 Gemma4 sliding/global and shared KV caches, Qwen3.5 hybrid recurrent/full-attention
 state and enabled MTP cache capacity are distinguished. Prefill/MLP, vision/audio

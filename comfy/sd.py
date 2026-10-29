@@ -375,8 +375,17 @@ class CLIP:
         if auto_resize:
             # Use the memory owner's ordinary loading/offload policy, then measure headroom
             # with the selected weights resident. Planning never loads a parallel model.
-            self.load_model(tokens)
             device = self.patcher.load_device
+            estimate = getattr(self.cond_stage_model, "generation_memory_estimation_function", None)
+            rows = next(iter(tokens.values())) if isinstance(tokens, dict) else tokens
+            has_media = any(isinstance(token, dict) for row in rows for token, *_ in row)
+            if estimate is not None and max_length > 0 and not has_media:
+                # Text cannot shrink. Let the loader reserve its workspace before weights
+                # consume the headroom; media still sizes against measured residency.
+                required = estimate(tokens, max_length, device=device)
+                self.load_model(tokens, memory_required=required + model_management.minimum_inference_memory())
+            else:
+                self.load_model(tokens)
             keep = [model_management.LoadedModel(p) for p in [self.patcher, *self.patcher.model_patches_models()]]
             model_management.free_memory(model_management.get_total_memory(device), device, keep_loaded=keep)
             available = max(0, model_management.get_free_memory(device) - model_management.minimum_inference_memory())

@@ -13,7 +13,7 @@ from comfy.text_generation_media import prepare_generation_tokens, sample_video,
 from comfy.text_encoders.chat import count_chat_tokens
 from comfy.text_encoders.gemma4 import Gemma4Base, Gemma4_12B_Config, Gemma4_E2B_Config, prepare_chat_image
 from comfy.text_encoders.llama import BaseGenerate
-from comfy.text_encoders.qwen35 import Qwen35, Qwen35Config
+from comfy.text_encoders.qwen35 import Qwen35, Qwen35Config, Qwen35TEModel
 from comfy.text_encoders.qwen_vl import budget_image_size
 from comfy.sd import CLIP
 from comfy_extras.nodes_textgen import TextGenerate
@@ -259,6 +259,85 @@ def test_clip_memory_planning_measures_after_managed_loading(monkeypatch):
     assert events[2][1]['mtp'] is False
     assert events[2][1]['min_short_edge'] == 384
     assert info == {'memory_device': 'cuda:0', 'memory_kind': 'vram'}
+
+
+@pytest.mark.parametrize('device', ['cpu', 'cuda:0'])
+@pytest.mark.parametrize('can_reserve', [False, True])
+def test_text_planning_reserves_working_memory_before_loading(monkeypatch, device, can_reserve):
+    required, reserve, available = 11576251744, 1000000000, 10580000000
+    tokens = {'qwen': [[(index, 1.0) for index in range(7723)]]}
+    requests = []
+
+    def estimate(value, output, device):
+        assert value is tokens and output == 20000
+        return required
+
+    def load(value, memory_required=0):
+        nonlocal available
+        requests.append(memory_required)
+        if can_reserve and memory_required >= required + reserve:
+            available = required + reserve
+
+    def prepare(value, cap, output, resize, **kwargs):
+        return prepare_generation_tokens(value, 32768, cap, output,
+                                         lambda value: len(value['qwen'][0]), None, resize,
+                                         kwargs['memory_budget'], lambda *args: required)
+
+    patcher = SimpleNamespace(load_device=torch.device(device), model_patches_models=lambda: [])
+    clip = SimpleNamespace(cond_stage_model=SimpleNamespace(prepare_generation_tokens=prepare,
+                           generation_memory_estimation_function=estimate), patcher=patcher, load_model=load)
+    monkeypatch.setattr('comfy.model_management.LoadedModel', lambda value: value)
+    monkeypatch.setattr('comfy.model_management.get_total_memory', lambda device: 32000000000)
+    monkeypatch.setattr('comfy.model_management.free_memory', lambda *args, **kwargs: None)
+    monkeypatch.setattr('comfy.model_management.get_free_memory', lambda device: available)
+    monkeypatch.setattr('comfy.model_management.minimum_inference_memory', lambda: reserve)
+    if not can_reserve:
+        with pytest.raises(ContextOverflowError, match='available budget'):
+            CLIP.prepare_generation_tokens(clip, tokens, 32768, 20000, True)
+        assert requests == [required + reserve]
+        assert len(tokens['qwen'][0]) == 7723
+        return
+    selected, info = CLIP.prepare_generation_tokens(clip, tokens, 32768, 20000, True)
+    assert selected == tokens
+    assert info['input_tokens'] == 7723 and info['output_allowance'] == 20000
+    assert info['estimated_working_bytes'] == required
+    assert requests == [required + reserve]
+    assert info['memory_kind'] == ('ram' if device == 'cpu' else 'vram')
+
+
+@pytest.mark.parametrize('kind,output', [('image', 128), ('audio', 128), ('text', 0)])
+def test_initial_reservation_preserves_media_sizing_and_automatic_output(monkeypatch, kind, output):
+    tokens = {'qwen': [[(1 if kind == 'text' else {'type': kind}, 1.0)]]}
+    events = []
+    def estimate(*args, **kwargs):
+        pytest.fail('Unplanned media or automatic output must not reserve their full raw estimate')
+    def prepare(value, cap, output, resize, **kwargs):
+        events.append(('prepare', kwargs['memory_budget']))
+        return value, {}
+    patcher = SimpleNamespace(load_device=torch.device('cpu'), model_patches_models=lambda: [])
+    clip = SimpleNamespace(cond_stage_model=SimpleNamespace(prepare_generation_tokens=prepare,
+                           generation_memory_estimation_function=estimate), patcher=patcher,
+                           load_model=lambda value: events.append(('load', value)))
+    monkeypatch.setattr('comfy.model_management.LoadedModel', lambda value: value)
+    monkeypatch.setattr('comfy.model_management.get_total_memory', lambda device: 10000)
+    monkeypatch.setattr('comfy.model_management.free_memory', lambda *args, **kwargs: None)
+    monkeypatch.setattr('comfy.model_management.get_free_memory', lambda device: 4000)
+    monkeypatch.setattr('comfy.model_management.minimum_inference_memory', lambda: 1000)
+    CLIP.prepare_generation_tokens(clip, tokens, 2048, output, True, memory_budget=2000)
+    assert events == [('load', tokens), ('prepare', 2000)]
+
+
+@pytest.mark.parametrize('output,expected', [(20000, 20000), (0, 32768 - 7723)])
+def test_qwen_generation_reservation_uses_expanded_tokens(output, expected):
+    calls = []
+    tokens = {'qwen': [[(1, 1.0), ({'type': 'image'}, 1.0)]]}
+    model = SimpleNamespace(model=SimpleNamespace(config=SimpleNamespace(max_position_embeddings=32768)),
+                            count_chat_tokens=lambda value: 7723,
+                            generation_memory=lambda *args: calls.append(args) or 1234)
+    model.resolve_max_length = lambda length, count: BaseGenerate.resolve_max_length(model, length, count)
+    encoder = SimpleNamespace(clip='qwen', qwen=SimpleNamespace(transformer=model))
+    assert Qwen35TEModel.generation_memory_estimation_function(encoder, tokens, output, torch.device('cpu')) == 1234
+    assert calls == [(tokens, 7723, expected, torch.device('cpu'))]
 
 
 def test_video_as_images_preserves_frame_association_and_fractional_timestamps():
