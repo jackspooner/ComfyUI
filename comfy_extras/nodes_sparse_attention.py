@@ -307,17 +307,34 @@ def h3_sparse_attention(attn, x, rope_freqs, transformer_options, patch: SparseA
     return attn.out_proj(out)
 
 
-def make_h3_block_patch(block, block_index, patch: SparseAttnPatch):
-    """Runs the block with its attention swapped for the sparse producer."""
-    def attention(h, rope_freqs=None, transformer_options={}):
-        return h3_sparse_attention(block.attn, h, rope_freqs, transformer_options, patch, block_index)
+class H3SparseBlockPatch:
+    def __init__(self, block, block_index, patch, previous):
+        self.block = block
+        self.block_index = block_index
+        self.patch = patch
+        self.previous = previous
 
-    def block_patch(args, extra):
-        if h3_eligible(block.attn, args["img"], args["rope_freqs"], args["transformer_options"], patch, block_index):
-            args = {**args, "attention": attention}
+    def attention(self, h, rope_freqs=None, transformer_options={}):
+        return h3_sparse_attention(self.block.attn, h, rope_freqs, transformer_options, self.patch, self.block_index)
+
+    def __call__(self, args, extra):
+        if h3_eligible(self.block.attn, args["img"], args["rope_freqs"], args["transformer_options"], self.patch, self.block_index):
+            args = {**args, "attention": self.attention}
+        if self.previous is not None:
+            return self.previous(args, extra)
         return extra["original_block"](args)
 
-    return block_patch
+    def to(self, device_or_dtype):
+        if hasattr(self.previous, "to"):
+            self.previous = self.previous.to(device_or_dtype)
+        return self
+
+    def cleanup(self):
+        if hasattr(self.previous, "cleanup"):
+            self.previous.cleanup()
+
+    def models(self):
+        return self.previous.models() if hasattr(self.previous, "models") else []
 
 
 def apply_block_sparse_attention(model, *, tau, topk_ratio, vsa, start_percent, end_percent, min_tokens,
@@ -342,7 +359,8 @@ def apply_block_sparse_attention(model, *, tau, topk_ratio, vsa, start_percent, 
     diffusion_model = model.get_model_object("diffusion_model")
     if isinstance(diffusion_model, MiniMaxH3Model):
         for i, block in enumerate(diffusion_model.blocks):
-            m.set_model_patch_replace(make_h3_block_patch(block, i, patch), "dit", "double_block", i)
+            previous = m.model_options["transformer_options"].get("patches_replace", {}).get("dit", {}).get(("double_block", i))
+            m.set_model_patch_replace(H3SparseBlockPatch(block, i, patch, previous), "dit", "double_block", i)
         if vsa and diffusion_model.blocks[0].attn.to_gate_compress is None:
             logging.warning("VSA: the model has no to_gate_compress layers; running the fine stage without the coarse branch")
     elif vsa:

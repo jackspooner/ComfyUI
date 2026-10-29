@@ -1,3 +1,11 @@
+## H3 control and selective editing in this fork
+
+Native H3 Fun ControlNet now composes with native block-sparse attention in either
+patch order, preserving control weights and cleanup while keeping the control
+stream dense. See [checkpoint representations, guides, inpainting and LanPaint
+extension composition](docs/h3-control-editing.md). CPU regression coverage is
+separate from real-model acceptance and serving activation.
+
 ## Local maintenance fencing in this fork
 
 This fork adds opt-in local operator maintenance: persistently fence new native
