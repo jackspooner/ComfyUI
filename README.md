@@ -1,3 +1,14 @@
+## Bounded native component reuse in this fork
+
+This fork adds opt-in sequential CLIP leases, including shared full Qwen3-VL
+backbones with private Krea2, Fibo2, FLUX.3 and selected 8B route adapters.
+Native memory management retains loading/offload ownership. An explicit bounded
+image-feature cache can reuse source vision across compatible nodes; generation
+history and KV state stay per call. Partial Qwen3-VL packages cannot generate text.
+See [API, compatibility, bounds and CPU acceptance](docs/component-leases.md).
+Matching lifecycle integration and real-weight GPU acceptance are separate from
+source availability.
+
 ## H3 control and selective editing in this fork
 
 Native H3 Fun ControlNet now composes with native block-sparse attention in either

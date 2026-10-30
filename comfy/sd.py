@@ -3,8 +3,11 @@ import torch
 from enum import Enum
 import logging
 from contextlib import contextmanager
+from functools import wraps
+import threading
 
 from comfy import model_management
+from comfy.component_leases import active_pool
 from comfy.text_generation_media import sample_video, timestamp
 from comfy.text_encoders.vision_features import VisionFeatures
 from comfy.utils import ProgressBar
@@ -254,9 +257,22 @@ def load_bypass_lora_for_models(model, clip, lora, strength_model, strength_clip
     return (new_modelpatcher, new_clip)
 
 
+def _private_clip_options(function):
+    @wraps(function)
+    def call(self, *args, **kwargs):
+        with self._option_scope():
+            return function(self, *args, **kwargs)
+    return call
+
+
 class CLIP:
     def __init__(self, target=None, embedding_directory=None, no_init=False, tokenizer_data={}, parameters=0, state_dict=[], model_options={}, disable_dynamic=False):
         self._vision_features = None
+        self._component_vision_features = None
+        self._component_lock = threading.RLock()
+        self._component_model_options = {}
+        self._component_lease = False
+        self._component_adapter = False
         if no_init:
             return
         params = target.params.copy()
@@ -274,6 +290,7 @@ class CLIP:
         params['model_options'] = model_options
 
         self.cond_stage_model = clip(**(params))
+        self._component_model_options = model_options.copy()
         self.generation_missing_keys = None
         self.generation_load_scope = None
 
@@ -326,6 +343,11 @@ class CLIP:
     def clone(self, disable_dynamic=False):
         n = CLIP(no_init=True)
         n.patcher = self.patcher.clone(disable_dynamic=disable_dynamic)
+        n._component_lock = self._component_lock
+        n._component_vision_features = self._component_vision_features
+        n._component_model_options = self._component_model_options.copy()
+        n._component_lease = self._component_lease
+        n._component_adapter = self._component_adapter
         n.cond_stage_model = self.cond_stage_model
         n.generation_missing_keys = None if self.generation_missing_keys is None else self.generation_missing_keys.copy()
         n.generation_load_scope = self.generation_load_scope
@@ -335,6 +357,28 @@ class CLIP:
         n.use_clip_schedule = self.use_clip_schedule
         n.apply_hooks_to_conds = self.apply_hooks_to_conds
         return n
+
+    @contextmanager
+    def _option_scope(self):
+        # CLIP.clone intentionally shares modules. Restore call-local options on
+        # errors and cancellation as well as success, including adapter clones.
+        with self._component_lock:
+            saved = []
+            modules = getattr(self.cond_stage_model, "modules", lambda: ())()
+            for module in modules:
+                if isinstance(module, sd1_clip.SDClipModel):
+                    saved.append((module, {name: getattr(module, name) for name in
+                                           ("layer", "layer_idx", "return_projected_pooled", "execution_device")}))
+                    if hasattr(module, "image_spans"):
+                        saved.append((module, {"image_spans": module.image_spans}))
+                if isinstance(module, comfy.text_encoders.qwen3vl.Qwen3VL):
+                    saved.append((module, {"vision_feature_cache": module.vision_feature_cache}))
+            try:
+                yield
+            finally:
+                for module, options in saved:
+                    for name, value in options.items():
+                        setattr(module, name, value)
 
     def add_patches(self, patches, strength_patch=1.0, strength_model=1.0):
         return self.patcher.add_patches(patches, strength_patch, strength_model)
@@ -429,15 +473,20 @@ class CLIP:
     def vision_encode_scope(self, max_entries=16, max_bytes=256 * 1024 * 1024):
         """Reuse Qwen3-VL image features within one conditioning preparation."""
         previous = self._vision_features
-        features = VisionFeatures(max_entries, max_bytes)
+        features = self._component_vision_features
+        shared = features is not None and not features.closed and features.max_entries <= max_entries and features.max_bytes <= max_bytes
+        if not shared:
+            features = VisionFeatures(max_entries, max_bytes)
         self._vision_features = features
         try:
             yield
         finally:
-            features.clear()
+            if not shared:
+                features.clear()
             self._vision_features = previous
             self.cond_stage_model.set_clip_options({"vision_feature_cache": None})
 
+    @_private_clip_options
     def encode_from_tokens_scheduled(self, tokens, unprojected=False, add_dict: dict[str]={}, show_pbar=True):
         all_cond_pooled: list[tuple[torch.Tensor, dict[str]]] = []
         all_hooks = self.patcher.forced_hooks
@@ -501,6 +550,7 @@ class CLIP:
             all_hooks.reset()
         return all_cond_pooled
 
+    @_private_clip_options
     def encode_from_tokens(self, tokens, return_pooled=False, return_dict=False):
         self.cond_stage_model.reset_clip_options()
 
@@ -538,6 +588,8 @@ class CLIP:
         return self.encode_from_tokens(tokens)
 
     def load_sd(self, sd, full_model=False):
+        if self._component_lease:
+            raise ValueError("Cannot replace shared component weights in place; load the new checkpoint outside this lease")
         if full_model:
             result = self.cond_stage_model.load_state_dict(sd, strict=False, assign=self.patcher.is_dynamic())
         else:
@@ -576,6 +628,11 @@ class CLIP:
         return sd_clip
 
     def load_model(self, tokens={}, memory_required=0):
+        if self._component_adapter and (set(self.patcher.object_patches) - {"manual_cast_dtype"}
+                or self.patcher.injections or self.patcher.forced_hooks is not None
+                or any(any(groups.values()) for groups in self.patcher.callbacks.values())
+                or any(any(groups.values()) for groups in self.patcher.wrappers.values())):
+            raise ValueError("Shared Qwen3-VL adapters do not support object replacements, injections or custom hooks; load outside the component lease")
         memory_used = memory_required
         if hasattr(self.cond_stage_model, "memory_estimation_function"):
             memory_used = max(memory_used, self.cond_stage_model.memory_estimation_function(tokens, device=self.patcher.load_device))
@@ -597,7 +654,17 @@ class CLIP:
             raise StructuredOutputError("capability", "This model/tokenizer family does not support native structured output.")
         return prepare(tokenizer(), schema_text, thinking)
 
+    @_private_clip_options
     def generate(self, tokens, do_sample=True, max_length=256, temperature=1.0, top_k=50, top_p=0.95, min_p=0.0, repetition_penalty=1.0, seed=None, presence_penalty=0.0, mtp=True, constraint=None):
+        if isinstance(self.cond_stage_model, sd1_clip.SD1ClipModel):
+            child = getattr(self.cond_stage_model, self.cond_stage_model.clip)
+            if isinstance(child, sd1_clip.SDClipModel) and isinstance(child.transformer, comfy.text_encoders.qwen3vl.Qwen3VL):
+                config = child.transformer.model.config
+                if (self.generation_missing_keys is None or self.generation_missing_keys
+                        or not config.final_norm or child.transformer.model.norm is None
+                        or child.transformer.model_type not in ("qwen3vl_4b", "qwen3vl_8b")
+                        or config.num_hidden_layers != comfy.text_encoders.qwen3vl.QWEN3VL_CONFIGS[child.transformer.model_type]().num_hidden_layers):
+                    raise ValueError("Qwen3-VL generation requires completely loaded layers, final norm and a separate or tied language head")
         if constraint is not None and mtp:
             raise ValueError("structured_output.mtp: Select mtp=off for constrained generation.")
         if constraint is not None:
@@ -1817,6 +1884,16 @@ def load_clip_model_patcher(ckpt_paths, embedding_directory=None, clip_type=CLIP
     return clip.patcher
 
 def load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_DIFFUSION, model_options={}, disable_dynamic=False):
+    pool = active_pool.get()
+    if pool is not None:
+        load_device = model_options.get("load_device", model_management.text_encoder_device())
+        runtime = (load_device, model_options.get("offload_device", model_management.text_encoder_offload_device()),
+                   model_options.get("dtype") or model_management.text_encoder_dtype(load_device))
+        return pool.load_clip(_load_clip, _component_clip_adapter, ckpt_paths, embedding_directory, clip_type, model_options, disable_dynamic, runtime)
+    return _load_clip(ckpt_paths, embedding_directory, clip_type, model_options, disable_dynamic)
+
+
+def _load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_DIFFUSION, model_options={}, disable_dynamic=False):
     clip_data = []
     for p in ckpt_paths:
         sd, metadata = comfy.utils.load_torch_file(p, safe_load=True, return_metadata=True)
@@ -1826,6 +1903,52 @@ def load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_DI
     clip = load_text_encoder_state_dicts(clip_data, embedding_directory=embedding_directory, clip_type=clip_type, model_options=model_options, disable_dynamic=disable_dynamic)
     clip.patcher.cached_patcher_init = (load_clip_model_patcher, (ckpt_paths, embedding_directory, clip_type, model_options))
     return clip
+
+
+def _component_clip_adapter(source, source_type, clip_type, embedding_directory, model_options):
+    owner = source.cond_stage_model
+    if not isinstance(owner, sd1_clip.SD1ClipModel):
+        return (source.clone(), None) if source_type == clip_type else (None, "unsupported_wrapper")
+    child = getattr(owner, owner.clip)
+    if not isinstance(child, sd1_clip.SDClipModel) or not isinstance(child.transformer, comfy.text_encoders.qwen3vl.Qwen3VL):
+        return (source.clone(), None) if source_type == clip_type else (None, "different_backbone_architecture")
+    model_type = child.transformer.model_type
+    if (model_type not in ("qwen3vl_4b", "qwen3vl_8b") or source.generation_missing_keys is None
+            or source.generation_missing_keys or not child.transformer.model.config.final_norm
+            or child.transformer.model.norm is None
+            or child.transformer.model.config.num_hidden_layers != comfy.text_encoders.qwen3vl.QWEN3VL_CONFIGS[model_type]().num_hidden_layers):
+        return (source.clone(), None) if source_type == clip_type else (None, "partial_or_conditioning_only_backbone")
+    # These adapters preserve the same parameter namespaces. Their tokenization,
+    # feature taps, position handling and output transforms remain private.
+    adapters = {
+        "qwen3vl_4b": {
+            CLIPType.KREA2: (comfy.text_encoders.krea2.Krea2TEModel, comfy.text_encoders.krea2.Krea2Tokenizer),
+            CLIPType.FIBO2: (comfy.text_encoders.fibo2.Fibo2TEModel, comfy.text_encoders.fibo2.Fibo2Tokenizer),
+            CLIPType.FLUX3: (comfy.text_encoders.flux.Flux3TEModel, comfy.text_encoders.flux.Flux3Tokenizer),
+            CLIPType.MAGE: (comfy.text_encoders.mage_flow.MageFlowTEModel, comfy.text_encoders.mage_flow.MageFlowTokenizer),
+        },
+        "qwen3vl_8b": {
+            CLIPType.IDEOGRAM4: (comfy.text_encoders.ideogram4.Ideogram4Qwen3VLTEModel, comfy.text_encoders.ideogram4.Ideogram4Qwen3VLTokenizer),
+            CLIPType.BOOGU: (comfy.text_encoders.boogu.BooguTEModel, comfy.text_encoders.boogu.BooguTokenizer),
+            CLIPType.QWEN_IMAGE: (comfy.text_encoders.qwen_image21.QwenImage21TEModel, comfy.text_encoders.qwen_image21.QwenImage21Tokenizer),
+        },
+    }[model_type]
+    adapters[CLIPType.STABLE_DIFFUSION] = (comfy.text_encoders.qwen3vl.te(model_type=model_type),
+                                         comfy.text_encoders.qwen3vl.tokenizer(model_type=model_type))
+    if source_type not in adapters or clip_type not in adapters:
+        return (source.clone(), None) if source_type == clip_type else (None, "unaudited_wrapper_or_architecture")
+    if any(key.endswith("_class") for key in model_options):
+        return None, "custom_wrapper"
+    model_class, tokenizer_class = adapters[clip_type]
+    options = source._component_model_options.copy()
+    options["custom_operations"] = child.operations
+    with comfy.text_encoders.qwen3vl.share_backbone(child.transformer, child.operations):
+        wrapper = model_class(device=source.patcher.offload_device, dtype=child.transformer.dtype, model_options=options)
+    result = source.clone()
+    result.cond_stage_model = wrapper
+    result.tokenizer = tokenizer_class(embedding_directory=embedding_directory)
+    result._component_adapter = True
+    return result, None
 
 
 class TEModel(Enum):
