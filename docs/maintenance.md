@@ -24,10 +24,14 @@ Set both environment variables in the existing service's startup environment:
   Provision securely; never put the token in command arguments, logs or Git.
 
 Optional `COMFYUI_MAINTENANCE_MAX_RECEIPTS` sets the receipt count limit at startup
-(default 10,000; positive decimal integer of at most nine digits). Invalid values
+(default 10,000; positive decimal integer of at most nine digits, or the exact
+value `unlimited` to disable only the receipt-count limit). Invalid values
 fail startup. Size this for the expected seven-day prompt volume and available
 disk and memory: terminal history is restored in memory at startup. For example,
 `100000` allows a larger OCR corpus while retaining existing receipt evidence.
+`COMFYUI_MAINTENANCE_MAX_RECEIPTS=unlimited` admits receipts without a count cap;
+it does not provide unlimited disk or memory. Seven-day terminal pruning, the
+per-receipt payload limit, operation limit and unresolved-work safeguards remain.
 Changing the setting requires a coordinated safe restart with the same store;
 it does not clear receipts, change retention, release a fence or resolve unknown
 work. Lowering the limit below the retained count preserves existing receipts and
@@ -204,7 +208,7 @@ or deleting native history persists its display suppression, but intentionally
 does not erase protected receipt/idempotency evidence. By default 10,000 receipts
 are admitted (startup-configurable as above), with a 4 MiB strict-JSON terminal payload limit. Terminal receipts
 older than seven days are pruned on new admission. Unknown/accepted receipts are
-never silently aged away. At capacity, admission fails rather than evicting
+never silently aged away. With a finite count limit, admission at capacity fails rather than evicting
 unresolved work. Operation identities are retained up to 1,024 operations and
 then fail closed; there is no automatic operation-archive/reset endpoint in v1.
 Never reuse an expired ID; bounded retention is not lifetime exactly-once.
