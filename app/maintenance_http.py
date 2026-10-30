@@ -33,9 +33,11 @@ def configured_store():
     if not 32 <= len(token) <= 4096 or not token.isascii() or any(c.isspace() for c in token):
         raise ValueError("maintenance token must contain 32-4096 non-whitespace ASCII characters")
     max_receipts = MAX_RECEIPTS
-    if capacity is not None:
+    if capacity == "unlimited":
+        max_receipts = None
+    elif capacity is not None:
         if not capacity.isascii() or not capacity.isdecimal() or len(capacity) > 9 or int(capacity) < 1:
-            raise ValueError("COMFYUI_MAINTENANCE_MAX_RECEIPTS must be a positive integer of at most nine digits")
+            raise ValueError("COMFYUI_MAINTENANCE_MAX_RECEIPTS must be 'unlimited' or a positive integer of at most nine digits")
         max_receipts = int(capacity)
     return MaintenanceStore(directory, max_receipts=max_receipts), token
 
