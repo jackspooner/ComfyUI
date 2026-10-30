@@ -83,7 +83,11 @@ class SAM3DBody_Loader(io.ComfyNode):
         else:
             operations = comfy.ops.pick_operations(torch_dtype, manual_cast_dtype, load_device=load_device, disable_fast_fp8=True)
 
-        model = SAM3DBody(dtype=torch_dtype, operations=operations)
+        # The dense BF16 checkpoint keeps its prediction layers in FP32. Creating
+        # them as BF16 loses those values during ordinary loading or AIMDO residency;
+        # promoting the resulting activations in forward_pose_branch cannot undo it.
+        head_dtype = torch.float32 if torch_dtype == torch.bfloat16 and quant_config is None else torch_dtype
+        model = SAM3DBody(dtype=head_dtype, backbone_dtype=torch_dtype, operations=operations)
         sd.pop("hand_cls_embed.weight", None)
         sd.pop("hand_cls_embed.bias", None)
         missing, unexpected = model.load_state_dict(sd, strict=False)
