@@ -71,12 +71,17 @@ class SAM3DBody_Loader(io.ComfyNode):
 
         load_device = comfy.model_management.get_torch_device()
         weight_dtype = comfy.utils.weight_dtype(sd)
+        quant_config = comfy.utils.detect_layer_quantization(sd, "")
+        dtype_options = {}
+        if weight_dtype == torch.bfloat16 and quant_config is None:
+            # Generic diffusion policy prefers FP16 on CUDA. This checkpoint's
+            # BF16 backbone must retain its range and its FP32 prediction path.
+            dtype_options["supported_dtypes"] = [torch.bfloat16, torch.float32]
         torch_dtype = comfy.model_management.unet_dtype(
-            device=load_device, model_params=-1, weight_dtype=weight_dtype,
+            device=load_device, model_params=-1, weight_dtype=weight_dtype, **dtype_options,
         )
         manual_cast_dtype = comfy.model_management.unet_manual_cast(torch_dtype, load_device)
 
-        quant_config = comfy.utils.detect_layer_quantization(sd, "")
         if quant_config is not None:
             operations = comfy.ops.mixed_precision_ops(quant_config, torch_dtype)
             logging.info("SAM3D-Body: detected mixed precision quantization, using MixedPrecisionOps")
