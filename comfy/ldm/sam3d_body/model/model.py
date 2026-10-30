@@ -36,7 +36,7 @@ N_KEYPOINTS = 70  # mhr70
 class SAM3DBody(nn.Module):
     pelvis_idx = [9, 10]  # left_hip, right_hip
 
-    def __init__(self, device=None, dtype=None, operations=None):
+    def __init__(self, device=None, dtype=None, operations=None, backbone_dtype=None):
         super().__init__()
         # Per-batch state populated by `_initialize_batch`.
         self._max_num_person = None
@@ -45,7 +45,7 @@ class SAM3DBody(nn.Module):
         self.register_buffer("image_std", torch.tensor(IMAGE_STD).view(-1, 1, 1), False)
 
         self.image_size = IMAGE_SIZE
-        self.backbone = DINOv3ViTModel(DINOV3_VITH_CONFIG, dtype=dtype, device=device, operations=operations, use_mask_token=False)
+        self.backbone = DINOv3ViTModel(DINOV3_VITH_CONFIG, dtype=backbone_dtype if backbone_dtype is not None else dtype, device=device, operations=operations, use_mask_token=False)
         embed_dims = self.backbone.embed_dims
 
         # MHR rig shared between body + hand pose heads via a non-registered
