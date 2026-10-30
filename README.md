@@ -1,3 +1,10 @@
+## SAM 3D Body precision in this fork
+
+The dense BF16 SAM 3D Body loader preserves FP32 prediction layers while keeping
+the DINOv3 backbone in BF16. See [precision, setup and acceptance limits](docs/sam3d-body-precision.md).
+CPU regression checks and source availability do not establish full-model visual
+acceptance or serving activation.
+
 ## Bounded native component reuse in this fork
 
 This fork adds opt-in sequential CLIP leases, including shared full Qwen3-VL
