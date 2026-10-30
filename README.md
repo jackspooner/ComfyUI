@@ -40,7 +40,8 @@ reported as interrupted/unknown, not replayed or declared safe.
 Set both `COMFYUI_MAINTENANCE_DIR` and `COMFYUI_MAINTENANCE_TOKEN_FILE` at startup;
 see [authentication, exact API, recovery and rollout limits](docs/maintenance.md).
 `COMFYUI_MAINTENANCE_MAX_RECEIPTS` optionally increases the default 10,000-receipt
-capacity for larger workloads without discarding retained evidence; apply it only
+capacity, or accepts `unlimited` to remove the receipt-count cap. Retention and
+unresolved-work safeguards remain unchanged; apply it only
 through a safe restart with the same store and adequate disk/memory headroom.
 Without that configuration, ordinary queue behavior is unchanged. Source and
 isolated CPU/HTTP tests are available; serving activation is a separate operation.

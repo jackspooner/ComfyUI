@@ -18,9 +18,9 @@ from execution import PromptQueue
 TOKEN = "test-operator-token-not-used-outside-fixtures"
 
 
-@pytest.fixture
-def store(tmp_path):
-    result = MaintenanceStore(tmp_path / "state")
+@pytest.fixture(params=[10000, None], ids=["bounded", "unlimited"])
+def store(tmp_path, request):
+    result = MaintenanceStore(tmp_path / "state", max_receipts=request.param)
     yield result
     result.close()
 
@@ -369,7 +369,8 @@ def test_receipt_capacity_and_retention(queue, monkeypatch):
     assert queue.store.receipt("first") is None
 
 
-def test_capacity_increase_preserves_receipts_replay_and_fence(tmp_path):
+@pytest.mark.parametrize("capacity", [2, None], ids=["larger", "unlimited"])
+def test_capacity_increase_preserves_receipts_replay_and_fence(tmp_path, capacity):
     directory = tmp_path / "state"
     original = MaintenanceStore(directory, max_receipts=1)
     q = MaintenanceQueue(SimpleNamespace(queue_updated=lambda: None), original)
@@ -381,7 +382,7 @@ def test_capacity_increase_preserves_receipts_replay_and_fence(tmp_path):
         q.put(item("second", 2))
     start(q)
     original.close()
-    reopened = MaintenanceStore(directory, max_receipts=2)
+    reopened = MaintenanceStore(directory, max_receipts=capacity)
     try:
         assert reopened.receipt("first") == retained
         with pytest.raises(PromptReplay):
@@ -393,8 +394,12 @@ def test_capacity_increase_preserves_receipts_replay_and_fence(tmp_path):
         q2.put(item("second", 2))
         assert reopened.receipt("first") == retained
         assert reopened.receipt("second")["state"] == "accepted"
-        with pytest.raises(MaintenanceError, match="receipt_capacity"):
+        if capacity is None:
             q2.put(item("third", 3))
+            assert reopened.receipt("third")["state"] == "accepted"
+        else:
+            with pytest.raises(MaintenanceError, match="receipt_capacity"):
+                q2.put(item("third", 3))
     finally:
         reopened.close()
 
@@ -407,7 +412,7 @@ def test_invalid_capacity_does_not_create_store(tmp_path, capacity):
     assert not directory.exists()
 
 
-@pytest.mark.parametrize("capacity", ["", "0", "-1", "1.5", " 2", "１２", "1000000000"])
+@pytest.mark.parametrize("capacity", ["", "0", "-1", "1.5", " 2", "１２", "1000000000", "Unlimited", "unlimited "])
 def test_invalid_capacity_environment(tmp_path, monkeypatch, capacity):
     token_file = tmp_path / "token"
     token_file.write_text(TOKEN)
@@ -420,16 +425,20 @@ def test_invalid_capacity_environment(tmp_path, monkeypatch, capacity):
     assert not (tmp_path / "state").exists()
 
 
-def test_capacity_environment_reaches_store(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("capacity", "expected"), [(None, 10000), ("100000", 100000), ("unlimited", None)])
+def test_capacity_environment_reaches_store(tmp_path, monkeypatch, capacity, expected):
     token_file = tmp_path / "token"
     token_file.write_text(TOKEN)
     token_file.chmod(0o600)
     monkeypatch.setenv("COMFYUI_MAINTENANCE_DIR", str(tmp_path / "state"))
     monkeypatch.setenv("COMFYUI_MAINTENANCE_TOKEN_FILE", str(token_file))
-    monkeypatch.setenv("COMFYUI_MAINTENANCE_MAX_RECEIPTS", "100000")
+    if capacity is None:
+        monkeypatch.delenv("COMFYUI_MAINTENANCE_MAX_RECEIPTS", raising=False)
+    else:
+        monkeypatch.setenv("COMFYUI_MAINTENANCE_MAX_RECEIPTS", capacity)
     configured, _ = configured_store()
     try:
-        assert configured.max_receipts == 100000
+        assert configured.max_receipts == expected
     finally:
         configured.close()
 
