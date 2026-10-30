@@ -1,3 +1,12 @@
+## Native component leases
+
+`comfy/component_leases.py` owns bounded references, not GPU residency or prompt
+registration. See [component leases](docs/component-leases.md) for the API,
+audited Qwen3-VL adapters, strict partial-generation checks and focused tests.
+Keep lifecycle/async-context binding in the execution caller and native loading
+in ModelPatcher/model_management. The shared authoritative `comfyui` skill owns
+operating guidance.
+
 ## Engineering Style
 
 - Keep changes small and direct. Most fixes should touch the narrowest code path
