@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 from aiohttp import web
 
-from app.maintenance_store import MaintenanceError, MaintenanceStore, PromptReplay
+from app.maintenance_store import MAX_RECEIPTS, MaintenanceError, MaintenanceStore, PromptReplay
 
 
 IDENTITY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -18,7 +18,8 @@ IDENTITY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 def configured_store():
     directory = os.environ.get("COMFYUI_MAINTENANCE_DIR")
     token_file = os.environ.get("COMFYUI_MAINTENANCE_TOKEN_FILE")
-    if not directory and not token_file:
+    capacity = os.environ.get("COMFYUI_MAINTENANCE_MAX_RECEIPTS")
+    if not directory and not token_file and capacity is None:
         return None, None
     if not directory or not token_file:
         raise ValueError("maintenance requires both directory and token file")
@@ -31,7 +32,12 @@ def configured_store():
         token = handle.read(4097).strip()
     if not 32 <= len(token) <= 4096 or not token.isascii() or any(c.isspace() for c in token):
         raise ValueError("maintenance token must contain 32-4096 non-whitespace ASCII characters")
-    return MaintenanceStore(directory), token
+    max_receipts = MAX_RECEIPTS
+    if capacity is not None:
+        if not capacity.isascii() or not capacity.isdecimal() or len(capacity) > 9 or int(capacity) < 1:
+            raise ValueError("COMFYUI_MAINTENANCE_MAX_RECEIPTS must be a positive integer of at most nine digits")
+        max_receipts = int(capacity)
+    return MaintenanceStore(directory, max_receipts=max_receipts), token
 
 
 def authorize(request, token):

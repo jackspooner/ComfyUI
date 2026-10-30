@@ -23,6 +23,16 @@ Set both environment variables in the existing service's startup environment:
   32–4096-character non-whitespace ASCII token, optionally followed by a newline.
   Provision securely; never put the token in command arguments, logs or Git.
 
+Optional `COMFYUI_MAINTENANCE_MAX_RECEIPTS` sets the receipt count limit at startup
+(default 10,000; positive decimal integer of at most nine digits). Invalid values
+fail startup. Size this for the expected seven-day prompt volume and available
+disk and memory: terminal history is restored in memory at startup. For example,
+`100000` allows a larger OCR corpus while retaining existing receipt evidence.
+Changing the setting requires a coordinated safe restart with the same store;
+it does not clear receipts, change retention, release a fence or resolve unknown
+work. Lowering the limit below the retained count preserves existing receipts and
+rejects new admissions until eligible expiry or a subsequent capacity increase.
+
 Partial/invalid configuration fails startup. Without either variable, the normal
 `PromptQueue` is used and maintenance routes are absent. **Do not remove these
 variables, switch directories, restore old databases or run an old binary to
@@ -191,13 +201,19 @@ journal does not checksum/copy every output or guarantee external durability.
 
 Native history loads the sanitized terminal projection after restart. Clearing
 or deleting native history persists its display suppression, but intentionally
-does not erase protected receipt/idempotency evidence. At most 10,000 receipts
-are admitted, with a 4 MiB strict-JSON terminal payload limit. Terminal receipts
+does not erase protected receipt/idempotency evidence. By default 10,000 receipts
+are admitted (startup-configurable as above), with a 4 MiB strict-JSON terminal payload limit. Terminal receipts
 older than seven days are pruned on new admission. Unknown/accepted receipts are
 never silently aged away. At capacity, admission fails rather than evicting
 unresolved work. Operation identities are retained up to 1,024 operations and
 then fail closed; there is no automatic operation-archive/reset endpoint in v1.
 Never reuse an expired ID; bounded retention is not lifetime exactly-once.
+
+`receipt_capacity` can occur while `GET /maintenance` reports `phase=open` and
+`accepting=true`: those fields describe the gate and recovery blockers, not
+remaining journal capacity. A restart with unchanged capacity does not repair
+this condition. Preserve retained evidence and increase configured capacity in a
+verified safe activation window; do not delete the store or hide history as a fix.
 
 Publication failure closes admission and blocks readiness, retaining completion
 data in memory while the native worker continues draining previously accepted
