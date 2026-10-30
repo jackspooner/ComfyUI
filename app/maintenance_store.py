@@ -42,7 +42,10 @@ def encode(value):
 
 
 class MaintenanceStore:
-    def __init__(self, directory):
+    def __init__(self, directory, *, max_receipts=MAX_RECEIPTS):
+        if type(max_receipts) is not int or max_receipts < 1:
+            raise ValueError("maintenance max receipts must be a positive integer")
+        self.max_receipts = max_receipts
         if fcntl is None:
             raise ValueError("maintenance requires local POSIX file locking")
         directory = Path(directory)
@@ -140,7 +143,7 @@ class MaintenanceStore:
         self.check_admission()
         with self.transaction():
             self.db.execute("DELETE FROM receipts WHERE terminal < ?", (time.time() - RETENTION_SECONDS,))
-            if self.db.execute("SELECT count(*) FROM receipts").fetchone()[0] >= MAX_RECEIPTS:
+            if self.db.execute("SELECT count(*) FROM receipts").fetchone()[0] >= self.max_receipts:
                 raise MaintenanceError("receipt_capacity", 503)
             self.db.execute("INSERT INTO receipts (id,digest,number,state,created,terminal,history,visible) VALUES (?,?,?,'accepted',?,NULL,NULL,1)",
                             (item[1], digest, item[0], time.time()))
