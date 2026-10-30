@@ -1,7 +1,8 @@
 ## SAM 3D Body precision in this fork
 
-The dense BF16 SAM 3D Body loader preserves FP32 prediction layers while keeping
-the DINOv3 backbone in BF16. See [precision, setup and acceptance limits](docs/sam3d-body-precision.md).
+The dense BF16 SAM 3D Body loader prefers BF16 backbone computation with FP32
+prediction layers, avoiding the generic CUDA FP16 default. FP32 fallback and
+explicit global dtype overrides remain available. See [precision, setup and acceptance limits](docs/sam3d-body-precision.md).
 CPU regression checks and source availability do not establish full-model visual
 acceptance or serving activation.
 
