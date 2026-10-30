@@ -357,8 +357,7 @@ def test_history_deletion_stays_hidden_on_restart(tmp_path):
 
 
 def test_receipt_capacity_and_retention(queue, monkeypatch):
-    import app.maintenance_store as store_module
-    monkeypatch.setattr(store_module, "MAX_RECEIPTS", 1)
+    monkeypatch.setattr(queue.store, "max_receipts", 1)
     queue.put(item())
     with pytest.raises(MaintenanceError, match="receipt_capacity"):
         queue.put(item("second", 2))
@@ -368,6 +367,71 @@ def test_receipt_capacity_and_retention(queue, monkeypatch):
     queue.store.db.commit()
     queue.put(item("second", 2))
     assert queue.store.receipt("first") is None
+
+
+def test_capacity_increase_preserves_receipts_replay_and_fence(tmp_path):
+    directory = tmp_path / "state"
+    original = MaintenanceStore(directory, max_receipts=1)
+    q = MaintenanceQueue(SimpleNamespace(queue_updated=lambda: None), original)
+    q.put(item())
+    _, index = q.get()
+    done(q, index)
+    retained = original.receipt("first")
+    with pytest.raises(MaintenanceError, match="receipt_capacity"):
+        q.put(item("second", 2))
+    start(q)
+    original.close()
+    reopened = MaintenanceStore(directory, max_receipts=2)
+    try:
+        assert reopened.receipt("first") == retained
+        with pytest.raises(PromptReplay):
+            reopened.accept(item())
+        with pytest.raises(MaintenanceError, match="maintenance_fenced"):
+            reopened.accept(item("second", 2))
+        q2 = MaintenanceQueue(SimpleNamespace(queue_updated=lambda: None), reopened)
+        release(q2)
+        q2.put(item("second", 2))
+        assert reopened.receipt("first") == retained
+        assert reopened.receipt("second")["state"] == "accepted"
+        with pytest.raises(MaintenanceError, match="receipt_capacity"):
+            q2.put(item("third", 3))
+    finally:
+        reopened.close()
+
+
+@pytest.mark.parametrize("capacity", [0, -1, True, 1.5, "2"])
+def test_invalid_capacity_does_not_create_store(tmp_path, capacity):
+    directory = tmp_path / "state"
+    with pytest.raises(ValueError, match="positive integer"):
+        MaintenanceStore(directory, max_receipts=capacity)
+    assert not directory.exists()
+
+
+@pytest.mark.parametrize("capacity", ["", "0", "-1", "1.5", " 2", "１２", "1000000000"])
+def test_invalid_capacity_environment(tmp_path, monkeypatch, capacity):
+    token_file = tmp_path / "token"
+    token_file.write_text(TOKEN)
+    token_file.chmod(0o600)
+    monkeypatch.setenv("COMFYUI_MAINTENANCE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("COMFYUI_MAINTENANCE_TOKEN_FILE", str(token_file))
+    monkeypatch.setenv("COMFYUI_MAINTENANCE_MAX_RECEIPTS", capacity)
+    with pytest.raises(ValueError, match="COMFYUI_MAINTENANCE_MAX_RECEIPTS"):
+        configured_store()
+    assert not (tmp_path / "state").exists()
+
+
+def test_capacity_environment_reaches_store(tmp_path, monkeypatch):
+    token_file = tmp_path / "token"
+    token_file.write_text(TOKEN)
+    token_file.chmod(0o600)
+    monkeypatch.setenv("COMFYUI_MAINTENANCE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("COMFYUI_MAINTENANCE_TOKEN_FILE", str(token_file))
+    monkeypatch.setenv("COMFYUI_MAINTENANCE_MAX_RECEIPTS", "100000")
+    configured, _ = configured_store()
+    try:
+        assert configured.max_receipts == 100000
+    finally:
+        configured.close()
 
 
 def test_serialization_failure_is_not_lost_or_reexecuted(queue):
