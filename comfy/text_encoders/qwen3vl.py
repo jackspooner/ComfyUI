@@ -1,5 +1,7 @@
 from .chat import qwen_chat
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 import torch
 import torch.nn as nn
@@ -21,6 +23,18 @@ QWEN3VL_VISION_COMMON = dict(num_heads=16, patch_size=16, temporal_patch_size=2,
                              spatial_merge_size=2, num_position_embeddings=2304)
 
 QWEN3VL_CONFIGS = {"qwen3vl_4b": Qwen3VL_4BConfig, "qwen3vl_8b": Qwen3VL_8BConfig, "qwen3vl_32b": Qwen3VL_32BConfig}
+
+_shared_backbone = ContextVar("qwen3vl_shared_backbone", default=None)
+
+
+@contextmanager
+def share_backbone(source, operations):
+    """Construct a private adapter around an already loaded, compatible backbone."""
+    token = _shared_backbone.set((source, operations))
+    try:
+        yield
+    finally:
+        _shared_backbone.reset(token)
 
 
 class Qwen3VLDeepstackMerger(nn.Module):
@@ -66,9 +80,17 @@ class Qwen3VL(BaseLlama, BaseQwen3, BaseGenerate, torch.nn.Module):
         super().__init__()
         config = QWEN3VL_CONFIGS[self.model_type](**config_dict)
         self.num_layers = config.num_hidden_layers
-        self.model = Llama2_(config, device=device, dtype=dtype, ops=operations)
-        vision_config = {**QWEN3VL_VISION_COMMON, **QWEN3VL_VISION[self.model_type], "out_hidden_size": config.hidden_size}
-        self.visual = Qwen3VLVisionModel(vision_config, device=device, dtype=dtype, ops=operations)
+        shared = _shared_backbone.get()
+        if shared is None:
+            self.model = Llama2_(config, device=device, dtype=dtype, ops=operations)
+            vision_config = {**QWEN3VL_VISION_COMMON, **QWEN3VL_VISION[self.model_type], "out_hidden_size": config.hidden_size}
+            self.visual = Qwen3VLVisionModel(vision_config, device=device, dtype=dtype, ops=operations)
+        else:
+            source, source_operations = shared
+            if (self.model_type != source.model_type or config != source.model.config
+                    or dtype != source.dtype or operations is not source_operations):
+                raise ValueError("Incompatible Qwen3-VL component architecture, precision or operations")
+            self.model, self.visual = source.model, source.visual
         self.dtype = dtype
         self.vision_feature_cache = None
 
