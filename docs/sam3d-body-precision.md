@@ -30,8 +30,8 @@ the CUDA policy selected FP16. Direct CPU inference using the same checkpoint
 with a BF16 backbone and FP32 heads recovered the raised limbs both with and
 without hand refinement. The default-selection correction was deployed, but GPU
 acceptance still failed: hand refinement encountered singular crop matrices and
-body-only output contained nonfinite pose values. This is not yet a validated GPU
-configuration.
+body-only output contained nonfinite pose values. Loader precision alone was not
+sufficient on the deployed Comfy Kitchen configuration.
 
 SAM3D's DINOv3 backbone and decoder explicitly request
 `low_precision_attention=False`. The Comfy Kitchen INT8 dispatcher now respects
@@ -40,8 +40,17 @@ path with the caller's dtype, mask, scale and layout. Both tensor and consuming
 container paths honor the same contract; default calls still use INT8. Global
 attention flags are unchanged. Run the CPU dispatch regression with
 `tests-unit/comfy_test/attention_precision_test.py`; it reproduces eight failures
-before the fix. This dispatch correction still requires activation and real GPU
-visual/numeric acceptance before attributing the failed poses to attention.
+before the fix.
+
+On 31 October 2026, the combined correction at `9802be5a9` passed native RTX 5090
+acceptance with the official dense BF16 checkpoint, normal AIMDO ownership and
+the existing `--use-ck-attention` launch flag. The dancer overlay follows the
+raised arm, knee and tilted torso; a five-frame, 5 FPS video follows the selected
+person walking away. Both use hand refinement; the video uses Gaussian smoothing.
+All 26 image/102 video numeric arrays are finite. Skinned/animated GLB, BVH,
+PNG and H.264 preview exports pass structural, timing and hash checks. Recovery
+preserves the original native prompt and all binary hashes. This validates these
+bounded fixtures, not arbitrary scenes, metric accuracy or BVH retargeting.
 Successful file creation alone is not quality acceptance. Compare source and
 overlay, then verify a bounded video and animation in a compatible viewer.
 
