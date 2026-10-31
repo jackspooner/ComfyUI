@@ -554,6 +554,36 @@ class MoGeGeometryToFOV(io.ComfyNode):
         return io.NodeOutput(fov, focal_pixels)
 
 
+class LoadMoGeGeometry(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(node_id="LoadMoGeGeometry", display_name="Load MoGe Point Map",
+                         category="image/geometry estimation",
+                         inputs=[io.String.Input("file", default="geometry.npz")],
+                         outputs=[MoGeGeometry.Output()])
+
+    @classmethod
+    def execute(cls, file):
+        from comfy_extras.moge_geometry_io import load_geometry
+        return io.NodeOutput(load_geometry(file))
+
+
+class SaveMoGeGeometry(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(node_id="SaveMoGeGeometry", display_name="Save MoGe Geometry",
+                         category="image/geometry estimation",
+                         inputs=[MoGeGeometry.Input("moge_geometry"), io.Image.Input("normal_preview"),
+                                 io.String.Input("run_id"), io.Mesh.Input("mesh", optional=True)],
+                         outputs=[], is_output_node=True)
+
+    @classmethod
+    def execute(cls, moge_geometry, normal_preview, run_id, mesh=None):
+        from comfy_extras.moge_geometry_io import save_geometry
+        descriptor = save_geometry(moge_geometry, normal_preview, run_id, mesh)
+        return io.NodeOutput(ui={"moge_geometry": [descriptor]})
+
+
 class MoGeExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
@@ -565,6 +595,8 @@ class MoGeExtension(ComfyExtension):
             SaveMoGeDepthPNG,
             MoGePointMapToMesh,
             MoGeGeometryToFOV,
+            LoadMoGeGeometry,
+            SaveMoGeGeometry,
         ]
 
 
