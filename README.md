@@ -1,3 +1,14 @@
+## Scaled image dimensions in this fork
+
+**Scale Image to Total Pixels** outputs `IMAGE`, `width` (`INT`) and `height`
+(`INT`), in that order. Connect the integer outputs to downstream size inputs;
+they report the scaled image's actual pixel dimensions after `resolution_steps`
+rounding. Existing image connections and resizing settings retain their behavior.
+Restart an idle instance to load the change, then refresh the editor's node
+definitions. Validate with `python -m pytest
+tests-unit/comfy_extras_test/image_scale_total_pixels_test.py -q` using the
+prepared interpreter described below.
+
 ## SAM 3D Body precision in this fork
 
 The dense BF16 SAM 3D Body loader prefers BF16 backbone computation with FP32
