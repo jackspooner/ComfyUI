@@ -3,6 +3,8 @@
 The dense BF16 SAM 3D Body loader prefers BF16 backbone computation with FP32
 prediction layers, avoiding the generic CUDA FP16 default. FP32 fallback and
 explicit global dtype overrides remain available. See [precision, setup and acceptance limits](docs/sam3d-body-precision.md).
+Comfy Kitchen INT8 attention honors the model's explicit precision opt-out for
+all input dtypes, including BF16 DINOv3, through the existing SDPA path.
 CPU regression checks and source availability do not establish full-model visual
 acceptance or serving activation.
 

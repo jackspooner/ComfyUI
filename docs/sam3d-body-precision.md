@@ -28,8 +28,20 @@ patcher handoff without GPU inference. The initial correction only preserved
 FP32 heads when BF16 was selected; a deployed dancer test still failed because
 the CUDA policy selected FP16. Direct CPU inference using the same checkpoint
 with a BF16 backbone and FP32 heads recovered the raised limbs both with and
-without hand refinement. The default-selection correction still needs GPU
-visual and numeric acceptance after activation.
+without hand refinement. The default-selection correction was deployed, but GPU
+acceptance still failed: hand refinement encountered singular crop matrices and
+body-only output contained nonfinite pose values. This is not yet a validated GPU
+configuration.
+
+SAM3D's DINOv3 backbone and decoder explicitly request
+`low_precision_attention=False`. The Comfy Kitchen INT8 dispatcher now respects
+that opt-out for BF16 and FP16 as well as FP32, using the existing PyTorch SDPA
+path with the caller's dtype, mask, scale and layout. Both tensor and consuming
+container paths honor the same contract; default calls still use INT8. Global
+attention flags are unchanged. Run the CPU dispatch regression with
+`tests-unit/comfy_test/attention_precision_test.py`; it reproduces eight failures
+before the fix. This dispatch correction still requires activation and real GPU
+visual/numeric acceptance before attributing the failed poses to attention.
 Successful file creation alone is not quality acceptance. Compare source and
 overlay, then verify a bounded video and animation in a compatible viewer.
 
