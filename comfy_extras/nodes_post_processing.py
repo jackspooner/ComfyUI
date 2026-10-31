@@ -242,6 +242,8 @@ class ImageScaleToTotalPixels(io.ComfyNode):
             ],
             outputs=[
                 io.Image.Output(),
+                io.Int.Output("width"),
+                io.Int.Output("height"),
             ],
         )
 
@@ -256,7 +258,7 @@ class ImageScaleToTotalPixels(io.ComfyNode):
 
         s = comfy.utils.common_upscale(samples, int(width), int(height), upscale_method, "disabled")
         s = s.movedim(1,-1)
-        return io.NodeOutput(s)
+        return io.NodeOutput(s, s.shape[2], s.shape[1])
 
 class ResizeType(str, Enum):
     SCALE_BY = "scale by multiplier"
