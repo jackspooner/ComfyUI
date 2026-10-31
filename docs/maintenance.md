@@ -203,6 +203,15 @@ workflow/asset metadata are not restored. `outputs` are node-authored data, not 
 general secret scrubber. Artifact files themselves must remain available; the
 journal does not checksum/copy every output or guarantee external durability.
 
+The Jobs API omits optional `execution_error` details for sanitized or incomplete
+error events; the job remains failed, and raw retained status/outputs are unchanged.
+Emitting a prompt-ID-only marker as a full error object makes strict frontend
+history-page validation fail, also hiding history-backed generated Assets. This
+applies at finite and unlimited capacities. The read-side correction handles
+existing receipts without rewriting, deleting or replaying them. The separate
+asset database API is opt-in (`--enable-assets`); its disabled state is not proof
+that the history-backed generated-assets view should be empty.
+
 Native history loads the sanitized terminal projection after restart. Clearing
 or deleting native history persists its display suppression, but intentionally
 does not erase protected receipt/idempotency evidence. By default 10,000 receipts
