@@ -233,7 +233,14 @@ def normalize_history_item(prompt_id: str, history_item: dict, include_outputs: 
                     elif event_name in ('execution_success', 'execution_error', 'execution_interrupted'):
                         execution_end_time = event_data.get('timestamp')
                         if event_name == 'execution_error':
-                            execution_error = event_data
+                            # Restored maintenance receipts retain the failure event,
+                            # but not its private error details. Do not expose that
+                            # marker as a full Jobs API error and invalidate the page.
+                            if (all(isinstance(event_data.get(key), str) for key in
+                                    ('node_id', 'node_type', 'exception_message', 'exception_type'))
+                                    and isinstance(event_data.get('traceback'), list)
+                                    and all(isinstance(line, str) for line in event_data['traceback'])):
+                                execution_error = event_data
                         elif event_name == 'execution_interrupted':
                             was_interrupted = True
 

@@ -659,6 +659,32 @@ class TestNormalizeHistoryItem:
         # Cancelled jobs should not have execution_error set
         assert 'execution_error' not in job
 
+    @pytest.mark.parametrize('error', [
+        {'prompt_id': 'restored-failure'},
+        {'prompt_id': 'restored-failure', 'timestamp': 1234567891000},
+        {'node_id': None, 'node_type': '', 'exception_message': 'Admission failed',
+         'exception_type': 'RuntimeError', 'traceback': []},
+        {'node_id': '1', 'node_type': 'Fixture', 'exception_message': 'Failed',
+         'exception_type': 'RuntimeError', 'traceback': 'not a list'},
+    ])
+    def test_partial_error_does_not_invalidate_jobs_page(self, error):
+        history = {
+            'prompt': (1, 'restored-failure', {}, {'create_time': 1234567890000}, ['1']),
+            'status': {'status_str': 'error', 'completed': False,
+                       'messages': [('execution_error', error)]},
+            'outputs': {'1': {'images': [
+                {'filename': 'retained.png', 'subfolder': '', 'type': 'output'}
+            ]}},
+        }
+        job = normalize_history_item('restored-failure', history, include_outputs=True)
+        assert job['status'] == 'failed'
+        assert 'execution_error' not in job
+        assert job.get('execution_end_time') == error.get('timestamp')
+        assert job['preview_output']['filename'] == 'retained.png'
+        assert job['outputs_count'] == job['previewable_outputs_count'] == 1
+        assert job['execution_status'] == history['status']
+        assert job['outputs'] == history['outputs']
+
     def test_include_outputs(self):
         """When include_outputs=True, should include full output data."""
         history_item = {

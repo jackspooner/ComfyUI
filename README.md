@@ -53,6 +53,9 @@ see [authentication, exact API, recovery and rollout limits](docs/maintenance.md
 capacity, or accepts `unlimited` to remove the receipt-count cap. Retention and
 unresolved-work safeguards remain unchanged; apply it only
 through a safe restart with the same store and adequate disk/memory headroom.
+Restored failures remain failed in Jobs/history, but omit optional error details
+when the journal retained only a sanitized lifecycle marker. This keeps history
+and its generated-asset previews readable without restoring private error data.
 Without that configuration, ordinary queue behavior is unchanged. Source and
 isolated CPU/HTTP tests are available; serving activation is a separate operation.
 This extends [upstream ComfyUI](https://github.com/Comfy-Org/ComfyUI) without changing

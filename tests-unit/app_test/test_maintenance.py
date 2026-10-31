@@ -13,6 +13,7 @@ from app.maintenance_http import add_routes, authorize, command_request, configu
 from app.maintenance_queue import MaintenanceQueue
 from app.maintenance_store import MaintenanceError, MaintenanceStore, PromptReplay
 from execution import PromptQueue
+from comfy_execution.jobs import get_all_jobs, get_job
 
 
 TOKEN = "test-operator-token-not-used-outside-fixtures"
@@ -210,6 +211,48 @@ def test_crash_accepted_is_unknown_never_replayed_or_ready(tmp_path):
         assert exc.value.receipt["state"] == "interrupted_unknown"
         with pytest.raises(MaintenanceError, match="maintenance_not_ready"):
             release(q2)
+    finally:
+        reopened.close()
+
+
+@pytest.mark.parametrize('capacity', [10000, None], ids=['bounded', 'unlimited'])
+def test_restored_failed_history_keeps_jobs_and_assets_readable(tmp_path, capacity):
+    directory = tmp_path / 'store'
+    server = SimpleNamespace(queue_updated=lambda: None)
+    output = {'out': {'images': [{'filename': 'retained.png', 'subfolder': '', 'type': 'output'}]}}
+    with_store = MaintenanceStore(directory, max_receipts=capacity)
+    try:
+        q = MaintenanceQueue(server, with_store)
+        for prompt_id, event, success in [('success', 'execution_success', True),
+                                           ('failed', 'execution_error', False),
+                                           ('cancelled', 'execution_interrupted', False)]:
+            q.put(item(prompt_id))
+            _, index = q.get()
+            q.task_done(index, {'outputs': output}, PromptQueue.ExecutionStatus(
+                'success' if success else 'error', success,
+                [[event, {'prompt_id': prompt_id, 'private': 'never restored'}]]))
+        receipts = {prompt_id: with_store.receipt(prompt_id)
+                    for prompt_id in ('success', 'failed', 'cancelled')}
+    finally:
+        with_store.close()
+
+    reopened = MaintenanceStore(directory, max_receipts=capacity)
+    try:
+        q = MaintenanceQueue(server, reopened)
+        history = q.get_history()
+        jobs, total = get_all_jobs([], [], history)
+        assert total == 3
+        assert {job['status'] for job in jobs} == {'completed', 'failed', 'cancelled'}
+        assert all('execution_error' not in job for job in jobs)
+        assert all(job['preview_output']['filename'] == 'retained.png' for job in jobs)
+        assert all(job['outputs_count'] == job['previewable_outputs_count'] == 1 for job in jobs)
+        detail = get_job('failed', [], [], history)
+        assert detail['status'] == 'failed'
+        assert detail['outputs'] == output
+        assert detail['execution_status']['messages'] == [['execution_error', {'prompt_id': 'failed'}]]
+        assert 'never restored' not in json.dumps(history)
+        assert q.get_tasks_remaining() == 0
+        assert {prompt_id: reopened.receipt(prompt_id) for prompt_id in receipts} == receipts
     finally:
         reopened.close()
 
