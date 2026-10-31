@@ -475,6 +475,12 @@ to implemented ports. Its Applio example describes scoping only; it adds no Appl
 support. Prepare a development worktree as documented below; GPU acceptance needs
 separately provisioned checkpoints and a compatible runtime.
 
+`SaveMoGeGeometry` exports numeric point/depth/normal data, camera/FOV information,
+16-bit depth and normal/mask PNGs, plus optional native GLB. `LoadMoGeGeometry`
+loads the bounded pickle-free archive for meshing without inference. Panorama
+depth is relative radial distance; perspective scale/camera remain estimates.
+See [geometry interchange and conventions](docs/moge-depth.md#numeric-geometry-interchange).
+
 `SaveMoGeDepthPNG` converts native MoGe output to the same 16-bit grayscale
 format and depth-range metadata used by RuntimeHost. See
 [MoGe metric depth PNG](docs/moge-depth.md) for encoding, workflow and recovery
