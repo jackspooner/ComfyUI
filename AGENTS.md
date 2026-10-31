@@ -414,6 +414,12 @@ Use the existing shared `comfyui` skill for discovery and operating guidance and
 
 ## Worktree development
 
+MoGe numeric export/load lives in `comfy_extras/moge_geometry_io.py`; native
+nodes remain in `nodes_moge.py`. Run both `moge_geometry_io_test.py` and
+`nodes_moge_test.py` under `tests-unit/comfy_extras_test/`. See `docs/moge-depth.md`
+for the pickle-free versioned format and projection/scale conventions. Shared
+operating guidance remains in the authoritative `comfyui` skill.
+
 The optional `CLIP.vision_encode_scope()` contract and restrictions are in
 [scoped vision features](docs/vision-feature-reuse.md). Focused CPU validation is
 `python -m pytest tests-unit/comfy_test/vision_features_test.py -q` with the
