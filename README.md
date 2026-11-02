@@ -9,6 +9,14 @@ definitions. Validate with `python -m pytest
 tests-unit/comfy_extras_test/image_scale_total_pixels_test.py -q` using the
 prepared interpreter described below.
 
+## Native Gemma4 12B structured output in this fork
+
+Generate Text can constrain complete Gemma4 12B unified packages, including OYM
+BF16, to the existing closed JSON Schema subset. Use `response_format=json_schema`,
+`thinking=false`, `mtp=off` and the default template. Other Gemma variants remain
+unadmitted. See [requirements, schemas and verification limits](docs/text-json.md).
+This does not install weights or activate an already-running instance.
+
 ## SAM 3D Body precision in this fork
 
 The dense BF16 SAM 3D Body loader prefers BF16 backbone computation with FP32

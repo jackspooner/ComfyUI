@@ -89,7 +89,7 @@ class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
         # Qwen3-VL 4B legitimately uses tied embedding/output weights. The
         # conditioning-only 32B export omits the final norm as well as the head.
         if not config.final_norm or self.transformer.model.norm is None:
-            raise StructuredOutputError("capability", "A complete generative Qwen package with final norm and separate or tied language head is required.")
+            raise StructuredOutputError("capability", "A complete generative package with final norm and separate or tied language head is required.")
         return PreparedJSON(tokenizer, schema_text, config.vocab_size, config.stop_tokens, self.structured_output_family, thinking)
 
     LAYERS = [
