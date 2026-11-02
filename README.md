@@ -14,7 +14,9 @@ prepared interpreter described below.
 Generate Text can constrain complete Gemma4 12B unified packages, including OYM
 BF16, to the existing closed JSON Schema subset. Use `response_format=json_schema`,
 `thinking=false`, `mtp=off` and the default template. Other Gemma variants remain
-unadmitted. See [requirements, schemas and verification limits](docs/text-json.md).
+unadmitted. Bounded main-service OYM BF16 JSON and H3 image-conditioned writer
+checks passed; maximum capacity and perception accuracy remain unverified.
+See [requirements, schemas and verification limits](docs/text-json.md).
 This does not install weights or activate an already-running instance.
 
 ## SAM 3D Body precision in this fork
