@@ -1,8 +1,11 @@
 # Native constrained JSON text
 
 This fork adds optional, offline llguidance constraints to **Load CLIP → Generate
-Text**. Source implementation and CPU/tokenizer tests are available; **full-model
-GPU acceptance and serving activation have not been performed**. A schema-valid
+Text**. Source implementation and CPU/tokenizer tests are available. A bounded
+main-service GPU check on 2 November 2026 passed with complete Qwen3-VL 4B BF16:
+the closed object `{"text":"hello"}` finished with `native_schema`,
+`grammar_complete` and `validated:true`. This does not establish image/media or
+large-schema capacity. Gemma4 12B main-service acceptance remains pending. A schema-valid
 answer is a model interpretation, not verification of source observations,
 advertising claims, citations or factual accuracy.
 
