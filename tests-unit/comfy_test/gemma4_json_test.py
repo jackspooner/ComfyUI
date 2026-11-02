@@ -55,3 +55,12 @@ def test_other_gemma_variants_remain_unadmitted():
     model = SimpleNamespace(transformer=SimpleNamespace(model=SimpleNamespace(config=object())))
     with pytest.raises(StructuredOutputError, match="complete Gemma4 12B"):
         Gemma4Model.prepare_structured_output(model, None, "{}", False)
+
+
+def test_numeric_failure_reports_accepted_token_count_without_changing_other_errors():
+    def fail(*args, **kwargs):
+        raise ValueError("structured_output.logits: No usable legal logits.")
+    model = SimpleNamespace(execution_device="cpu", transformer=SimpleNamespace(generate=fail))
+    with patch("comfy.sd1_clip.SDClipModel.process_tokens", return_value=(torch.zeros(1, 2, 3), None, None, [])):
+        with pytest.raises(ValueError, match="accepted_tokens=2"):
+            Gemma4Model.generate(model, [[(2, 1), (3, 1)]], False, 10, 1, 0, 1, 0, 1, 0, mtp=False, constraint=SimpleNamespace(raw_ids=[3, 4]))
