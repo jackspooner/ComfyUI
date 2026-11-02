@@ -1646,6 +1646,10 @@ class _Gemma4Tokenizer:
             tokenizer_json_bytes = bytes(tokenizer_json_bytes.tolist())
         self.tokenizer = Tokenizer.from_str(tokenizer_json_bytes.decode("utf-8"))
 
+    @property
+    def backend_tokenizer(self):
+        return self.tokenizer
+
     @classmethod
     def from_pretrained(cls, tokenizer_data, **kwargs):
         return cls(tokenizer_json_bytes=tokenizer_data, **kwargs)
@@ -1723,6 +1727,13 @@ class Gemma4UnifiedTokenizer(Gemma4Tokenizer):
 # Model wrappers
 class Gemma4Model(sd1_clip.SDClipModel):
     model_class = None
+    structured_output_family = "gemma4_12b"
+
+    def prepare_structured_output(self, tokenizer, schema_text, thinking):
+        from comfy.text_json import StructuredOutputError
+        if not isinstance(self.transformer.model.config, Gemma4_12B_Config):
+            raise StructuredOutputError("capability", "Native Gemma JSON currently requires the complete Gemma4 12B unified package.")
+        return super().prepare_structured_output(tokenizer, schema_text, thinking)
     def __init__(self, device="cpu", layer="all", layer_idx=None, dtype=None, attention_mask=True, model_options={}):
         llama_quantization_metadata = model_options.get("llama_quantization_metadata", None)
         if llama_quantization_metadata is not None:
@@ -1732,7 +1743,7 @@ class Gemma4Model(sd1_clip.SDClipModel):
         self.dtypes.add(dtype)
         super().__init__(device=device, layer=layer, layer_idx=layer_idx, textmodel_json_config={}, dtype=dtype, special_tokens={"start": 2, "pad": 0}, layer_norm_hidden_state=False, model_class=self.model_class, enable_attention_masks=attention_mask, return_attention_masks=attention_mask, model_options=model_options)
 
-    def generate(self, tokens, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, presence_penalty=0.0, mtp=True):
+    def generate(self, tokens, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, presence_penalty=0.0, mtp=True, constraint=None):
         if isinstance(tokens, dict):
             tokens = next(iter(tokens.values()))
         tokens_only = [[t[0] for t in b] for b in tokens]
@@ -1752,7 +1763,8 @@ class Gemma4Model(sd1_clip.SDClipModel):
                 expanded_idx += 1
         initial_token_ids = [ids]
         input_ids = torch.tensor(initial_token_ids, device=self.execution_device)
-        return self.transformer.generate(embeds, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, initial_tokens=initial_token_ids[0], presence_penalty=presence_penalty, initial_input_ids=input_ids, embeds_info=embeds_info)
+        extra = {"constraint": constraint} if constraint is not None else {}
+        return self.transformer.generate(embeds, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, initial_tokens=initial_token_ids[0], presence_penalty=presence_penalty, initial_input_ids=input_ids, embeds_info=embeds_info, **extra)
 
 
 def gemma4_clip_model(model_class):
