@@ -1764,7 +1764,12 @@ class Gemma4Model(sd1_clip.SDClipModel):
         initial_token_ids = [ids]
         input_ids = torch.tensor(initial_token_ids, device=self.execution_device)
         extra = {"constraint": constraint} if constraint is not None else {}
-        return self.transformer.generate(embeds, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, initial_tokens=initial_token_ids[0], presence_penalty=presence_penalty, initial_input_ids=input_ids, embeds_info=embeds_info, **extra)
+        try:
+            return self.transformer.generate(embeds, do_sample, max_length, temperature, top_k, top_p, min_p, repetition_penalty, seed, initial_tokens=initial_token_ids[0], presence_penalty=presence_penalty, initial_input_ids=input_ids, embeds_info=embeds_info, **extra)
+        except ValueError as error:
+            if constraint is None or not str(error).startswith("structured_output.logits:"):
+                raise
+            raise ValueError(f"{error} Gemma4 accepted_tokens={len(constraint.raw_ids)}.") from error
 
 
 def gemma4_clip_model(model_class):
