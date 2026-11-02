@@ -1,3 +1,11 @@
+## Image count planning in this fork
+
+`Load CLIP → Plan Text Image Budget` estimates how many same-size images fit
+the selected native text model's context and current managed memory headroom.
+It reserves prompt/output space without vision encoding or text generation.
+See [inputs, queue usage and limits](docs/text-image-budget.md). Source and CPU
+tests do not establish live activation or successful maximum-size inference.
+
 ## Scaled image dimensions in this fork
 
 **Scale Image to Total Pixels** outputs `IMAGE`, `width` (`INT`) and `height`
