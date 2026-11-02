@@ -5,7 +5,11 @@ Text**. Source implementation and CPU/tokenizer tests are available. A bounded
 main-service GPU check on 2 November 2026 passed with complete Qwen3-VL 4B BF16:
 the closed object `{"text":"hello"}` finished with `native_schema`,
 `grammar_complete` and `validated:true`. This does not establish image/media or
-large-schema capacity. Gemma4 12B main-service acceptance remains pending. A schema-valid
+large-schema capacity. The main service also passed a complete Gemma4 12B OYM BF16
+closed-object probe (six tokens), a two-image FL2V writer (130 tokens) and an H3
+REF2V writer supplied three images plus image/video/audio descriptions (338 tokens).
+All reported native grammar completion and independent validation. These bounded
+checks do not establish maximum reference capacity or perception accuracy. A schema-valid
 answer is a model interpretation, not verification of source observations,
 advertising claims, citations or factual accuracy.
 
@@ -177,8 +181,10 @@ On Ryzen 7 9700X CPU, one sequential six-schema replay measured request preparat
 Across 1147 answer-token masks, median was 0.030 ms and p95 0.078 ms, excluding
 sampling/model work. Process peak RSS rose from 984012 to 1318512 KiB during the
 whole replay; this is not isolated allocator accounting. No torch.compile helper
-is used: the CPU byte mask is converted to a request-local Boolean tensor. CUDA
-transfer/synchronization overhead, model latency, cancellation during real compute,
+is used: the CPU byte mask is copied into a request-local Boolean tensor whose
+device storage is reused across tokens. Allocate it on the unbracketed first step;
+retaining new per-token masks across allocation-graph boundaries caused Gemma
+decode failures. CUDA transfer/synchronization overhead, model latency, cancellation during real compute,
 VRAM behavior and other accelerators remain unmeasured. These numbers are not an
 end-to-end performance promise.
 
