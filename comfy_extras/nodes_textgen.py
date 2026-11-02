@@ -6,6 +6,7 @@ import re
 from comfy.text_generation import read_history, select_context, write_history, count_text_tokens
 import comfy.model_management
 from comfy_extras.text_history_images import resolve_images, publish_images, fingerprint
+from comfy_extras.text_image_budget import plan_image_count
 
 _JSON_FENCE = re.compile(r"^```[ \t]*(?:json)?[ \t]*\r?\n(.*?)\r?\n?```$", re.DOTALL | re.IGNORECASE)
 
@@ -461,12 +462,49 @@ class TextGenerateLTX2Prompt(TextGenerate):
         return io.NodeOutput(out.args[0] or prompt, out.args[1])
 
 
+class TextImageBudget(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="TextImageBudget", display_name="Plan Text Image Budget", category="text",
+            description="Find the largest bounded image count supported by the native context/memory estimate at the requested image size. Loads the selected CLIP through normal memory management; does not generate text or encode images.",
+            inputs=[
+                io.Clip.Input("clip"),
+                io.String.Input("prompt", multiline=True, default=""),
+                io.String.Input("system_prompt", multiline=True, default=""),
+                io.Int.Input("width", default=944, min=1, max=16384),
+                io.Int.Input("height", default=528, min=1, max=16384),
+                io.Int.Input("maximum_images", default=128, min=1, max=512),
+                io.Int.Input("max_length", default=4096, min=1, max=1048576),
+                io.Int.Input("context_budget", default=0, min=0, max=1048576),
+                io.Int.Input("reserve_tokens", default=1024, min=0, max=65536),
+                io.String.Input("json_schema", multiline=True, default=""),
+            ],
+            outputs=[io.Int.Output(display_name="image_count"), io.String.Output(display_name="budget_json")],
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("nan")  # Device headroom must be observed for every queued plan.
+
+    @classmethod
+    def execute(cls, clip, prompt, system_prompt, width, height, maximum_images,
+                max_length, context_budget=0, reserve_tokens=1024, json_schema=""):
+        if json_schema.strip():
+            instruction = _json_instruction(json_schema)
+            system_prompt = f"{system_prompt.rstrip()}\n\n{instruction}" if system_prompt.strip() else instruction
+        count, info = plan_image_count(clip, prompt, system_prompt, width, height,
+                                       maximum_images, max_length, context_budget, reserve_tokens)
+        return io.NodeOutput(count, json.dumps(info, ensure_ascii=False, allow_nan=False))
+
+
 class TextgenExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
         return [
             TextGenerate,
             TextGenerateLTX2Prompt,
+            TextImageBudget,
         ]
 
 async def comfy_entrypoint() -> TextgenExtension:
