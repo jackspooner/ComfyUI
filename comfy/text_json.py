@@ -175,7 +175,7 @@ class PreparedJSON:
             "vocab_size": vocab_size, "stop_tokens": list(self.stops), "property_order": "schema",
             "thinking_protocol": "moss-qwen-token-v1" if thinking else "none",
         }
-        suffix = "<|im_start|>assistant\n"
+        suffix = "<|turn>model\n<|channel>thought\n<channel|>" if family == "gemma4_12b" else "<|im_start|>assistant\n"
         if family == "moss_audio" and not thinking:
             suffix += "<think>\n\n</think>\n\n"
         self.prompt_suffix = backend.encode(suffix, add_special_tokens=False).ids

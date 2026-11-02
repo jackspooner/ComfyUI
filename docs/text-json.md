@@ -53,11 +53,14 @@ ordinary CLIP decode contract is unchanged.
 | Complete MOSS-Audio 8B Instruct/Thinking | Implemented, actual embedded tokenizer CPU tests | Verified Qwen single-token open/close protocol; answer-only output also permitted |
 | Complete Qwen3-VL 8B / tied-head 4B | Implemented, bundled Qwen tokenizer and real template CPU tests | Rejected pending separate protocol acceptance |
 | H3 Qwen3-VL 32B conditioning-only export | Rejected: truncated package lacks final norm/head | Rejected |
-| Gemma3/4, Qwen3.5/3.8, Qwen3-Omni, GLM and other families | Not admitted in this milestone | Not admitted |
+| Complete Gemma4 12B unified, including OYM BF16 | Implemented; embedded tokenizer and nonthinking template tests | Rejected; use `thinking:false` |
+| Gemma3, other Gemma4 variants, Qwen3.5/3.8, Qwen3-Omni, GLM and other families | Not admitted | Not admitted |
 
-Gemma4's actual embedded tokenizer byte decoding was tested, but this is **not**
-acceptance of its channel protocol or full constrained generation. No checkpoint
-has been accepted by a full-model generation run for this feature yet.
+Gemma4 12B uses its native `<|turn>model` boundary followed by the empty thought
+channel supplied by the nonthinking template. The authoritative embedded tokenizer,
+Unicode token masking, stop IDs, raw-template rejection and wrapper delegation have
+CPU coverage. Other Gemma channel/thinking protocols remain unadmitted. Full-model
+GPU acceptance and serving activation must be verified separately.
 
 Preparation requires an authoritative `tokenizers` backend, exact vocabulary width
 and configured stop IDs. Older slow Transformers tokenizers without that backend
