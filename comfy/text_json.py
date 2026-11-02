@@ -202,6 +202,7 @@ class JSONAttempt:
         self.raw_ids = []
         self.finish_reason = None
         self.stop_tokens = prepared.stops
+        self.device_mask = None
 
     def allowed_mask(self, logits):
         p = self.prepared
@@ -224,8 +225,13 @@ class JSONAttempt:
                     allowed[token] = 1
             if self.phase == "start":
                 allowed[p.open_id] = 1
+        # Keep this request's device storage outside per-token allocation graphs.
         # compute_logit_bias is a byte mask, never a finite logit bias.
-        return torch.frombuffer(allowed, dtype=torch.uint8).to(device=logits.device, dtype=torch.bool).unsqueeze(0)
+        if self.device_mask is None:
+            self.device_mask = torch.empty_like(logits, dtype=torch.bool)
+        cpu_mask = torch.frombuffer(allowed, dtype=torch.uint8).to(dtype=torch.bool).unsqueeze(0)
+        self.device_mask.copy_(cpu_mask)
+        return self.device_mask
 
     def commit(self, token):
         p = self.prepared
