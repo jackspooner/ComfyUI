@@ -1412,7 +1412,7 @@ class BaseGenerate:
 
     def check_constrained_logits(self, logits):
         if torch.isnan(logits).any() or torch.isposinf(logits).any() or not torch.isfinite(logits).any(dim=-1).all():
-            raise ValueError("structured_output.logits: No usable legal logits; no unconstrained fallback.")
+            raise ValueError(f"structured_output.logits: No usable legal logits; no unconstrained fallback. NaN={torch.isnan(logits).sum().item()}, positive_inf={torch.isposinf(logits).sum().item()}, finite={torch.isfinite(logits).sum().item()}.")
 
     def sample_token(self, logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, generator, do_sample=True, presence_penalty=0.0, penalty_mask=None, allowed_mask=None):
 
