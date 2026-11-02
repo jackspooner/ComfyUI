@@ -90,6 +90,25 @@ def test_fresh_matcher_and_budget(prepared):
     assert second.finish()[0] == '{"text":"ok"}'
 
 
+def test_attempt_reuses_mask_storage_without_sharing_between_attempts(prepared):
+    attempt = prepared.new_attempt()
+    logits = torch.zeros(1, prepared.vocab_size)
+    initial = attempt.allowed_mask(logits)
+    pointer = initial.data_ptr()
+    assert not initial[0, list(prepared.stops)].any()
+    for token in ordinary_ids(prepared, '{"text":"ok"}'):
+        mask = attempt.allowed_mask(logits)
+        assert mask.data_ptr() == pointer
+        assert mask[0, token]
+        attempt.commit(token)
+    complete = attempt.allowed_mask(logits)
+    assert complete.data_ptr() == pointer
+    assert complete[0, list(prepared.stops)].all()
+    other = prepared.new_attempt().allowed_mask(logits)
+    assert other.data_ptr() != pointer
+    assert not other[0, list(prepared.stops)].any()
+
+
 @pytest.mark.parametrize("text", ['{}', '{"text":"ok","text":"duplicate"}', '{"text":""}'])
 def test_required_duplicate_and_minlength_excluded(prepared, text):
     attempt = prepared.new_attempt()
