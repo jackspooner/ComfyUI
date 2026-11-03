@@ -996,3 +996,13 @@ Run `python -m pytest tests-unit/execution_test/test_prompt_admission.py -q` wit
 the prepared runtime; these checks do not start live GPU workloads.
 
 Development prerequisites and focused native validation remain in [AGENTS.md](AGENTS.md#worktree-development). The [native integration guide](docs/native-model-integration.md) uses the prepared Python runtime directly; historical graph/lifecycle receipts are not setup requirements.
+
+## Native audio-visual video captioners in this fork
+
+An optional native extension adds video-SALMONN-2-Pro-8B video/audio questions
+and PadCaptioner-3B dense event captions with learned temporal grounding.
+Offline conversion packages complete BF16 checkpoints and tokenizer assets into
+single safetensors files; inference uses ComfyUI model/memory ownership and its
+normal queue. See [conversion, nodes, sources and acceptance limits](docs/video-captioners.md).
+This candidate requires separate serving activation and real-video acceptance;
+source/component tests do not establish full upstream parity or output quality.
