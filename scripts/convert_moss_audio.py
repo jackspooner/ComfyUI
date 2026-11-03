@@ -120,7 +120,8 @@ def inspect_shards(source, expected=None):
     if expected is not None and set(records) != set(expected):
         raise ValueError(f"Missing tensors: {sorted(set(expected) - set(records))}")
     total = sum(entry['data_offsets'][1] - entry['data_offsets'][0] for _, _, entry in records.values())
-    if index is not None and total != index['metadata']['total_size']:
+    declared_total = index.get('metadata', {}).get('total_size') if index is not None else None
+    if declared_total is not None and total != declared_total:
         raise ValueError('Payload size does not match the shard index')
     return records
 
