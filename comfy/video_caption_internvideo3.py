@@ -161,6 +161,8 @@ class InternVideoCaptioner:
         self.dtype = torch.bfloat16 if comfy.model_management.supports_dtype(self.load_device, torch.bfloat16) else torch.float32
         self.tokenizer = Tokenizer.from_str(state_dict.pop('tokenizer_json').numpy().tobytes().decode())
         config = json.loads(metadata['captioner_config'])
+        generation = json.loads(json.loads(metadata['captioner_assets'])['generation_config.json'])
+        self.eos_tokens = frozenset(generation['eos_token_id'])
         self.config = namespace(config)
         self.network = InternVideoNetwork(config, self.dtype, offload, comfy.ops.manual_cast).eval()
         self.network.load_state_dict(state_dict, strict=True, assign=True)
@@ -193,7 +195,7 @@ class InternVideoCaptioner:
             comfy.model_management.throw_exception_if_processing_interrupted()
             hidden, cache = self.network.model.step(hidden, positions, cache)
             token = int(self.network.model.lm_head(hidden[:, -1:]).argmax(-1).item())
-            if token == self.config.text_config.eos_token_id:
+            if token in self.eos_tokens:
                 break
             output.append(token)
             hidden = self.network.model.embed_tokens(torch.tensor([[token]], device=self.load_device), out_dtype=self.dtype)
