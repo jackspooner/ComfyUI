@@ -160,6 +160,8 @@ class PadSession(PadGrounding):
 
 
 class VideoCaptioner:
+    supports_audio = True
+
     def __init__(self, state_dict, metadata):
         if metadata.get('conversion_version') != '1' or metadata.get('architecture') not in ('salmonn2_pro_8b', 'padcaptioner_3b'):
             raise ValueError('Use scripts/convert_video_captioner.py to prepare a complete native captioner')
