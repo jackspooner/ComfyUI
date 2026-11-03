@@ -36,7 +36,7 @@ def test_stream_exact_payloads_and_tokenizer(tmp_path):
         converter.stream_checkpoint(records, tokenizer, dest, {})
 
 
-@pytest.mark.parametrize('fault', ['missing_shard', 'truncated', 'missing_tensor', 'duplicate', 'lfs'])
+@pytest.mark.parametrize('fault', ['missing_shard', 'truncated', 'missing_tensor', 'duplicate', 'lfs', 'total_size'])
 def test_invalid_shards(tmp_path, fault):
     weights, index = shards(tmp_path)
     path = tmp_path / 'model-1.safetensors'
@@ -51,9 +51,26 @@ def test_invalid_shards(tmp_path, fault):
         index['weight_map']['extra'] = 'model-2.safetensors'
     elif fault == 'lfs':
         path.write_text('version https://git-lfs.github.com/spec/v1\noid sha256:123\nsize 1000\n')
+    elif fault == 'total_size':
+        index['metadata']['total_size'] += 1
     (tmp_path / 'model.safetensors.index.json').write_text(json.dumps(index))
     with pytest.raises(Exception):
         converter.inspect_shards(tmp_path)
+
+
+@pytest.mark.parametrize('metadata', [{}, None])
+def test_shard_index_without_optional_byte_total_keeps_tensor_validation(tmp_path, metadata):
+    weights, index = shards(tmp_path)
+    if metadata is None:
+        del index['metadata']
+    else:
+        index['metadata'] = metadata
+    (tmp_path / 'model.safetensors.index.json').write_text(json.dumps(index))
+    expected = {name: list(tensor.shape) for name, tensor in weights.items()}
+    assert set(converter.inspect_shards(tmp_path, expected)) == set(weights)
+    expected['lm_head.weight'] = [3, 4]
+    with pytest.raises(ValueError, match='shape/dtype'):
+        converter.inspect_shards(tmp_path, expected)
 
 
 def test_duplicate_json_key():
