@@ -79,6 +79,9 @@ InternVideo3 requires about 18.7 GB each for source and output. All 732 weight
 tensors are retained without casting or attention-weight transformations; its
 tokenizer and processor/config assets are embedded. The converter does not execute
 the downloaded remote model code. Full native loading enforces strict coverage.
+The shard index may omit optional `metadata.total_size`; published file hashes,
+actual payload lengths and the complete expected BF16 tensor inventory still
+apply. A declared byte total must match.
 
 ## Nodes and execution
 
