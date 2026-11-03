@@ -1001,6 +1001,8 @@ Development prerequisites and focused native validation remain in [AGENTS.md](AG
 
 An optional native extension adds video-SALMONN-2-Pro-8B video/audio questions
 and PadCaptioner-3B dense event captions with learned temporal grounding.
+InternVideo3-8B-Instruct adds visual video questions with native M²LA and a
+compressed latent cache; it has no audio encoder or recursive agent/tool loop.
 Offline conversion packages complete BF16 checkpoints and tokenizer assets into
 single safetensors files; inference uses ComfyUI model/memory ownership and its
 normal queue. See [conversion, nodes, sources and acceptance limits](docs/video-captioners.md).

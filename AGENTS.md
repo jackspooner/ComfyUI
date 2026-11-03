@@ -1,3 +1,11 @@
+## Native video captioners
+
+Native video-captioner preparation and acceptance are documented in
+[video captioners](docs/video-captioners.md). InternVideo3 M²LA stays in its model
+module; reuse the optional caption extension and offline converter. Run the
+focused `internvideo3_test.py` and `video_caption_test.py` CPU suites. Heavy GPU
+acceptance belongs to the serving instance's normal queue.
+
 ## Native component leases
 
 `comfy/component_leases.py` owns bounded references, not GPU residency or prompt

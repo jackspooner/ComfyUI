@@ -1,7 +1,7 @@
 # Native audio-visual captioners
 
 This fork adds offline single-file conversion and an optional native ComfyUI
-extension for video-SALMONN-2-Pro-8B and PadCaptioner-3B. The dedicated model handle
+extension for video-SALMONN-2-Pro-8B, PadCaptioner-3B and InternVideo3-8B-Instruct. The dedicated model handle
 is intentional: PadCaptioner returns event intervals from learned heads, plans
 events, and decodes branch-isolated captions. This differs from ordinary CLIP
 conditioning or one text-generation stream. Both models reuse native Qwen
@@ -14,6 +14,7 @@ They do not launch an upstream Python inference worker or a second GPU service.
 | --- | --- | --- |
 | [SALMONN Pro 8B](https://huggingface.co/tsinghua-ee/video-SALMONN-2-Pro-8B) | `89319a9934169266b8d5da3d7d4850e9f714870f` | [Tsinghua/ByteDance](https://github.com/bytedance/video-SALMONN-2/tree/2d28e841c8378885d2f30982be801d0c44f7a5bb/video_SALMONN2_pro) |
 | [PadCaptioner 3B](https://huggingface.co/wenzhengzeng/PadCaptioner-3B) | `a1eb578dd619be63819d8342d8d49fa2676d20e8` | [Show Lab](https://github.com/showlab/PadCaptioner/tree/ae3f3bc11a66e99d18cdeb457e3c27cf15869dd6) |
+| [InternVideo3 8B](https://huggingface.co/yanziang/InternVideo3-8B-Instruct) | `c4602918b65225650d152db2850fe34e01d21fcd` | [model-supplied implementation](https://huggingface.co/yanziang/InternVideo3-8B-Instruct/blob/c4602918b65225650d152db2850fe34e01d21fcd/modeling_internvideo3.py) |
 
 Credit Tsinghua University, ByteDance and the PadCaptioner authors. The adapted
 SALMONN model code carries Apache-2.0 notices; the upstream sources and model
@@ -26,6 +27,14 @@ attention-weighted event aggregation and isolated parallel caption branches.
 Its six other upstream task APIs, training/evaluation suite, stochastic decoding,
 deduplication heuristics and automatic retries are outside this interface.
 Intervals are estimates, not verified timestamps or measurements.
+
+InternVideo3 by Ziang Yan and collaborators is Apache-2.0. It accepts visual
+questions and captions, using native M²LA with rank-896 latent KV and shared
+rotary keys, a 36-layer decoder and the compatible 27-layer native Qwen vision
+encoder without DeepStack. It has no audio encoder. The nodes skip its soundtrack
+and report `audio_used:false`; the low-level handle rejects supplied audio.
+Its provider's recursive perception/action agent, external ASR/web/segmentation
+tools, training and hour-long/256K-capacity claims are outside this interface.
 
 ## Preparation and conversion
 
@@ -44,6 +53,10 @@ python scripts/convert_video_captioner.py \
   --source /absolute/model-sources/PadCaptioner-3B \
   --family padcaptioner_3b \
   --destination /absolute/models/text_encoders/video_captioners/padcaptioner_3b_bf16.safetensors
+python scripts/convert_video_captioner.py \
+  --source /absolute/model-sources/InternVideo3-8B-Instruct \
+  --family internvideo3_8b \
+  --destination /absolute/models/text_encoders/video_captioners/internvideo3_8b_instruct_bf16.safetensors
 ```
 
 The converter checks published weight SHA256 values and pinned configuration,
@@ -62,6 +75,10 @@ preserved. Resident conversion memory is bounded by mapped storage and the
 serialization library, not a complete CUDA model. An interruption leaves no
 published partial checkpoint; inspect only task-owned temporary files before
 retrying. Use a fresh destination if a complete package already exists.
+InternVideo3 requires about 18.7 GB each for source and output. All 732 weight
+tensors are retained without casting or attention-weight transformations; its
+tokenizer and processor/config assets are embedded. The converter does not execute
+the downloaded remote model code. Full native loading enforces strict coverage.
 
 ## Nodes and execution
 
@@ -89,6 +106,12 @@ upstream interleaved prompt; PadCaptioner's grounding ranges select actual time
 windows independently. No transcript is inserted in place of learned audio.
 SALMONN uses timestamp-separated visual groups and DeepStack; PadCaptioner uses
 audio/video MRoPE and bidirectional media-prefix visibility.
+InternVideo3 uses timestamp-separated visual groups and its pinned no-default-system
+chat template. It reuses the visual preprocessing/position algorithm, with its
+interleaved MRoPE and DeepSeek pair layout in the custom decoder. `max_tokens` is
+its total answer budget; `max_events` is unused. Its default MediaTools prompt is
+“Please describe this video in detail.” Start with short clips and modest frame
+resolution; this API retains the same 120-second/512-frame bounds for all models.
 
 Greedy `max_tokens` applies to the total SALMONN answer or each PadCaptioner event.
 `max_events` limits PadCaptioner planning. Use the upstream dense-caption prompt:
@@ -129,3 +152,32 @@ normal-queue real-video quality, repeated runs, cancellation, model transitions,
 cold/warm performance and peak memory remain separate acceptance gates until
 recorded. CPU fixtures and all-parameter inventory checks are not GPU acceptance.
 Other accelerators, quantization and long-video capacity are unqualified.
+
+### InternVideo3 backend selection and checks
+
+The same RTX 5090 SM 12.0 / Torch 2.14.1+cu130 target applies. The native vision
+encoder reuses ComfyUI attention dispatch. M²LA prefill expands one layer's latent
+KV, zero-pads values to the 256-wide QK head, dispatches native attention, then
+discards the padded dimensions. Decode absorbs the up-projection into query/output
+einsums and retains only latent/rotary tensors. ModelPatcher, native cast contexts,
+prefetch and interruption checks own weight movement and cancellation.
+Admission estimates compressed KV plus expanded prefill/workspace separately.
+
+Compared the pinned upstream eager/SDPA/FlashAttention implementations with
+[PyTorch SDPA](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html)
+and the [vLLM model table](https://docs.vllm.ai/en/latest/models/supported_models/).
+That table lists InternVideo 2.5 under InternVL, not this exact M²LA architecture;
+the [SGLang registry](https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/models/registry.py)
+discovers implementations dynamically and is not proof of model support. No
+compatible external engine was established or benchmarked. The native selection
+is provisional until main-queue quality, cold/warm timing, peak memory and actual
+kernel execution are measured; no optimal-backend claim is made.
+
+Run `python -m pytest tests-unit/comfy_test/internvideo3_test.py -q` in the prepared
+CPU test environment. Set `INTERNVIDEO3_REFERENCE` to the pinned local
+`modeling_internvideo3.py` to additionally compare the upstream attention class's
+prefill/absorbed decode and the native vision encoder on a temporal non-square
+grid. This compiles only selected inspected definitions;
+it does not import upstream model registration or network hooks. Tiny fixtures
+and strict checkpoint construction remain separate from full-checkpoint output
+parity and real-video acceptance. Both require activation and the main queue.

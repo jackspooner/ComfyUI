@@ -5,6 +5,7 @@ import math
 import folder_paths
 import comfy.utils
 from comfy.video_caption import VideoCaptioner
+from comfy.video_caption_internvideo3 import InternVideoCaptioner
 from comfy_api.latest import ComfyExtension, io
 from comfy_api.input_impl import VideoFromFile
 
@@ -23,14 +24,15 @@ class LoadVideoCaptioner(io.ComfyNode):
     def execute(cls, model_name):
         path = folder_paths.get_full_path_or_raise('text_encoders', model_name)
         state, metadata = comfy.utils.load_torch_file(path, safe_load=True, return_metadata=True)
-        return io.NodeOutput(VideoCaptioner(state, metadata))
+        loader = InternVideoCaptioner if metadata.get('architecture') == 'internvideo3_8b' else VideoCaptioner
+        return io.NodeOutput(loader(state, metadata))
 
 
 class CaptionVideo(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(node_id='CaptionVideo', display_name='Caption Audio-Visual Video', category='text/video',
-            description='Native SALMONN question answering or PadCaptioner dense grounded captions. Greedy decoding; no network, training, or automatic model download.',
+            description='Native SALMONN audio-visual questions, PadCaptioner dense captions or InternVideo3 visual questions. InternVideo3 has no audio encoder. Greedy decoding; no network, training, or automatic download.',
             inputs=[CaptionModel.Input('captioner'), io.Image.Input('images'),
                 io.Float.Input('source_fps', default=24.0, min=0.01, max=1000),
                 io.String.Input('prompt', multiline=True, default='Describe the visual events and the sounds in the video.'),
@@ -43,8 +45,9 @@ class CaptionVideo(io.ComfyNode):
 
     @classmethod
     def execute(cls, captioner, images, source_fps, prompt, fps=2.0, max_pixels=61250, max_tokens=320, max_events=24, audio=None):
-        result = captioner.caption(images, source_fps, audio, prompt, fps, max_pixels, max_tokens, max_events)
-        result.update(model=captioner.family, sampling_fps=min(fps, source_fps), audio_used=audio is not None)
+        selected_audio = audio if captioner.supports_audio else None
+        result = captioner.caption(images, source_fps, selected_audio, prompt, fps, max_pixels, max_tokens, max_events)
+        result.update(model=captioner.family, sampling_fps=min(fps, source_fps), audio_used=selected_audio is not None)
         return io.NodeOutput(result['text'], json.dumps(result))
 
 
@@ -78,7 +81,7 @@ class CaptionVideoFile(io.ComfyNode):
         sampled_frames = math.ceil(duration * rate / stride)
         if sampled_frames > 512:
             raise ValueError('Selected video exceeds 512 sampled frames; lower fps or trim the source')
-        components = source.get_components_selected(include_images=True, include_audio=use_audio,
+        components = source.get_components_selected(include_images=True, include_audio=use_audio and captioner.supports_audio,
             frame_stride=stride, max_size=512, compact=True)
         result = captioner.caption(components.images, float(components.frame_rate), components.audio,
             prompt, fps, max_pixels, max_tokens, max_events)
