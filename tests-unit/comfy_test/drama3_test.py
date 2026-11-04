@@ -56,6 +56,39 @@ def test_history_roundtrip_and_branch(tmp_path):
     history.validate_codes(bad)
 
 
+def test_stage_history_roundtrip_keeps_child_tensors_private():
+    codes = torch.arange(30).reshape(10, 3)
+    original = history.History('fixture', (history.Reference('hello', 0, codes, 'fixture'),),
+                               (history.Take('hello', (('hello', codes),), {'seed': 1}),))
+    checkpoint = history.state(original)
+    restored = history.from_state(checkpoint)
+    assert torch.equal(restored.takes[0].chunks[0][1], codes)
+    restored.references[0].codes.zero_()
+    assert torch.equal(original.references[0].codes, codes)
+    assert torch.equal(checkpoint['references'][0]['codes'], codes)
+    with pytest.raises(ValueError, match='stage history'):
+        history.from_state({**checkpoint, 'version': 2})
+
+
+def test_staged_generation_preserves_history_and_exact_parameters(monkeypatch):
+    model = SimpleNamespace(compatibility='fixture')
+    prior = history.History('fixture')
+    state = nodes_drama3.Drama3PrepareHistory.execute(model, history=prior).result[0]
+    expected = history.History('fixture', takes=(history.Take('Hello.', (('Hello.', torch.zeros(10, 3, dtype=torch.int64)),), {'seed': 7}),))
+    def generate(*values):
+        assert values[0] is model
+        assert values[1:3] == ('Hello.', ())
+        assert values[3].takes == ()
+        assert values[4:] == (7, .7, .7, 30, 1024, False)
+        return expected
+    monkeypatch.setattr(nodes_drama3.runtime, 'generate_codes', generate)
+    result = nodes_drama3.Drama3GenerateCodes.execute(model, state, 'Hello.', 7, .7, .7, 30, 1024, False).result[0]
+    assert history.from_state(state['drama3_history']).takes == ()
+    monkeypatch.setattr(nodes_drama3.runtime, 'decode_history', lambda model, value: {'sample_rate': 44100, 'waveform': value.takes[-1].chunks[0][1]})
+    audio, updated = nodes_drama3.Drama3DecodeHistory.execute(model, result).result
+    assert audio['sample_rate'] == 44100 and len(updated.takes) == 1
+
+
 def test_history_rejects_unknown_version_and_tensor(tmp_path):
     from safetensors.torch import save_file
     p = tmp_path / 'bad.safetensors'
@@ -75,9 +108,9 @@ def test_loader_rejects_paths_outside_admitted_roots(tmp_path, monkeypatch):
         nodes_drama3.Drama3LoadHistory.execute('../../elsewhere.safetensors [output]')
 
 
-def test_schema_has_five_nodes_and_optional_references():
+def test_schema_has_generation_history_and_stage_nodes():
     nodes = asyncio.run(nodes_drama3.Drama3Extension().get_node_list())
-    assert len(nodes) == 5
+    assert len(nodes) == 8
     for node in nodes:
         assert node.define_schema().node_id == node.__name__
     schema = nodes_drama3.Drama3Generate.define_schema()
@@ -250,7 +283,8 @@ def test_manifest_failure_never_publishes_model(tmp_path, monkeypatch):
     assert not list(tmp_path.glob('.*'))
 
 
-def test_tiny_fp8_conversion_loads_native_expert_banks(tmp_path):
+@pytest.mark.parametrize('precision', ['nvfp4', 'mxfp8'])
+def test_tiny_fp8_conversion_loads_native_expert_banks(tmp_path, precision):
     from dataclasses import asdict
     from safetensors.torch import save_file, load_file
     from scripts.convert_drama3 import convert, InventoryOperations
@@ -293,14 +327,14 @@ def test_tiny_fp8_conversion_loads_native_expert_banks(tmp_path):
     (tmp_path / 'tokenizer.json').write_text('{}')
     (tmp_path / 'LICENSE').write_text('fixture')
     output = tmp_path / 'converted.safetensors'
-    convert(tmp_path, output, 'fixture-codec')
+    convert(tmp_path, output, 'fixture-codec', precision=precision)
     restored = GenerationModel(c, torch.bfloat16, 'cpu', comfy.ops.mixed_precision_ops(compute_dtype=torch.bfloat16, full_precision_mm=True))
     restored.load_state_dict(load_file(output), strict=True, assign=True)
     bank = restored.backbone.layers[0].mlp.experts.gate_up_proj
     assert bank.weight.shape == (2, 256, 128)
     assert restored.lm_head.weight.device.type == 'cpu'
     assert restored.backbone.layers[0].self_attn.q_proj.weight.shape == (32, 128)
-    assert bank.quant_format == 'nvfp4'
+    assert bank.quant_format == precision
     assert bank.weight._qdata.device.type == 'cpu'
     x = torch.ones(1, 128, dtype=torch.bfloat16)
     with bank.bank_resident(x) as resident:
