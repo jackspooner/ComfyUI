@@ -1896,6 +1896,7 @@ def load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_DI
 
 def _load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_DIFFUSION, model_options={}, disable_dynamic=False):
     clip_data = []
+    dramabox_indices = None
     for p in ckpt_paths:
         sd, metadata = comfy.utils.load_torch_file(p, safe_load=True, return_metadata=True)
         if model_options.get("custom_operations", None) is None:
@@ -1903,10 +1904,16 @@ def _load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_D
         clip_data.append(sd)
     if clip_type == CLIPType.DRAMABOX:
         from comfy.text_encoders import dramabox
-        _, audio_index = dramabox.split_state_dicts(clip_data)
+        gemma_index, audio_index = dramabox.split_state_dicts(clip_data)
+        dramabox_indices = (gemma_index, audio_index)
         model_options = model_options.copy()
         model_options["dramabox_audio_components_path"] = ckpt_paths[audio_index]
     clip = load_text_encoder_state_dicts(clip_data, embedding_directory=embedding_directory, clip_type=clip_type, model_options=model_options, disable_dynamic=disable_dynamic)
+    if dramabox_indices is not None:
+        gemma_index, audio_index = dramabox_indices
+        clip.dramabox_model_path = ckpt_paths[gemma_index]
+        clip.dramabox_model_name = os.path.basename(ckpt_paths[gemma_index])
+        clip.dramabox_audio_components_path = ckpt_paths[audio_index]
     clip.patcher.cached_patcher_init = (load_clip_model_patcher, (ckpt_paths, embedding_directory, clip_type, model_options))
     return clip
 
