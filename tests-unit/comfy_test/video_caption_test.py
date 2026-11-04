@@ -65,6 +65,9 @@ def test_multimodal_decoder_positions_use_native_single_batch_layout():
                          num_attention_heads=2, num_key_value_heads=1)
     config.head_dim, config.rope_dims, config.interleaved_mrope = 8, [2, 1, 1], True
     decoder = CaptionDecoder(config, device='cpu', dtype=torch.float32, ops=torch.nn)
+    for name, parameter in decoder.named_parameters():
+        if 'norm' in name:
+            torch.nn.init.ones_(parameter)
     positions = torch.tensor([[0, 1, 2, 3], [0, 2, 4, 6], [0, 3, 6, 9]])
     hidden = torch.randn(1, 4, 16)
     with torch.inference_mode():
