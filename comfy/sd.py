@@ -1876,6 +1876,7 @@ class CLIPType(Enum):
     FIBO2 = 43
     MOSS_TTS = 44
     MOSS_SOUNDEFFECT = 45
+    DRAMABOX = 46
 
 
 
@@ -1900,6 +1901,11 @@ def _load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_D
         if model_options.get("custom_operations", None) is None:
             sd, metadata = comfy.utils.convert_old_quants(sd, model_prefix="", metadata=metadata)
         clip_data.append(sd)
+    if clip_type == CLIPType.DRAMABOX:
+        from comfy.text_encoders import dramabox
+        _, audio_index = dramabox.split_state_dicts(clip_data)
+        model_options = model_options.copy()
+        model_options["dramabox_audio_components_path"] = ckpt_paths[audio_index]
     clip = load_text_encoder_state_dicts(clip_data, embedding_directory=embedding_directory, clip_type=clip_type, model_options=model_options, disable_dynamic=disable_dynamic)
     clip.patcher.cached_patcher_init = (load_clip_model_patcher, (ckpt_paths, embedding_directory, clip_type, model_options))
     return clip
@@ -2173,7 +2179,16 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
     tokenizer_data = {}
     clip_target = EmptyClass()
     clip_target.params = {}
-    if len(clip_data) == 1:
+    if clip_type == CLIPType.DRAMABOX:
+        from comfy.text_encoders import dramabox
+        gemma_index, _ = dramabox.split_state_dicts(clip_data)
+        clip_target.clip = dramabox.te(
+            **llama_detect(clip_data),
+            audio_components_path=model_options.get("dramabox_audio_components_path"),
+        )
+        clip_target.tokenizer = comfy.text_encoders.lt.LTXAVGemmaTokenizer
+        tokenizer_data["spiece_model"] = clip_data[gemma_index].get("spiece_model")
+    elif len(clip_data) == 1:
         te_model = detect_te_model(clip_data[0])
         if clip_type == CLIPType.QWEN3_OMNI and te_model != TEModel.QWEN3_OMNI:
             raise ValueError("Qwen3-Omni requires its converted native package with complete signatures and embedded assets. Run scripts/convert_qwen3_omni.py again.")
