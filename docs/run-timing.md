@@ -25,8 +25,10 @@ Known native loader selections include hashed registered file identity metadata
 (device/inode/size/mtime/ctime); this is distinct from a content-verified owner
 model-binding fingerprint. Unsupported implicit loaders retain selection-only
 assurance. Repeated graph instances share a profile topology while numeric node
-counts retain workload size. Text generation contributes numeric token counts and
-output limits without storing generated text. Cutlery may describe immutable stage
+counts retain workload size. Node implementation file identity also separates
+profiles after custom-node code changes, without retaining local source paths.
+Text generation contributes numeric token counts and output limits without
+storing generated text. Cutlery may describe immutable stage
 expansions through an optional read-only resolver; missing bounded selections stay
 unavailable until the execution owner saves them. Read-time resolution writes no
 telemetry or execution state.
