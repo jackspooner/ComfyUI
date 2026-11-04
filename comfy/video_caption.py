@@ -34,7 +34,11 @@ class CaptionDecoder(Llama2_):
             keys = torch.arange(past + length, device=hidden.device)
             queries = torch.arange(past, past + length, device=hidden.device)
             mask = hidden.new_zeros((1, 1, length, past + length)).masked_fill(keys[None, :] > queries[:, None], torch.finfo(hidden.dtype).min)
-        frequencies = self.compute_freqs_cis(positions, hidden.device)
+        # Upstream builders return [axes, batch, tokens]; native Qwen rotary
+        # preparation consumes [axes, tokens] for this single-video decoder.
+        if positions.ndim == 3:
+            positions = positions[:, 0]
+        frequencies = self.compute_freqs_cis(positions.to(hidden.device), hidden.device)
         attention = optimized_attention_for_device(hidden.device, mask=mask is not None, small_input=True)
         snapshots = {}
         next_cache = []
@@ -228,7 +232,9 @@ class VideoCaptioner:
             end = min(audio_count, math.ceil((index + 1) * 4 / fps))
             audio_ranges.append([(start, end)] if end > start else [])
         session = PadSession(network, ids, (video_ranges, audio_ranges), 2 / fps)
-        positions, delta = session.get_rope_index(ids, video_grid_thw=grid, audio_lengths=[audio_count] if audio_count else None,
+        # The upstream position builder mixes scalar/grid arithmetic with audio
+        # indices. Build its small integer layout on CPU before native transfer.
+        positions, delta = session.get_rope_index(ids.cpu(), video_grid_thw=grid.cpu(), audio_lengths=[audio_count] if audio_count else None,
             second_per_grid_ts=[2 / fps])
         prefix_length = ids.shape[1]
         mask = hidden.new_full((1, 1, prefix_length, prefix_length), torch.finfo(hidden.dtype).min).triu_(1)

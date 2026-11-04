@@ -59,6 +59,20 @@ def test_pad_branch_masks_isolate_histories_and_restrict_intervals():
                                                [False, True, False, True, False, True, False, True]]))
 
 
+def test_multimodal_decoder_positions_use_native_single_batch_layout():
+    torch.manual_seed(9)
+    config = Llama2Config(vocab_size=24, hidden_size=16, intermediate_size=32, num_hidden_layers=1,
+                         num_attention_heads=2, num_key_value_heads=1)
+    config.head_dim, config.rope_dims, config.interleaved_mrope = 8, [2, 1, 1], True
+    decoder = CaptionDecoder(config, device='cpu', dtype=torch.float32, ops=torch.nn)
+    positions = torch.tensor([[0, 1, 2, 3], [0, 2, 4, 6], [0, 3, 6, 9]])
+    hidden = torch.randn(1, 4, 16)
+    with torch.inference_mode():
+        upstream, _, _ = decoder.step(hidden.clone(), positions[:, None], None)
+        native, _, _ = decoder.step(hidden.clone(), positions, None)
+    torch.testing.assert_close(upstream, native, atol=0, rtol=0)
+
+
 def test_temporal_patching_preserves_both_frames_and_last_odd_frame():
     frames = torch.stack([torch.zeros(28, 28, 3), torch.ones(28, 28, 3), torch.full((28, 28, 3), 0.5)])
     patches, grid, timestamps = prepare_video(frames, 2, 2, 14, 784)
