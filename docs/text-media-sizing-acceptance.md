@@ -1,4 +1,45 @@
-# Text media sizing acceptance — 2026-10-23
+# Text media sizing acceptance
+
+## Dynamic VRAM headroom — 2026-11-04
+
+Task `4b21260b6` was integrated and deployed as `489eecba5`. Generate Text now
+uses the existing ModelPatcher CUDA headroom, including allocator-evictable
+weights, for media planning and the final generation admission check. It retains
+the inference reserve, caller/retry caps, minimum image floor and positive output
+reservation. CPU and other-device measurements remain unchanged.
+
+The task and integration checkouts each passed 293 focused text/media/history,
+structured-output, Gemma and Qwen/attention tests, with four optional-reference
+skips. Skill validation, 19 shared-skill production tests and discovery checks
+passed. The service was stopped at an empty queue after explicit operator
+authorization, fast-forwarded and restarted with unchanged flags. A byte-for-byte
+comparison preserved the pre-existing local diff. The canonical GitNexus index
+was refreshed; its static graph still reports bounded-resolution limitations.
+
+RTX 5090 main-queue checks used `gemma4_12b_bf16.safetensors`, 16 constant-colour
+frames, 1 FPS sampling, `context_budget=8192`, `min_short_edge=768`,
+`max_length=512`, sampling/thinking/MTP off:
+
+| Check | Prompt ID | Result |
+| --- | --- | --- |
+| Initial load | `b76c9e5b-78d9-48cc-ab01-e4f4f5033fa3` | Success; 7,597 input tokens, 512 reserved output tokens, sixteen 768×1392 frames, zero OOM retries |
+| Warm weights, new prompt | `ba41fb2f-6e6a-4a0c-b447-ac5d7b8c64e1` | Same successful sizing and reservation; loader and source frames reused, generation reran |
+
+Both estimated 7,231,117,888 working bytes. Immediately before the warm submission,
+the raw free-memory reading was 7,618,855,820 bytes: subtracting the unchanged
+inference reserve would give the old planner 6,340,431,960.8 bytes. The corrected
+warm planner reported 28,536,229,976.8 bytes including reclaimable dynamic weights.
+This is workspace the allocator may make available by evicting weights, not idle
+VRAM or a promise that weights and the entire workspace remain resident together.
+
+Both replies ended after two generated tokens. These checks establish bounded
+admission and execution, not a 512-token decode stress test, natural-video quality,
+an exact peak-memory calibration, or replay of the originally failing user clip.
+The workspace estimator remains conservative about attention. Exact graphs,
+submission receipts and returned histories are retained in this task's
+`work/text-budget-acceptance/` directory; never replay a receipt automatically.
+
+## Original sizing acceptance — 2026-10-23
 
 Source `fa68cb587` added the controls/planner. Serving checkout `a84d2544a` also
 contained the separately integrated video-component extraction changes. The
