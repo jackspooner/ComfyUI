@@ -102,6 +102,8 @@ Both output text and JSON. An explicit `use_audio:false` ignores the soundtrack.
 The single-video decoder normalizes upstream `[axes,batch,tokens]` positions to
 the native Qwen layout. PadCaptioner's integer audio/video layout is built on CPU
 before rotary preparation transfers it to the execution device.
+PadCaptioner's tied output head uses the native cast/materialization context,
+including disk-backed virtual weights and registered weight transforms.
 Sampling and reported intervals use source FPS. Variable-rate timestamp fidelity
 has not been qualified; use a constant-rate source when timing accuracy matters.
 

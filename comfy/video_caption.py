@@ -99,7 +99,8 @@ class CaptionNetwork(nn.Module):
 
     def logits(self, hidden):
         if self.family == 'padcaptioner_3b':
-            return F.linear(hidden, comfy.ops.cast_to_input(self.model.embed_tokens.weight, hidden))
+            with comfy.ops.CastBiasWeightContext(self.model.embed_tokens, hidden, offloadable=True) as (weight, _):
+                return F.linear(hidden, weight)
         return self.model.lm_head(hidden)
 
     def embed_media(self, ids, patches, grid, audio_features):
