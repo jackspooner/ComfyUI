@@ -159,15 +159,20 @@ adds no telemetry or licensing network checks.
 
 ## Editable examples and acceptance commands
 
-The installed examples live under `user/default/workflows/Drama 3/`: Speech,
-Dialogue, Revision, and Reload. Revision chains a first take into a changed-word
-second take and saves the new audio/history. The installed Reload example selects the retained plain history; fresh templates
-require selecting a real history saved by an earlier execution. API templates have the `.api.json` suffix;
+The current MXFP8 examples live under `user/default/workflows/Drama 3 MXFP8/`:
+Speech, Dialogue, Revision and Reload. All four editable layouts pass the layout
+checker; this does not establish successful inference. Revision chains a first
+take into a changed-word second take and saves the new audio/history. Reload
+requires selecting a real history saved by an earlier execution. API templates have the `.api.json` suffix;
 they are submitted to `/prompt`, not opened as editable graphs. Recreate these
 files only into an empty destination with
-`python -m scripts.create_drama3_workflows --library /absolute/workflow/library`.
+`python -m scripts.create_drama3_workflows --library /absolute/workflow/library --model drama3_mxfp8.safetensors`.
 
-The isolated candidate wrapper embeds `main.start_comfyui`; ordinary server,
+Current GPU acceptance runs through the main ComfyUI queue. For the case helper,
+pass `--base-url http://127.0.0.1:8188 --model drama3_mxfp8.safetensors` explicitly;
+its defaults belong to the historical NVFP4 candidate below.
+
+The historical isolated candidate wrapper embeds `main.start_comfyui`; ordinary server,
 model-root and output-path arguments can be passed to `scripts/check_drama3_server.py`.
 Set GPU visibility before launch rather than relying on late allocator options; set `DRAMA3_EVIDENCE_DIRECTORY` to a private
 local evidence directory. Its test-only execution wrapper records elapsed time,

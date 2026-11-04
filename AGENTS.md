@@ -509,7 +509,7 @@ Setup and validation do not start live workloads or restart services.
 
 ### Native Drama 3
 
-Use the standard worktree setup command. `docs/drama3.md` owns offline FP8-to-NVFP4
+Use the standard worktree setup command. `docs/drama3.md` owns offline FP8-to-NVFP4/MXFP8
 conversion, native node/history contracts, reference verification and acceptance
 limits. Run `python -m pytest tests-unit/comfy_test/drama3_test.py -q`; set
 `DRAMA3_UPSTREAM` to the pinned offline source for independent component checks.
