@@ -6,7 +6,7 @@ import torch
 from torch.nn import functional as F
 
 import comfy.ops
-from comfy.video_caption import CaptionDecoder
+from comfy.video_caption import CaptionDecoder, CaptionNetwork
 from comfy.video_caption_audio import QueryBlock
 from comfy.video_caption_grounding import PadGrounding, SalmonnPositions
 from comfy.video_caption_media import prepare_video, media_prompt, prepare_audio
@@ -29,6 +29,19 @@ def test_qformer_matches_independent_query_attention_math():
         expected = attention.output.LayerNorm(attention.output.dense(attended) + expected)
     expected = block.output_query.LayerNorm(block.output_query.dense(F.gelu(block.intermediate_query.dense(expected))) + expected)
     torch.testing.assert_close(block(hidden, source), expected, atol=2e-6, rtol=2e-6)
+
+
+def test_tied_caption_head_honors_native_weight_materialization_and_functions():
+    network = CaptionNetwork.__new__(CaptionNetwork)
+    torch.nn.Module.__init__(network)
+    network.family = 'padcaptioner_3b'
+    network.model = torch.nn.Module()
+    network.model.embed_tokens = comfy.ops.manual_cast.Embedding(7, 3, device='cpu', dtype=torch.float32)
+    weight = torch.arange(21, dtype=torch.float32).view(7, 3)
+    network.model.embed_tokens.weight = torch.nn.Parameter(weight)
+    network.model.embed_tokens.weight_function = [lambda value: value * 2]
+    hidden = torch.randn(1, 2, 3)
+    torch.testing.assert_close(network.logits(hidden), F.linear(hidden, weight * 2))
 
 
 def test_decoder_cached_steps_match_full_causal_pass():
