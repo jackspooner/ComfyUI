@@ -694,6 +694,12 @@ class PromptExecutor:
         self.success = True
 
     def add_message(self, event, data: dict, broadcast: bool):
+        if event == 'execution_cached':
+            queue = getattr(self.server, 'prompt_queue', None)
+            timing = getattr(queue, 'timing', None)
+            if timing is not None:
+                with queue.mutex:
+                    timing.safe_cache(data.get('prompt_id'), data.get('nodes', []))
         data = {
             **data,
             "timestamp": int(time.time() * 1000),

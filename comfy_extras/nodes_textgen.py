@@ -276,6 +276,8 @@ class TextGenerate(io.ComfyNode):
             if auto_resize:
                 context_info["oom_retries"] = retries
             context_info.update(video_info)
+        from app.run_timing import report_execution_features
+        report_execution_features({"inputTokens": (context_info or {}).get("input_tokens"), "outputTokens": len(generated_ids), "outputAllowance": max_length})
         return io.NodeOutput(output_text, reasoning.strip() if constraint is not None else reasoning.replace("<think>", "", 1).strip(), updated_history, json.dumps(context_info) if context_info is not None else "", generated_text)
 
 
