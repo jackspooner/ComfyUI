@@ -52,11 +52,21 @@ Token limits come from the loaded generative model configuration, not the node's
 UI maximum. Counts include actual formatted text/role/thinking markers and expanded
 visual tokens. With `auto_resize` enabled, the CLIP owner loads through ordinary
 model management, releases idle other models through that owner and measures free
-device memory after the selected model's managed loading/staging. It subtracts the
-memory owner's existing inference reserve. Currently resident, quantized or
-offloaded weights affect this measurement; dynamic loading may stage rather than
-fully populate GPU weights, and the existing owner retains eviction/reload policy.
+device memory after the selected model's managed loading/staging. On CUDA, it uses
+`ModelPatcher.get_free_memory`, which includes dynamic weights the allocator can
+evict on demand, rather than treating resident weights as unavailable workspace.
+The final generation admission check uses the same owner. Other devices retain
+their existing free-memory measurement. Planning subtracts the memory owner's
+existing inference reserve; an explicit caller/retry budget remains an upper bound.
+Currently resident, quantized or offloaded weights affect this measurement;
+the existing owner retains eviction/reload policy.
 Weights, KV caches and execution dtype are separate costs.
+
+The dynamic-headroom regression uses the reported 7,102-input / 512-output request
+and 6,574,866,688-byte workspace estimate in CPU fixtures: reclaimable CUDA weights
+permit admission, while insufficient reclaimable memory, disabled dynamic loading,
+CPU placement and an explicit smaller budget still reject it. These checks do not
+establish live GPU fit or calibrate the conservative attention/workspace estimates.
 
 For text-only planning with a positive output reservation, adapters that expose
 the generation-memory estimate now pass it to ordinary model loading before
