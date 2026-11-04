@@ -40,13 +40,15 @@ class CaptionVideo(io.ComfyNode):
                 io.Float.Input('fps', default=2.0, min=0.1, max=30),
                 io.Int.Input('max_pixels', default=61250, min=3136, max=262144),
                 io.Int.Input('max_tokens', default=320, min=1, max=4096),
-                io.Int.Input('max_events', default=24, min=1, max=30)],
+                io.Int.Input('max_events', default=24, min=1, max=30),
+                io.Combo.Input('response_format', options=['text', 'json_schema'], default='text', optional=True),
+                io.String.Input('json_schema', default='', multiline=True, optional=True)],
             outputs=[io.String.Output('text'), io.String.Output('result_json')])
 
     @classmethod
-    def execute(cls, captioner, images, source_fps, prompt, fps=2.0, max_pixels=61250, max_tokens=320, max_events=24, audio=None):
+    def execute(cls, captioner, images, source_fps, prompt, fps=2.0, max_pixels=61250, max_tokens=320, max_events=24, audio=None, response_format='text', json_schema=''):
         selected_audio = audio if captioner.supports_audio else None
-        result = captioner.caption(images, source_fps, selected_audio, prompt, fps, max_pixels, max_tokens, max_events)
+        result = captioner.caption(images, source_fps, selected_audio, prompt, fps, max_pixels, max_tokens, max_events, response_format, json_schema)
         result.update(model=captioner.family, sampling_fps=min(fps, source_fps), audio_used=selected_audio is not None)
         return io.NodeOutput(result['text'], json.dumps(result))
 
@@ -66,11 +68,13 @@ class CaptionVideoFile(io.ComfyNode):
                 io.Float.Input('fps', default=2.0, min=0.1, max=10),
                 io.Int.Input('max_pixels', default=61250, min=3136, max=262144),
                 io.Int.Input('max_tokens', default=320, min=1, max=4096),
-                io.Int.Input('max_events', default=24, min=1, max=30)],
+                io.Int.Input('max_events', default=24, min=1, max=30),
+                io.Combo.Input('response_format', options=['text', 'json_schema'], default='text', optional=True),
+                io.String.Input('json_schema', default='', multiline=True, optional=True)],
             outputs=[io.String.Output('text'), io.String.Output('result_json')])
 
     @classmethod
-    def execute(cls, captioner, file, prompt, use_audio=True, fps=2.0, max_pixels=61250, max_tokens=320, max_events=24):
+    def execute(cls, captioner, file, prompt, use_audio=True, fps=2.0, max_pixels=61250, max_tokens=320, max_events=24, response_format='text', json_schema=''):
         if not folder_paths.exists_annotated_filepath(file):
             raise ValueError('Video file is absent from the configured input directory')
         source = VideoFromFile(folder_paths.get_annotated_filepath(file))
@@ -84,7 +88,7 @@ class CaptionVideoFile(io.ComfyNode):
         components = source.get_components_selected(include_images=True, include_audio=use_audio and captioner.supports_audio,
             frame_stride=stride, max_size=512, compact=True)
         result = captioner.caption(components.images, float(components.frame_rate), components.audio,
-            prompt, fps, max_pixels, max_tokens, max_events)
+            prompt, fps, max_pixels, max_tokens, max_events, response_format, json_schema)
         result.update(model=captioner.family, duration_seconds=duration,
             sampling_fps=min(fps, float(components.frame_rate)), audio_used=components.audio is not None)
         return io.NodeOutput(result['text'], json.dumps(result))

@@ -5,6 +5,9 @@ Native video-captioner preparation and acceptance are documented in
 module; reuse the optional caption extension and offline converter. Run the
 focused `internvideo3_test.py` and `video_caption_test.py` CPU suites. Heavy GPU
 acceptance belongs to the serving instance's normal queue.
+Constrained caption JSON reuses `comfy/text_json.py` and the native sampler;
+check optional pins with `setup_worktree.py --text-json` and run
+`video_caption_json_test.py` with the shared `text_json_native_test.py` regression.
 
 ## Native component leases
 
