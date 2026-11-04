@@ -137,6 +137,67 @@ and `video_caption_job` tools, retaining admitted source snapshots and durable
 job/key identities, and publishing JSON results through MediaIO. It does not add
 video files to RouterText's `text_infer` contract.
 
+## Constrained JSON
+
+Both caption nodes append optional `response_format` (`text` by default) and
+`json_schema` string controls. Existing API graphs may omit them. Select
+`response_format="json_schema"` and supply a nonempty schema; providing a schema
+in text mode, unsupported formats such as `json_object`, and invalid schemas fail.
+Prepare the existing optional pins with normal package tooling and check readiness
+using `COMFYUI_PYTHON=/absolute/prepared/python python3 scripts/setup_worktree.py --text-json`.
+Node execution never installs dependencies or downloads a tokenizer.
+
+The schema policy is the existing [comfy-json-v1 subset](text-json.md#comfy-json-v1-subset):
+closed root/nested objects, homogeneous arrays, scalar values and supported bounds;
+no references, arbitrary keywords or network resolution. The 128 KiB schema and
+grammar resource limits apply. For example:
+
+```json
+{"type":"object","properties":{"caption":{"type":"string","minLength":1}},"required":["caption"],"additionalProperties":false}
+```
+
+All three use the package's authoritative embedded tokenizer and configured stop
+IDs. The shared `PreparedJSON` compiles on CPU before GPU admission, verifies the
+native assistant boundary and creates request-local matchers. Schema instructions
+are included in the actual input/context calculation. There is no thinking phase,
+speculative decoding, schema repair or unconstrained fallback. Greedy decoding uses
+the shared hard `-inf` mask and legal-logit checks on every token, including EOS.
+Completion at the last allowed token succeeds; incomplete JSON or unusable legal
+logits fail without publishing a successful result. No token budget is increased.
+
+SALMONN and InternVideo3 return the exact constrained object text in `text`, its
+parsed value in `structured`, and `structured_output` enforcement evidence.
+PadCaptioner preserves learned planning/intervals. Each event caption starts at
+its event embedding with a separate matcher; completed branches cannot mutate
+another branch's grammar. The caller schema applies to **each event's caption
+object**, not the interval envelope. Each event contains its JSON `text`,
+`structured` value and evidence. Top-level `structured` and JSON `text` contain
+`{"events":[{"intervals":[[0,1]],"caption":{"caption":"example"}}]}`;
+that envelope is assembled deterministically from the learned intervals and
+validated captions. Top-level evidence has `scope="event_caption"`,
+`event_count` and `finish_reason="all_events_complete"`. An empty plan or any
+incomplete event fails. JSON mode does not certify event detection, interval
+accuracy or repair the separately observed free-text empty-caption issue.
+
+Evidence retains `enforcement="native_schema"`, `backend="llguidance"`, backend
+version, schema/tokenizer hashes, family, stops, completion and independent
+validation. `request_schema_sha256` binds the exact supplied UTF-8 schema string;
+`schema_sha256` identifies the native compact schema. `scope="answer"` applies
+to the other two models. The existing `result_json` output contains this metadata;
+the two node output positions stay unchanged. MediaTools forwards `responseFormat`
+and `jsonSchema`, independently validates the collected objects, checks scope and
+request-schema identity, and preserves same-job recovery. Plain text adds no
+enforcement evidence and retains its existing output behavior.
+
+Run `python -m pytest tests-unit/comfy_test/video_caption_json_test.py tests-unit/comfy_test/text_json_native_test.py -q`.
+Set `VIDEO_CAPTION_JSON_FIXTURES` to the existing converted `video_captioners`
+directory to additionally test all three actual embedded tokenizers, reading only
+headers and tokenizer tensors. The fixtures exercise illegal EOS/control-token
+preferences, final-token completion, incomplete-budget failure, Unicode and
+independent PadCaptioner branches. Heavy real-media validation must use the main
+ComfyUI queue and remains distinct from those CPU checks. Discovery of the new
+sockets establishes source activation, not output quality or maximum capacity.
+
 ## Backend and acceptance boundaries
 
 The inspected target is an RTX 5090 (SM 12.0, 32,607 MiB), driver 615.71.09,

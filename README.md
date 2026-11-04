@@ -1003,6 +1003,9 @@ An optional native extension adds video-SALMONN-2-Pro-8B video/audio questions
 and PadCaptioner-3B dense event captions with learned temporal grounding.
 InternVideo3-8B-Instruct adds visual video questions with native M²LA and a
 compressed latent cache; it has no audio encoder or recursive agent/tool loop.
+Both caption nodes support optional `response_format=json_schema` with a
+`json_schema` string, using the shared native hard token mask and final validation.
+SALMONN/InternVideo3 constrain one answer; PadCaptioner constrains each event caption.
 Offline conversion packages complete BF16 checkpoints and tokenizer assets into
 single safetensors files; inference uses ComfyUI model/memory ownership and its
 normal queue. See [conversion, nodes, sources and acceptance limits](docs/video-captioners.md).
