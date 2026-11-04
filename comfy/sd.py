@@ -417,8 +417,8 @@ class CLIP:
         if prepare is None:
             raise ValueError("This CLIP model does not support generation context planning.")
         if auto_resize:
-            # Use the memory owner's ordinary loading/offload policy, then measure headroom
-            # with the selected weights resident. Planning never loads a parallel model.
+            # Use ordinary loading/offload and include weights the owner can evict.
+            # Planning never loads a parallel model.
             device = self.patcher.load_device
             estimate = getattr(self.cond_stage_model, "generation_memory_estimation_function", None)
             rows = next(iter(tokens.values())) if isinstance(tokens, dict) else tokens
@@ -432,7 +432,8 @@ class CLIP:
                 self.load_model(tokens)
             keep = [model_management.LoadedModel(p) for p in [self.patcher, *self.patcher.model_patches_models()]]
             model_management.free_memory(model_management.get_total_memory(device), device, keep_loaded=keep)
-            available = max(0, model_management.get_free_memory(device) - model_management.minimum_inference_memory())
+            get_free_memory = self.patcher.get_free_memory if device.type == "cuda" else model_management.get_free_memory
+            available = max(0, get_free_memory(device) - model_management.minimum_inference_memory())
             memory_budget = available if memory_budget is None else min(memory_budget, available)
             selected, info = prepare(tokens, context_budget, max_length, auto_resize,
                                      memory_budget=memory_budget, device=device, mtp=mtp, min_short_edge=min_short_edge)
@@ -677,12 +678,13 @@ class CLIP:
             self.load_model(tokens, memory_required=required)
             device = self.patcher.load_device
             reserved = 0 if model_management.is_device_cpu(device) else model_management.extra_reserved_memory()
-            available = model_management.get_free_memory(device)
+            get_free_memory = self.patcher.get_free_memory if device.type == "cuda" else model_management.get_free_memory
+            available = get_free_memory(device)
             if available < required + reserved:
                 # Dynamic weights can remain resident until an allocation evicts them.
                 keep = [model_management.LoadedModel(p) for p in [self.patcher, *self.patcher.model_patches_models()]]
                 model_management.free_memory(required + reserved, device, keep_loaded=keep)
-                available = model_management.get_free_memory(device)
+                available = get_free_memory(device)
             if available < required + reserved:
                 raise RuntimeError(f"Text generation needs {required + reserved} free bytes including reserve; observed {available}. Shorten the input or output budget, or release idle models.")
         else:
