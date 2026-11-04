@@ -11,6 +11,7 @@ import re
 import socket
 import sqlite3
 import subprocess
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -118,6 +119,16 @@ def workload(graph):
         signatures[node_id] = digest([node.get('class_type'), sorted(node.get('inputs', {})), sorted(links)])
         return signatures[node_id]
     structure = sorted(signature(node_id, set()) for node_id in graph)
+    implementations = []
+    registry = getattr(sys.modules.get('nodes'), 'NODE_CLASS_MAPPINGS', {})
+    for kind in sorted({node.get('class_type', '') for node in graph.values()}):
+        cls = registry.get(kind)
+        filename = getattr(sys.modules.get(getattr(cls, '__module__', '')), '__file__', None)
+        try:
+            stat = Path(filename).stat() if filename else None
+            implementations.append([kind, digest([filename, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]) if stat else None])
+        except OSError:
+            implementations.append([kind, None])
     for node in graph.values():
         kind, inputs = node.get('class_type', ''), node.get('inputs', {})
         features[kind + '.nodeInstances'] = features.get(kind + '.nodeInstances', 0) + 1
@@ -138,7 +149,7 @@ def workload(graph):
     if selected_files and all(selected_files):
         settings['artifactAssurance'] = 'selected_file_identity'
     precision = sorted(str(value) for key, value in settings.items() if any(word in key for word in ('precision', 'dtype')))
-    return {'model': digest(components) if components else None, 'profileRevision': digest(sorted(set(structure))),
+    return {'model': digest(components) if components else None, 'profileRevision': digest([sorted(set(structure)), implementations]),
             'components': components, 'executionMode': 'comfyui', 'precision': ','.join(precision) or None,
             'residency': 'unknown', 'cache': 'unknown', 'features': features, 'settings': settings}
 

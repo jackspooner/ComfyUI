@@ -89,6 +89,20 @@ def test_browser_and_remote_requests_are_rejected():
     assert not local_request(SimpleNamespace(remote='127.0.0.1', host='localhost', headers={'Origin': 'http://localhost'}))
 
 
+def test_profile_separates_changed_node_implementations(tmp_path, monkeypatch):
+    import sys
+    filename = tmp_path / 'implementation.py'
+    filename.write_text('first implementation')
+    cls = type('Loader', (), {'__module__': 'timing_fixture_implementation'})
+    monkeypatch.setitem(sys.modules, 'timing_fixture_implementation', SimpleNamespace(__file__=str(filename)))
+    monkeypatch.setitem(sys.modules, 'nodes', SimpleNamespace(NODE_CLASS_MAPPINGS={'Loader': cls}))
+    first = workload(item()[2])
+    filename.write_text('changed implementation with the same graph')
+    second = workload(item()[2])
+    assert first['profileRevision'] != second['profileRevision']
+    assert str(filename) not in json.dumps(second)
+
+
 def test_duplicate_completion_and_read_only_page(tmp_path):
     store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
     store.event('accepted', item())
