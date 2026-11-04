@@ -1,6 +1,7 @@
 import copy
 import json
 import math
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import pytest
@@ -16,6 +17,7 @@ from comfy.text_encoders.llama import BaseGenerate
 from comfy.text_encoders.qwen35 import Qwen35, Qwen35Config, Qwen35TEModel
 from comfy.text_encoders.qwen_vl import budget_image_size
 from comfy.sd import CLIP
+from comfy.model_patcher import ModelPatcher
 from comfy_extras.nodes_textgen import TextGenerate
 
 
@@ -244,7 +246,8 @@ def test_clip_memory_planning_measures_after_managed_loading(monkeypatch):
     def prepare(tokens, cap, output, resize, **kwargs):
         events.append(('prepare', kwargs))
         return tokens, {}
-    patcher = SimpleNamespace(load_device=torch.device('cuda:0'), model_patches_models=lambda: [])
+    patcher = SimpleNamespace(load_device=torch.device('cuda:0'), model_patches_models=lambda: [],
+                              get_free_memory=lambda device: 4000)
     clip = SimpleNamespace(cond_stage_model=SimpleNamespace(prepare_generation_tokens=prepare),
                            patcher=patcher, load_model=lambda tokens: events.append(('load', tokens)))
     monkeypatch.setattr('comfy.model_management.LoadedModel', lambda value: value)
@@ -259,6 +262,76 @@ def test_clip_memory_planning_measures_after_managed_loading(monkeypatch):
     assert events[2][1]['mtp'] is False
     assert events[2][1]['min_short_edge'] == 384
     assert info == {'memory_device': 'cuda:0', 'memory_kind': 'vram'}
+
+
+@pytest.mark.parametrize('device,dynamic,reclaimable,explicit_budget,admitted', [
+    ('cuda:0', True, 3_000_000_000, None, True),
+    ('cuda:0', True, 0, None, False),
+    ('cuda:0', False, 3_000_000_000, None, False),
+    ('cuda:0', True, 3_000_000_000, 4_000_000_000, False),
+    ('cpu', True, 3_000_000_000, None, False),
+])
+def test_media_admission_counts_only_owner_reclaimable_vram(monkeypatch, device, dynamic, reclaimable, explicit_budget, admitted):
+    # Reproduce the reported 7102 + 512 token request without loading a model.
+    required, free, reserve = 6_574_866_688, 5_517_378_444, 1_278_423_859.2
+    tokens = images((768, 768))
+    analyzed = []
+    patcher = SimpleNamespace(load_device=torch.device(device), model_patches_models=lambda: [])
+    patcher.get_free_memory = lambda device: ModelPatcher.get_free_memory(patcher, device)
+    def prepare(value, cap, output, resize, **kwargs):
+        return prepare_generation_tokens(value, 131072, cap, output, lambda value: 7102,
+            lambda image, ceiling: (768, 768), resize, kwargs['memory_budget'],
+            lambda *args: required, kwargs['min_short_edge'])
+    clip = SimpleNamespace(cond_stage_model=SimpleNamespace(prepare_generation_tokens=prepare),
+                           patcher=patcher, load_model=lambda value: None)
+    monkeypatch.setattr('comfy.memory_management.aimdo_enabled', dynamic)
+    monkeypatch.setattr('comfy_aimdo.model_vbar.vbars_analyze', lambda index: analyzed.append(index) or reclaimable)
+    monkeypatch.setattr('comfy.model_management.LoadedModel', lambda value: value)
+    monkeypatch.setattr('comfy.model_management.get_total_memory', lambda device: 32_000_000_000)
+    monkeypatch.setattr('comfy.model_management.free_memory', lambda *args, **kwargs: None)
+    monkeypatch.setattr('comfy.model_management.get_free_memory', lambda device: free)
+    monkeypatch.setattr('comfy.model_management.minimum_inference_memory', lambda: reserve)
+    if admitted:
+        selected, info = CLIP.prepare_generation_tokens(clip, tokens, 0, 512, True, explicit_budget, min_short_edge=768)
+        assert info['memory_budget_bytes'] == free + reclaimable - reserve
+        assert info['input_tokens'] == 7102 and info['output_allowance'] == 512
+        assert info['image_sizes'] == [[768, 768]]
+        assert torch.equal(selected['qwen'][0][1][0]['data'], tokens['qwen'][0][1][0]['data'])
+    else:
+        with pytest.raises(ContextOverflowError, match='Media cannot fit'):
+            CLIP.prepare_generation_tokens(clip, tokens, 0, 512, True, explicit_budget, min_short_edge=768)
+    assert analyzed == ([0] if dynamic and device == 'cuda:0' else [])
+
+
+@pytest.mark.parametrize('device,reclaimable,admitted', [
+    ('cuda:0', 3_000_000_000, True), ('cuda:0', 0, False), ('cpu', 3_000_000_000, False),
+])
+def test_generation_admission_uses_same_memory_owner(monkeypatch, device, reclaimable, admitted):
+    required, free = 6_574_866_688, 5_517_378_444
+    loads, releases, generated = [], [], []
+    patcher = SimpleNamespace(load_device=torch.device(device), model_patches_models=lambda: [])
+    patcher.get_free_memory = lambda device: ModelPatcher.get_free_memory(patcher, device)
+    model = SimpleNamespace(reset_clip_options=lambda: None, set_clip_options=lambda value: None,
+        generation_memory_estimation_function=lambda *args, **kwargs: required,
+        generate=lambda *args, **kwargs: generated.append(kwargs['max_length']) or [42])
+    clip = SimpleNamespace(cond_stage_model=model, patcher=patcher,
+        load_model=lambda value, memory_required: loads.append(memory_required))
+    monkeypatch.setattr('comfy.memory_management.aimdo_enabled', True)
+    monkeypatch.setattr('comfy_aimdo.model_vbar.vbars_analyze', lambda index: reclaimable)
+    monkeypatch.setattr('comfy.model_management.LoadedModel', lambda value: value)
+    monkeypatch.setattr('comfy.model_management.free_memory', lambda *args, **kwargs: releases.append(args[0]))
+    monkeypatch.setattr('comfy.model_management.get_free_memory', lambda device: free)
+    monkeypatch.setattr('comfy.model_management.extra_reserved_memory', lambda: 419_430_400)
+    monkeypatch.setattr('comfy.model_management.cuda_device_context', lambda device: nullcontext())
+    monkeypatch.setattr('comfy.ops.use_quantized_matmul', lambda *args: nullcontext())
+    if admitted:
+        assert CLIP.generate.__wrapped__(clip, [], max_length=512) == [42]
+        assert generated == [512] and releases == []
+    else:
+        with pytest.raises(RuntimeError, match='free bytes including reserve'):
+            CLIP.generate.__wrapped__(clip, [], max_length=512)
+        assert generated == [] and len(releases) == 1
+    assert loads == [required]
 
 
 @pytest.mark.parametrize('device', ['cpu', 'cuda:0'])
@@ -283,7 +356,8 @@ def test_text_planning_reserves_working_memory_before_loading(monkeypatch, devic
                                          lambda value: len(value['qwen'][0]), None, resize,
                                          kwargs['memory_budget'], lambda *args: required)
 
-    patcher = SimpleNamespace(load_device=torch.device(device), model_patches_models=lambda: [])
+    patcher = SimpleNamespace(load_device=torch.device(device), model_patches_models=lambda: [],
+                              get_free_memory=lambda device: available)
     clip = SimpleNamespace(cond_stage_model=SimpleNamespace(prepare_generation_tokens=prepare,
                            generation_memory_estimation_function=estimate), patcher=patcher, load_model=load)
     monkeypatch.setattr('comfy.model_management.LoadedModel', lambda value: value)
