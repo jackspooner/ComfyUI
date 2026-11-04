@@ -1006,5 +1006,7 @@ compressed latent cache; it has no audio encoder or recursive agent/tool loop.
 Offline conversion packages complete BF16 checkpoints and tokenizer assets into
 single safetensors files; inference uses ComfyUI model/memory ownership and its
 normal queue. See [conversion, nodes, sources and acceptance limits](docs/video-captioners.md).
-This candidate requires separate serving activation and real-video acceptance;
-source/component tests do not establish full upstream parity or output quality.
+Serving activation remains installation-specific. Local RTX 5090 queue checks
+returned SALMONN/InternVideo3 descriptions, with mixed accuracy. PadCaptioner
+returned empty descriptions and has failed usable-output acceptance; treat it as
+experimental. Source/component tests do not establish full upstream parity.

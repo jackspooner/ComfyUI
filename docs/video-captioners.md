@@ -161,6 +161,18 @@ cold/warm performance and peak memory remain separate acceptance gates until
 recorded. CPU fixtures and all-parameter inventory checks are not GPU acceptance.
 Other accelerators, quantization and long-video capacity are unqualified.
 
+Local acceptance on 2026-11-04 loaded all three complete BF16 packages on the
+main RTX 5090 queue through MediaTools, including submit/watch/collect and JSON
+delivery. SALMONN and InternVideo3 described a ten-second interview, but both made
+motion errors on a synthetic clip. Detailed identity/speech claims and broad
+quality remain unqualified. PadCaptioner emitted empty event descriptions on
+synthetic, upstream-demo and interview clips, including a normal 24-event budget.
+Its completed queue/delivery state is not usable-caption acceptance. An adapted
+pinned-upstream CPU diagnostic also emitted immediate EOS for each branch; it
+used a serial generation/cache shim and native visual preparation, so this does
+not establish full-checkpoint upstream parity or conclusively locate the cause.
+Keep PadCaptioner experimental until nonempty captions and grounding are verified.
+
 ### InternVideo3 backend selection and checks
 
 The same RTX 5090 SM 12.0 / Torch 2.14.1+cu130 target applies. The native vision
