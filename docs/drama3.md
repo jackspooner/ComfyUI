@@ -108,6 +108,9 @@ compiler scopes. Repeated decode keeps stable external frame/hidden buffers whil
 the existing compiler and dynamic offload remain enabled. This matches native
 text generation's allocation lifetime boundary; it does not change precision or
 silently disable compilation when a graph fails.
+Backbone and codebook-tower block loops copy each result into call-private
+external storage, so one block does not free an escaped allocation from another
+recorded block. Caller tensors and retained caches remain unchanged by the handoff.
 
 Prompt rows include text, voice-reference frames and earlier takes. The upstream
 prompt builder allows 8192 rows; generated frames also fit the runtime capacity.

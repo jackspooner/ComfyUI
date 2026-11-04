@@ -186,12 +186,16 @@ class Backbone(nn.Module):
         self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps, add=True, dtype=dtype, device=device)
 
     def forward(self, x, start, caches, capacity):
+        # A layer result must not escape a recorded allocation scope and then
+        # be freed by the following layer. Keep the inter-layer storage owned
+        # by this call, outside the allocator's repeated block scopes.
+        with prefetch.pause_malloc_graph():
+            x = x.clone()
         queue = prefetch.make_prefetch_queue(list(self.layers), x.device, {"prefetch_dynamic_vbars": True})
         for index, layer in enumerate(self.layers):
             mm.throw_exception_if_processing_interrupted()
             def core():
-                nonlocal x
-                x = layer(x, start, caches[index], capacity)
+                x.copy_(layer(x, start, caches[index], capacity))
             prefetch.prefetch_queue_pop(queue, x.device, layer, x.dtype, core=core, malloc_scope='drama3')
         prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope='drama3')
         return self.norm(x)

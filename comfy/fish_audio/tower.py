@@ -126,26 +126,28 @@ class Tower(nn.Module):
         return torch.where(self.is_semantic(frames[:, 0])[:, None], mixed, text)
 
     def run_shared(self, hidden, c0, semantic, start, frames, caches, capacity):
+        with prefetch.pause_malloc_graph():
+            hidden = hidden.clone()
         unseen = self.embedding_sum(frames, 1 + self.config.vq_backbone_codebooks, self.config.num_codebooks)
         unseen = torch.where(self.is_semantic(frames[:, 0])[:, None], unseen, 0.)
         queue = prefetch.make_prefetch_queue(list(self.shared_layers), hidden.device, {"prefetch_dynamic_vbars": True})
         for i, layer in enumerate(self.shared_layers):
             mm.throw_exception_if_processing_interrupted()
             def core():
-                nonlocal hidden
-                hidden = layer(hidden, c0, semantic, start, caches[i], capacity, unseen if i == 0 else None)
+                hidden.copy_(layer(hidden, c0, semantic, start, caches[i], capacity, unseen if i == 0 else None))
             prefetch.prefetch_queue_pop(queue, hidden.device, layer, hidden.dtype, core=core, malloc_scope='drama3_tower')
         prefetch.prefetch_queue_pop(queue, hidden.device, None, malloc_scope='drama3_tower')
         return hidden
 
     def residual(self, hidden, labels, semantic, start, caches, capacity, sampling=None):
+        with prefetch.pause_malloc_graph():
+            hidden = hidden.clone()
         queue = prefetch.make_prefetch_queue(list(self.residual_layers), hidden.device, {"prefetch_dynamic_vbars": True})
         codes = [labels[:, 0]]
         for i, layer in enumerate(self.residual_layers):
             mm.throw_exception_if_processing_interrupted()
             def core():
-                nonlocal hidden
-                hidden = layer(hidden, codes[-1] if sampling else labels[:, i], semantic, start, caches[i], capacity)
+                hidden.copy_(layer(hidden, codes[-1] if sampling else labels[:, i], semantic, start, caches[i], capacity))
             prefetch.prefetch_queue_pop(queue, hidden.device, layer, hidden.dtype, core=core, malloc_scope='drama3_tower')
             if sampling:
                 codes.append(sample(self.codebook_heads[i](hidden), *sampling))

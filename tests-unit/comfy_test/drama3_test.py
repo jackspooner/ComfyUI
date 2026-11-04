@@ -182,6 +182,21 @@ def test_generation_prefill_owns_caches_outside_recorded_decode(monkeypatch):
     assert torch.equal(second[2], torch.tensor([5, 6, 8]))
 
 
+def test_backbone_layer_handoff_reuses_private_external_storage():
+    from comfy.fish_audio.model import Backbone
+    pointers = []
+    class Add(torch.nn.Module):
+        def forward(self, x, *args):
+            pointers.append(x.data_ptr())
+            return x + 1
+    backbone = SimpleNamespace(layers=[Add(), Add()], norm=lambda x: x)
+    source = torch.zeros(1, 2, 3)
+    result = Backbone.forward(backbone, source, 0, [[], []], 4)
+    assert len(set(pointers)) == 1 and pointers[0] != source.data_ptr()
+    assert torch.equal(source, torch.zeros_like(source))
+    assert torch.equal(result, torch.full_like(source, 2))
+
+
 @pytest.mark.parametrize('kind', ['full', 'delta'])
 def test_attention_cached_chunks_equal_full(kind):
     torch.manual_seed(4)
