@@ -235,6 +235,14 @@ compatible GPU runtime. See [maintenance, verification and rollback](docs/stable
 
 This fork adds native audio understanding and transcription with NVIDIA Audio Flamingo 3 through Load CLIP and Generate Text. It reuses ComfyUI model/attention/memory management and repackages a local HF snapshot without downloading during execution. See [setup, licensing, inputs and acceptance limits](docs/audio-flamingo.md). CPU reference checks and short-clip RTX 5090 inference, cancellation/reload and RouterAudio acceptance pass; broader resource and quality limits remain unverified.
 
+## Shared DramaBox CLIP loading
+
+This fork adds a native `dramabox` type to **Load CLIP (Dual)** for the DramaBox
+Gemma 3 12B encoder and its audio-components checkpoint. The existing DramaBox
+CLIP Loader remains workflow-compatible and now delegates to the shared model
+recognition, tokenizer and patcher path. See
+[files, preserved conditioning behavior and verification limits](docs/dramabox-clip.md).
+
 **The most powerful and modular AI engine for content creation.**
 
 ## Native YingMusic Singer Plus in this fork
