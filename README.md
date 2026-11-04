@@ -447,7 +447,8 @@ automatic planning support. Saved explicit values are preserved. For example,
 retries. Requests that cannot fit at that quality floor fail clearly; lower FPS,
 shorten the clip or explicitly lower the floor (`0` disables it). Source/model
 limits remain in effect; the floor does not force unsupported enlargement.
-Automatic sizing uses measured device headroom after managed model loading,
+Automatic sizing uses device headroom after managed model loading, including
+allocator-reclaimable dynamic weights on CUDA through the existing ModelPatcher,
 model-aware cache/workspace estimates and the model/user token ceilings while
 preserving a positive `max_length`. It reports the effective window, selected
 sizes and estimates through `context_info`, with bounded smaller-media retries
