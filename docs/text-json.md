@@ -55,6 +55,11 @@ ordinary CLIP decode contract is unchanged.
 
 ## Admission and supported families
 
+The optional [native video-caption extension](video-captioners.md#constrained-json)
+also reuses this grammar for SALMONN, PadCaptioner and InternVideo3 through its
+dedicated caption nodes. PadCaptioner constrains each event caption independently.
+Those handles do not broaden Load CLIP/Generate Text family admission below.
+
 | Family/package | Native schema path | Thinking |
 | --- | --- | --- |
 | Complete MOSS-Audio 8B Instruct/Thinking | Implemented, actual embedded tokenizer CPU tests | Verified Qwen single-token open/close protocol; answer-only output also permitted |
