@@ -14,6 +14,9 @@ The record contains hashed artifact identities, graph structure and allowlisted
 numeric/settings controls, never prompts, media paths, seeds or graph documents.
 Unknown residency/cache state stays unknown. Native time includes model loading,
 encoding and output-node work but excludes time waiting in the native queue.
+With matching Cutlery integration, GPU-owner hold waits also pause execution
+accounting. They contribute to resource queue time and numeric
+`observed.gpuHoldWaitSeconds`; `gpu_hold_active` marks an unresolved release time.
 Telemetry failure degrades coverage and logs once per outage; inference continues.
 Terminal timing data expires after 90 days, independently of job history. A restart
 marks previous in-flight observations unknown and never resubmits work.
