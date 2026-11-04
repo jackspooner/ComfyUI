@@ -103,6 +103,12 @@ references, prior takes or newly generated codes, without model handles/GPU cach
 Ordinary `Drama3Generate` uses the same generation and decode functions. Sampling,
 seed, context overflow, interruption and latest-take decode semantics are identical.
 
+Prefill initializes execution-owned recurrent/KV caches outside recorded memory
+compiler scopes. Repeated decode keeps stable external frame/hidden buffers while
+the existing compiler and dynamic offload remain enabled. This matches native
+text generation's allocation lifetime boundary; it does not change precision or
+silently disable compilation when a graph fails.
+
 Prompt rows include text, voice-reference frames and earlier takes. The upstream
 prompt builder allows 8192 rows; generated frames also fit the runtime capacity.
 A larger output allowance is bounded to remaining capacity. Long text is split

@@ -59,21 +59,30 @@ class GenerationModel(nn.Module):
             paired_end = min(end, len(frames) - 1)
             if paired_end > start:
                 self.tower.prefill(hidden[:paired_end - start], start, frames[start:paired_end], frames[start + 1:paired_end + 1], tower_caches, capacity)
-        hidden = hidden[-1:]
-        previous, main_history, produced = frames[-1:], frames[:, 0], []
+        # Prefill creates execution-owned recurrent/KV storage before the memory
+        # compiler records repeated decode work, matching native text generation.
+        # Keep the inter-step frame/hidden buffers outside recorded allocations.
+        hidden = hidden[-1:].clone()
+        previous, main_history, produced = frames[-1:].clone(), frames[:, 0], []
         finish_reason = 'length'
         for index in range(max_frames):
             mm.throw_exception_if_processing_interrupted()
             position = len(frames) - 1 + index
-            sampled = self.tower.decode(self.lm_head(hidden), hidden, position, previous, main_history, tower_caches, capacity, settings, generator)
-            if sampled[0, 0].item() == self.config.eos_token_id:
+            with prefetch.malloc_graph_scope(self.device):
+                sampled = self.tower.decode(self.lm_head(hidden), hidden, position, previous, main_history, tower_caches, capacity, settings, generator)
+                ended = sampled[0, 0].item() == self.config.eos_token_id
+                if not ended:
+                    previous.copy_(sampled)
+                    if index + 1 < max_frames:
+                        next_hidden = self.backbone(self.embed(sampled)[None], position + 1, caches, capacity)[0]
+                        hidden.copy_(next_hidden)
+                        del next_hidden
+                del sampled
+            if ended:
                 finish_reason = 'eos'
                 break
-            produced.append(sampled[0, 1:].to('cpu', copy=True))
-            previous = sampled
-            main_history = torch.cat((main_history[-15:], sampled[:, 0]))
-            if index + 1 < max_frames:
-                hidden = self.backbone(self.embed(sampled)[None], position + 1, caches, capacity)[0]
+            produced.append(previous[0, 1:].to('cpu', copy=True))
+            main_history = torch.cat((main_history[-15:], previous[:, 0]))
         if not produced:
             raise ValueError('Drama 3 ended without producing audio frames')
         return torch.stack(produced, 1), finish_reason
@@ -207,8 +216,7 @@ def generate_codes(model, text, references, history, seed, temperature, top_p, t
             per_frame += (a.shared_enrichment_layers + a.num_codebooks - 1) * a.n_local_heads * a.head_dim * 4
             recurrent = sum(t == 'linear_attention' for t in c.layer_types) * c.linear_num_value_heads * c.linear_key_head_dim * c.linear_value_head_dim * 4
             mm.load_models_gpu([model.generation], memory_required=(len(prompt) + allowance) * per_frame + recurrent + 1024 ** 3)
-            with prefetch.malloc_graph_scope(model.generation.load_device):
-                codes, reason = model.generation.model.generate(prompt, allowance, settings, generator)
+            codes, reason = model.generation.model.generate(prompt, allowance, settings, generator)
             finish_reasons.append(reason)
             generated.append((chunk, cpu_codes(codes)))
         mm.throw_exception_if_processing_interrupted()

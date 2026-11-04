@@ -136,6 +136,52 @@ def test_sampling_is_local_and_seeded():
         sample(logits * float('nan'), .7, 3, .8, torch.Generator())
 
 
+def test_generation_prefill_owns_caches_outside_recorded_decode(monkeypatch):
+    from contextlib import contextmanager
+    from comfy.fish_audio.runtime import GenerationModel
+    active, seen = False, []
+    @contextmanager
+    def record(device):
+        nonlocal active
+        assert not active
+        active = True
+        try:
+            yield
+        finally:
+            active = False
+    monkeypatch.setattr(nodes_drama3.runtime.prefetch, 'malloc_graph_scope', record)
+    class Backbone:
+        layers = [None]
+        def __call__(self, x, start, caches, capacity):
+            seen.append(('backbone', start, active))
+            if start == 0:
+                assert not active
+                caches[0].append(torch.ones(1))
+            else:
+                assert active and caches[0]
+            return x
+    class Tower:
+        shared_layers, residual_layers = [], []
+        def prefill(self, *args):
+            assert not active
+            seen.append(('prefill',))
+        def decode(self, logits, hidden, position, previous, history, caches, capacity, settings, generator):
+            assert active
+            # Repeated decode must keep its external inputs valid across scopes.
+            seen.append(('decode', previous.clone(), history.clone()))
+            return torch.tensor([[8, 3, 4]]) if len([r for r in seen if r[0] == 'decode']) == 1 else torch.tensor([[2, 0, 0]])
+    model = SimpleNamespace(config=SimpleNamespace(text=SimpleNamespace(max_position_embeddings=10), eos_token_id=2),
+        device='cpu', backbone=Backbone(), tower=Tower(), embed=lambda x: x.float(), lm_head=lambda x: x)
+    prompt = torch.tensor([[5, 0, 0], [6, 0, 0]])
+    original = prompt.clone()
+    codes, reason = GenerationModel.generate(model, prompt, 3, (.7, 30, .7), torch.Generator())
+    assert reason == 'eos' and torch.equal(codes, torch.tensor([[3], [4]]))
+    assert torch.equal(prompt, original)
+    second = [r for r in seen if r[0] == 'decode'][1]
+    assert torch.equal(second[1], torch.tensor([[8, 3, 4]]))
+    assert torch.equal(second[2], torch.tensor([5, 6, 8]))
+
+
 @pytest.mark.parametrize('kind', ['full', 'delta'])
 def test_attention_cached_chunks_equal_full(kind):
     torch.manual_seed(4)
