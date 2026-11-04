@@ -101,6 +101,31 @@ def test_duplicate_completion_and_read_only_page(tmp_path):
     assert store.db.total_changes == before
 
 
+def test_gpu_hold_wait_is_not_execution_training_and_blocks_active_forecasts(tmp_path):
+    clock = [0.0]
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'), now=lambda: clock[0])
+    store.event('accepted', item())
+    clock[0] = 2
+    store.event('started', item())
+    clock[0] = 5
+    store.safe_gpu_wait('p1', 'waiting', 1)
+    clock[0] = 9
+    active = store.page('0', 100, [item()], [])['active']['records'][0]
+    assert active['durations']['executionSeconds'] == 2
+    assert active['durations']['queueSeconds'] == 7
+    assert 'gpu_hold_active' in active['coverageReasons']
+    store.safe_gpu_wait('p1', 'waiting', 5)
+    store.safe_gpu_wait('p1', 'cleared', 5)
+    store.safe_gpu_wait('p1', 'cleared', 0)
+    clock[0] = 12
+    store.event('finished', item(), SimpleNamespace(completed=True, messages=[]))
+    final = store.page('0', 100, [], [])['observations'][-1]
+    assert final['durations']['executionSeconds'] == 5
+    assert final['durations']['queueSeconds'] == 7
+    assert final['workload']['features']['observed.gpuHoldWaitSeconds'] == 5
+    assert final['coverageReasons'] == []
+
+
 def test_cache_evidence_is_available_while_running_and_failure_is_nonfatal(tmp_path):
     store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
     store.event('accepted', item())

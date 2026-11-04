@@ -159,6 +159,7 @@ class RunTimingStore:
         self.resource = {'hostId': host_id or socket.gethostname(), 'gpuUuid': gpu_uuid,
                          'instanceId': self.instance_id, 'laneId': 'comfyui'}
         self.now, self.clocks, self.issue = now, {}, None
+        self.gpu_waits = {}
         self.pruned_at = 0
         self.db.commit()
         # Surviving observations are evidence of interruption, never a replay list.
@@ -191,6 +192,35 @@ class RunTimingStore:
             if key in ('inputTokens', 'outputTokens', 'outputAllowance') and type(value) in (int, float) and math.isfinite(value) and value >= 0:
                 record['workload']['features']['observed.' + key] = value
         self._save(record)
+
+    def safe_gpu_wait(self, prompt_id, state, elapsed=0):
+        """Pause execution accounting during the existing resource owner's wait."""
+        try:
+            clock = self.clocks.get(prompt_id)
+            if not clock or clock[1] is None:
+                return
+            row = self.db.execute('SELECT record FROM timing_records WHERE id=?', (prompt_id,)).fetchone()
+            if not row:
+                return
+            record = json.loads(row[0])
+            wait = self.gpu_waits.setdefault(prompt_id, [0, None])
+            if state == 'waiting' and wait[1] is None:
+                wait[1] = max(clock[1], self.now() - max(0, float(elapsed)))
+                record['coverageReasons'].append('gpu_hold_active')
+            elif state == 'cleared' and wait[1] is not None:
+                wait[0] += max(0, self.now() - wait[1])
+                wait[1] = None
+                record['coverageReasons'] = [reason for reason in record['coverageReasons'] if reason != 'gpu_hold_active']
+            else:
+                return
+            self._save(record)
+        except Exception:
+            self.issue = 'timing_gpu_wait_observation_unavailable'
+
+    def elapsed_phases(self, prompt_id, clock):
+        wait, since = self.gpu_waits.get(prompt_id, [0, None])
+        held = wait + (max(0, self.now() - since) if since is not None else 0)
+        return max(0, self.now() - clock[1] - held), max(0, clock[1] - clock[0]) + held, held
 
     def resolve_workload(self, record, graph, phase):
         record['coverageReasons'] = [reason for reason in record['coverageReasons'] if reason != 'workload_resolution_unavailable']
@@ -252,7 +282,10 @@ class RunTimingStore:
             clock = self.clocks.pop(prompt_id, None)
             record.update(phase='cancelled' if action == 'cancelled' else 'succeeded' if status and status.completed else 'failed', finishedAt=utc())
             if clock and clock[1] is not None:
-                record['durations']['executionSeconds'] = max(0, self.now() - clock[1])
+                execution, queued, held = self.elapsed_phases(prompt_id, clock)
+                record['durations'].update(executionSeconds=execution, queueSeconds=queued)
+                record['workload']['features']['observed.gpuHoldWaitSeconds'] = held
+            self.gpu_waits.pop(prompt_id, None)
             if record['phase'] == 'succeeded':
                 record['readyAt'] = record['finishedAt']
             messages = status.messages if status else []
@@ -307,7 +340,9 @@ class RunTimingStore:
                 clock = self.clocks.get(item[1])
                 if clock:
                     if clock[1] is not None:
-                        record['durations']['executionSeconds'] = max(0, self.now() - clock[1])
+                        execution, queued, held = self.elapsed_phases(item[1], clock)
+                        record['durations'].update(executionSeconds=execution, queueSeconds=queued)
+                        record['workload']['features']['observed.gpuHoldWaitSeconds'] = held
                     else:
                         record['durations']['queueSeconds'] = max(0, self.now() - clock[0])
                 active.append(record)
