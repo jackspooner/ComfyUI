@@ -87,7 +87,8 @@ def test_path_loader_passes_the_matching_audio_components_path(monkeypatch):
 
     def capture_loader(clip_data, **kwargs):
         captured.update(kwargs)
-        return FakeCLIP()
+        captured["clip"] = FakeCLIP()
+        return captured["clip"]
 
     monkeypatch.setattr(sd, "load_text_encoder_state_dicts", capture_loader)
 
@@ -99,6 +100,10 @@ def test_path_loader_passes_the_matching_audio_components_path(monkeypatch):
     assert captured["model_options"]["dramabox_audio_components_path"] == (
         "/models/audio.safetensors"
     )
+    clip = captured["clip"]
+    assert clip.dramabox_model_path == "/models/gemma.safetensors"
+    assert clip.dramabox_model_name == "gemma.safetensors"
+    assert clip.dramabox_audio_components_path == "/models/audio.safetensors"
 
 
 def test_audio_only_embeddings_preserves_audio_and_mask():
