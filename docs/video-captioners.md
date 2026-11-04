@@ -99,6 +99,9 @@ instance. Select the exact converted filename under `text_encoders`.
 limits duration to 120 seconds and sampled frames to 512, and optionally includes
 the original soundtrack. It never silently trims a source that exceeds the limit.
 Both output text and JSON. An explicit `use_audio:false` ignores the soundtrack.
+The single-video decoder normalizes upstream `[axes,batch,tokens]` positions to
+the native Qwen layout. PadCaptioner's integer audio/video layout is built on CPU
+before rotary preparation transfers it to the execution device.
 Sampling and reported intervals use source FPS. Variable-rate timestamp fidelity
 has not been qualified; use a constant-rate source when timing accuracy matters.
 
