@@ -1,4 +1,4 @@
-"""Offline FP8 -> native NVFP4 Drama 3 packaging; no downloads or inference."""
+"""Offline FP8 -> native NVFP4/MXFP8 Drama 3 packaging; no downloads or inference."""
 import argparse
 from contextlib import ExitStack
 import hashlib
@@ -16,7 +16,7 @@ from safetensors.torch import save_file
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from comfy.cli_args import args
 args.cpu = True
-from comfy.quant_ops import TensorCoreNVFP4Layout
+from comfy.quant_ops import TensorCoreNVFP4Layout, TensorCoreMXFP8Layout
 from comfy.fish_audio.config import FishOmniConfig
 from comfy.fish_audio.runtime import GenerationModel
 from comfy.fish_audio.codec import Codec
@@ -92,14 +92,14 @@ def verify_source(directory, codec_source):
 
 
 class Source:
-    def __init__(self, directory, stack):
+    def __init__(self, directory, stack, verified_hashes=None):
         self.directory = Path(directory)
         index = read_json(self.directory / 'model.safetensors.index.json')
         self.mapping = index['weight_map']
         self.files, self.specs = {}, {}
         for name in sorted(set(self.mapping.values())):
             path = (self.directory / name).resolve()
-            if not path.is_relative_to(self.directory.resolve()):
+            if not path.is_relative_to(self.directory.resolve()) and (not verified_hashes or verified_hashes.get(name) != sha256(path)):
                 raise ValueError('Source shard escapes checkpoint directory')
             saved = stack.enter_context(safe_open(str(path), framework='pt', device='cpu'))
             self.files[name] = saved
@@ -247,7 +247,9 @@ def convert_codec(source, destination):
     return source_hash
 
 
-def convert(source, destination, codec_hash, verified_hashes=None):
+def convert(source, destination, codec_hash, verified_hashes=None, precision='nvfp4'):
+    if precision not in ('nvfp4', 'mxfp8'):
+        raise ValueError('Drama 3 precision must be nvfp4 or mxfp8')
     source = Path(source)
     raw_config = read_json(source / 'config.json')
     config = FishOmniConfig.from_dict(raw_config)
@@ -258,7 +260,7 @@ def convert(source, destination, codec_hash, verified_hashes=None):
     specs, copies, consumed = {}, {}, {}
     banks = []
     with ExitStack() as stack:
-        tensors = Source(source, stack)
+        tensors = Source(source, stack, verified_hashes)
         for key, spec in tensors.specs.items():
             if EXPERT.match(key):
                 continue
@@ -275,10 +277,14 @@ def convert(source, destination, codec_hash, verified_hashes=None):
             for bank, projections, rows, cols in [('gate_up_proj', ('gate_proj', 'up_proj'), 2 * c.moe_intermediate_size, c.hidden_size),
                                                    ('down_proj', ('down_proj',), c.hidden_size, c.moe_intermediate_size)]:
                 prefix = f'backbone.layers.{layer}.mlp.experts.{bank}'
-                specs[prefix + '.weight'] = ((c.num_experts, rows, cols // 2), torch.uint8)
-                specs[prefix + '.weight_scale'] = ((c.num_experts, (rows + 127) // 128 * 128, (cols // 16 + 3) // 4 * 4), torch.float8_e4m3fn)
-                specs[prefix + '.weight_scale_2'] = ((c.num_experts,), torch.float32)
-                descriptor = torch.tensor(list(json.dumps(dict(format='nvfp4', num_experts=c.num_experts)).encode()), dtype=torch.uint8)
+                if precision == 'nvfp4':
+                    specs[prefix + '.weight'] = ((c.num_experts, rows, cols // 2), torch.uint8)
+                    specs[prefix + '.weight_scale'] = ((c.num_experts, (rows + 127) // 128 * 128, (cols // 16 + 3) // 4 * 4), torch.float8_e4m3fn)
+                    specs[prefix + '.weight_scale_2'] = ((c.num_experts,), torch.float32)
+                else:
+                    specs[prefix + '.weight'] = ((c.num_experts, rows, cols), torch.float8_e4m3fn)
+                    specs[prefix + '.weight_scale'] = ((c.num_experts, (rows + 127) // 128 * 128, (cols // 32 + 3) // 4 * 4), torch.uint8)
+                descriptor = torch.tensor(list(json.dumps(dict(format=precision, num_experts=c.num_experts)).encode()), dtype=torch.uint8)
                 specs[prefix + '.comfy_quant'] = (descriptor.shape, torch.uint8)
                 banks.append((prefix, layer, projections, descriptor))
                 for expert in range(c.num_experts):
@@ -291,7 +297,7 @@ def convert(source, destination, codec_hash, verified_hashes=None):
                             consumed[key] = prefix
         if set(consumed) != set(tensors.specs):
             raise ValueError('Source tensor accounting is incomplete')
-        metadata = dict(format='drama3_nvfp4', package_version='1', source_revision=SOURCE_REVISION, upstream_revision=UPSTREAM_REVISION,
+        metadata = dict(format=f'drama3_{precision}', package_version='1', source_revision=SOURCE_REVISION, upstream_revision=UPSTREAM_REVISION,
                         config=json.dumps(raw_config), tokenizer=tokenizer, codec_hash=codec_hash,
                         license=(source / 'LICENSE').read_text(), notice=(NOTICES / 'NOTICE').read_text())
         writer = Writer(destination, specs, metadata)
@@ -312,23 +318,28 @@ def convert(source, destination, codec_hash, verified_hashes=None):
                         base = f'model.language_model.layers.{layer}.mlp.experts.{expert}.{projection}'
                         values.append(decode_fp8(tensors.get(base + '.weight'), tensors.get(base + '.weight_scale_inv')))
                     value = torch.cat(values) if len(values) > 1 else values[0]
-                    packed, params = TensorCoreNVFP4Layout.quantize(value)
-                    restored = TensorCoreNVFP4Layout.dequantize(packed, params)
+                    layout = TensorCoreNVFP4Layout if precision == 'nvfp4' else TensorCoreMXFP8Layout
+                    packed, params = layout.quantize(value)
+                    restored = layout.dequantize(packed, params)
                     difference = restored.float() - value.float()
                     squared_error += difference.square().sum().item()
                     squared_signal += value.float().square().sum().item()
                     peak = max(peak, difference.abs().max().item())
                     writer.put(prefix + '.weight', packed, expert)
-                    writer.put(prefix + '.weight_scale', params.block_scale, expert)
-                    writer.put(prefix + '.weight_scale_2', params.scale.float().reshape(1), expert)
+                    if precision == 'nvfp4':
+                        writer.put(prefix + '.weight_scale', params.block_scale, expert)
+                        writer.put(prefix + '.weight_scale_2', params.scale.float().reshape(1), expert)
+                    else:
+                        writer.put(prefix + '.weight_scale', params.scale.view(torch.uint8), expert)
                 errors[prefix] = dict(relative_rmse=math.sqrt(squared_error / max(squared_signal, 1e-30)), max_abs=peak)
                 print(prefix, errors[prefix], flush=True)
             return writer.finish(dict(source_revision=SOURCE_REVISION, upstream_revision=UPSTREAM_REVISION,
                 source_hashes=verified_hashes if verified_hashes is not None else {name: sha256(source / name) for name in tensors.files}, mapping=consumed, quantization_errors=errors,
-                codec_hash=codec_hash, precision='NVFP4 routed experts; BF16 otherwise', package_version=1,
-                quantization=dict(layout='TensorCoreNVFP4Layout', block_size=16, stochastic_rounding=0,
-                    scale='per-expert absmax/(448*6)', block_scale_dtype='E4M3FN', scale_dtype='FP32',
-                    source_block_size=[128, 128], source_dequant_dtype='FP32 then BF16', input_passes=1)))
+                codec_hash=codec_hash, precision=f'{precision.upper()} routed experts; BF16 otherwise', package_version=1,
+                quantization=dict(layout=layout.__name__, block_size=16 if precision == 'nvfp4' else 32, stochastic_rounding=0,
+                    **(dict(scale='per-expert absmax/(448*6)', block_scale_dtype='E4M3FN', scale_dtype='FP32', input_passes=1)
+                       if precision == 'nvfp4' else dict(scale='power-of-two per 32 values', block_scale_dtype='E8M0', input_passes=1)),
+                    source_block_size=[128, 128], source_dequant_dtype='FP32 then BF16')))
         finally:
             writer.abort()
 
@@ -339,6 +350,7 @@ def main():
     p.add_argument('--model-output', type=Path, required=True)
     p.add_argument('--codec-output', type=Path, required=True)
     p.add_argument('--codec-source', type=Path)
+    p.add_argument('--precision', choices=('nvfp4', 'mxfp8'), default='nvfp4')
     options = p.parse_args()
     if options.model_output.exists() or options.model_output.with_suffix('.manifest.json').exists():
         raise FileExistsError(options.model_output)
@@ -354,7 +366,7 @@ def main():
             raise ValueError('Existing codec package failed recovery verification')
     else:
         codec_hash = convert_codec(codec_source, options.codec_output)
-    convert(options.source, options.model_output, codec_hash, verified_hashes)
+    convert(options.source, options.model_output, codec_hash, verified_hashes, options.precision)
 
 
 if __name__ == '__main__':

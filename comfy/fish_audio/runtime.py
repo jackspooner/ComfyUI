@@ -92,7 +92,7 @@ class Model:
 def metadata(path, expected):
     with safe_open(str(path), framework='pt', device='cpu') as saved:
         meta = saved.metadata() or {}
-    if meta.get('format') != expected or meta.get('package_version') != '1':
+    if meta.get('format') not in ((expected,) if isinstance(expected, str) else expected) or meta.get('package_version') != '1':
         raise ValueError(f'Expected converted {expected} version 1; run scripts/convert_drama3.py offline')
     manifest_path = Path(path).with_suffix('.manifest.json')
     manifest = json.loads(manifest_path.read_text())
@@ -103,9 +103,11 @@ def metadata(path, expected):
 
 def load(generation_path, codec_path):
     device = mm.get_torch_device()
-    if not mm.supports_nvfp4_compute(device):
-        raise RuntimeError('The Drama 3 NVFP4 package requires a Blackwell CUDA GPU')
-    meta, receipt = metadata(generation_path, 'drama3_nvfp4')
+    meta, receipt = metadata(generation_path, ('drama3_nvfp4', 'drama3_mxfp8'))
+    precision = meta['format'].removeprefix('drama3_')
+    supported = mm.supports_nvfp4_compute(device) if precision == 'nvfp4' else mm.supports_mxfp8_compute(device)
+    if not supported:
+        raise RuntimeError(f'The Drama 3 {precision.upper()} package requires a Blackwell CUDA GPU')
     codec_meta, codec_receipt = metadata(codec_path, 'fish_dac')
     if meta['codec_hash'] != codec_meta['source_hash']:
         raise ValueError('Select the codec packaged with this Drama 3 model')
@@ -140,7 +142,8 @@ def load(generation_path, codec_path):
     return Model(generation, codec_patcher, tokenizer, config, compatibility,
                  {'source_revision': meta['source_revision'], 'upstream_revision': meta['upstream_revision'],
                   'model_sha256': receipt['output_sha256'], 'codec_sha256': codec_receipt['output_sha256'],
-                  'nvfp4_input_passes': 1, 'precision': 'NVFP4 routed experts, BF16 remainder'})
+                  'precision': f'{precision.upper()} routed experts, BF16 remainder',
+                  **({'nvfp4_input_passes': 1} if precision == 'nvfp4' else {})})
 
 
 def encode_reference(model, audio, transcript, speaker):
@@ -167,6 +170,11 @@ def encode_reference(model, audio, transcript, speaker):
 
 
 def synthesize(model, text, references, history, seed, temperature, top_p, top_k, max_frames, single_chunk):
+    updated = generate_codes(model, text, references, history, seed, temperature, top_p, top_k, max_frames, single_chunk)
+    return decode_history(model, updated), updated
+
+
+def generate_codes(model, text, references, history, seed, temperature, top_p, top_k, max_frames, single_chunk):
     if history is None:
         history = History(model.compatibility)
     validate(history, model.compatibility)
@@ -204,19 +212,28 @@ def synthesize(model, text, references, history, seed, temperature, top_p, top_k
             finish_reasons.append(reason)
             generated.append((chunk, cpu_codes(codes)))
         mm.throw_exception_if_processing_interrupted()
-        waves = []
-        for _, codes in generated:
+        take = Take(text, tuple(generated), dict(seed=seed, temperature=temperature, top_p=top_p, top_k=top_k,
+                    max_frames=max_frames, single_chunk=single_chunk, finish_reasons=finish_reasons, **model.provenance))
+        updated = History(model.compatibility, refs, history.takes + (take,))
+        validate(updated)
+        return updated
+    finally:
+        prefetch.cleanup_prefetch_queues()
+
+
+def decode_history(model, history):
+    validate(history, model.compatibility)
+    if not history.takes:
+        raise ValueError('Drama 3 history has no generated take to decode')
+    waves = []
+    try:
+        for _, codes in history.takes[-1].chunks:
             frames = codes.shape[1]
             mm.load_models_gpu([model.codec], memory_required=max(1024 ** 3, frames * frames * 16 + frames * 1024 * 128))
             with prefetch.malloc_graph_scope(model.codec.load_device):
                 decoded = model.codec.model.decode(codes[None].to(model.codec.load_device))
             waves.append(decoded.float().cpu())
         mm.throw_exception_if_processing_interrupted()
-        audio = {'waveform': torch.cat(waves, -1), 'sample_rate': 44100}
-        take = Take(text, tuple(generated), dict(seed=seed, temperature=temperature, top_p=top_p, top_k=top_k,
-                    max_frames=max_frames, single_chunk=single_chunk, finish_reasons=finish_reasons, **model.provenance))
-        updated = History(model.compatibility, refs, history.takes + (take,))
-        validate(updated)
-        return audio, updated
+        return {'waveform': torch.cat(waves, -1), 'sample_rate': 44100}
     finally:
         prefetch.cleanup_prefetch_queues()

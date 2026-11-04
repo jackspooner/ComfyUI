@@ -60,6 +60,24 @@ def validate(history, compatibility=None):
             validate_codes(codes)
 
 
+def state(history):
+    """CPU tensor tree for the existing durable native stage checkpoint owner."""
+    validate(history)
+    return dict(version=1, compatibility=history.compatibility,
+                references=[dict(transcript=r.transcript, speaker=r.speaker, codes=r.codes.clone()) for r in history.references],
+                takes=[dict(text=t.text, settings=dict(t.settings), chunks=[dict(text=text, codes=codes.clone()) for text, codes in t.chunks]) for t in history.takes])
+
+
+def from_state(data):
+    if not isinstance(data, dict) or set(data) != {'version', 'compatibility', 'references', 'takes'} or data['version'] != 1:
+        raise ValueError('Unsupported Drama 3 stage history')
+    history = History(data['compatibility'],
+        tuple(Reference(r['transcript'], r['speaker'], cpu_codes(r['codes']), data['compatibility']) for r in data['references']),
+        tuple(Take(t['text'], tuple((c['text'], cpu_codes(c['codes'])) for c in t['chunks']), dict(t['settings'])) for t in data['takes']))
+    validate(history)
+    return history
+
+
 def save(history, path):
     validate(history)
     tensors, references, takes = {}, [], []
