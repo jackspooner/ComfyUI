@@ -198,6 +198,14 @@ and attribution are described below.
 
 # ComfyUI
 
+This fork adds local, durable [run timing observations](docs/run-timing.md) for
+MediaTools duration and queue forecasts. The server adapter records prompt-free
+native queue/execution measurements and exposes a machine-local read-only API.
+It preserves upstream queue/model ownership; forecasts are produced by MediaTools.
+Upstream documentation and licensing below remain applicable:
+[Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
+[README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
+
 ## Native UniPASE in this fork
 
 This fork adds **Load UniPASE → UniPASE Speech Restoration** for local generative

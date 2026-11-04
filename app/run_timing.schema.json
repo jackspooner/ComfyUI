@@ -1,0 +1,1113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:workspace2:run-timing:1",
+  "$defs": {
+    "TimingObservationPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "hostId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hostId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "gpuUuid": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "instanceId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "laneId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "required": [
+            "hostId",
+            "gpuUuid",
+            "instanceId",
+            "laneId"
+          ]
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "instanceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cursorExpired": {
+          "type": "boolean"
+        },
+        "observedAt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "version": {
+                "const": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "owner": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "operationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "attemptId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "nativePromptId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "parentOperationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "relatedOperationIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "batchId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "childId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "stageId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "sharedOperationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "hostId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "gpuUuid": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "instanceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "laneId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "hostId",
+                  "gpuUuid",
+                  "instanceId",
+                  "laneId"
+                ]
+              },
+              "workload": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "profileRevision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "components": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    }
+                  },
+                  "executionMode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "precision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "residency": {
+                    "enum": [
+                      "cold",
+                      "warm",
+                      "unknown"
+                    ]
+                  },
+                  "cache": {
+                    "enum": [
+                      "none",
+                      "hit",
+                      "partial",
+                      "unknown"
+                    ]
+                  },
+                  "features": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "settings": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "model",
+                  "profileRevision",
+                  "components",
+                  "executionMode",
+                  "precision",
+                  "residency",
+                  "cache",
+                  "features",
+                  "settings"
+                ]
+              },
+              "phase": {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled",
+                  "unknown"
+                ]
+              },
+              "acceptedAt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "submittedAt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "startedAt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "finishedAt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "readyAt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "observedAt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "durations": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "queueSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "executionSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "publicationSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "queueSeconds",
+                  "executionSeconds",
+                  "publicationSeconds"
+                ]
+              },
+              "measurement": {
+                "enum": [
+                  "native_monotonic",
+                  "owner_monotonic",
+                  "legacy_provider_elapsed",
+                  "unknown"
+                ]
+              },
+              "queueOrder": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "orderKnown": {
+                "type": "boolean"
+              },
+              "coverageReasons": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              }
+            },
+            "required": [
+              "version",
+              "id",
+              "revision",
+              "owner",
+              "operationId",
+              "attemptId",
+              "dependsOn",
+              "resource",
+              "workload",
+              "phase",
+              "observedAt",
+              "durations",
+              "measurement",
+              "queueOrder",
+              "orderKnown",
+              "coverageReasons"
+            ]
+          }
+        },
+        "active": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "complete": {
+              "type": "boolean"
+            },
+            "records": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "version": {
+                    "const": 1
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "owner": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "attemptId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "nativePromptId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "parentOperationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "relatedOperationIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    }
+                  },
+                  "batchId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "childId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "stageId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "dependsOn": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    }
+                  },
+                  "sharedOperationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "resource": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "hostId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      "gpuUuid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "instanceId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      "laneId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "hostId",
+                      "gpuUuid",
+                      "instanceId",
+                      "laneId"
+                    ]
+                  },
+                  "workload": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "model": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "profileRevision": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "components": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        }
+                      },
+                      "executionMode": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      "precision": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "residency": {
+                        "enum": [
+                          "cold",
+                          "warm",
+                          "unknown"
+                        ]
+                      },
+                      "cache": {
+                        "enum": [
+                          "none",
+                          "hit",
+                          "partial",
+                          "unknown"
+                        ]
+                      },
+                      "features": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "settings": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "model",
+                      "profileRevision",
+                      "components",
+                      "executionMode",
+                      "precision",
+                      "residency",
+                      "cache",
+                      "features",
+                      "settings"
+                    ]
+                  },
+                  "phase": {
+                    "enum": [
+                      "queued",
+                      "running",
+                      "succeeded",
+                      "failed",
+                      "cancelled",
+                      "unknown"
+                    ]
+                  },
+                  "acceptedAt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "submittedAt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "startedAt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "finishedAt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "readyAt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "observedAt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "durations": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "queueSeconds": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "executionSeconds": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "publicationSeconds": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "queueSeconds",
+                      "executionSeconds",
+                      "publicationSeconds"
+                    ]
+                  },
+                  "measurement": {
+                    "enum": [
+                      "native_monotonic",
+                      "owner_monotonic",
+                      "legacy_provider_elapsed",
+                      "unknown"
+                    ]
+                  },
+                  "queueOrder": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "orderKnown": {
+                    "type": "boolean"
+                  },
+                  "coverageReasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    }
+                  }
+                },
+                "required": [
+                  "version",
+                  "id",
+                  "revision",
+                  "owner",
+                  "operationId",
+                  "attemptId",
+                  "dependsOn",
+                  "resource",
+                  "workload",
+                  "phase",
+                  "observedAt",
+                  "durations",
+                  "measurement",
+                  "queueOrder",
+                  "orderKnown",
+                  "coverageReasons"
+                ]
+              }
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            }
+          },
+          "required": [
+            "complete",
+            "records",
+            "reasons"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "sourceId",
+        "instanceId",
+        "cursor",
+        "nextCursor",
+        "cursorExpired",
+        "observedAt",
+        "observations",
+        "active"
+      ]
+    },
+    "RunTiming": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "observedAt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "status": {
+          "enum": [
+            "available",
+            "partial",
+            "unavailable",
+            "completed"
+          ]
+        },
+        "measured": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "basis": {
+              "enum": [
+                "native_monotonic",
+                "owner_monotonic",
+                "legacy_provider_elapsed",
+                "unknown"
+              ]
+            },
+            "queueSeconds": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "executionSeconds": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "publicationSeconds": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "phaseBasis": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "queue": {
+                  "enum": [
+                    "native_monotonic",
+                    "owner_monotonic",
+                    "legacy_provider_elapsed",
+                    "unknown"
+                  ]
+                },
+                "execution": {
+                  "enum": [
+                    "native_monotonic",
+                    "owner_monotonic",
+                    "legacy_provider_elapsed",
+                    "unknown"
+                  ]
+                },
+                "publication": {
+                  "enum": [
+                    "native_monotonic",
+                    "owner_monotonic",
+                    "legacy_provider_elapsed",
+                    "unknown"
+                  ]
+                },
+                "call": {
+                  "enum": [
+                    "native_monotonic",
+                    "owner_monotonic",
+                    "legacy_provider_elapsed",
+                    "unknown"
+                  ]
+                }
+              },
+              "required": []
+            },
+            "callSeconds": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Owner-monotonic tool-call elapsed time, including waiting, orchestration and any delivery; not native execution time."
+            }
+          },
+          "required": [
+            "basis",
+            "queueSeconds",
+            "executionSeconds",
+            "publicationSeconds"
+          ]
+        },
+        "queueWaitSeconds": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executionSeconds": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "remainingSeconds": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generationCompleteAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publicationSeconds": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "queueWaitSeconds": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "executionSeconds": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "remainingSeconds": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "queueWaitSeconds",
+            "executionSeconds",
+            "remainingSeconds"
+          ]
+        },
+        "sampleCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "basis": {
+          "enum": [
+            "exact",
+            "related",
+            "legacy",
+            "unavailable"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "unknown"
+          ]
+        },
+        "coverage": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      },
+      "required": [
+        "version",
+        "observedAt",
+        "status",
+        "measured",
+        "queueWaitSeconds",
+        "executionSeconds",
+        "remainingSeconds",
+        "generationCompleteAt",
+        "publicationSeconds",
+        "range",
+        "sampleCount",
+        "basis",
+        "confidence",
+        "coverage",
+        "reasons"
+      ]
+    }
+  },
+  "x-source": {
+    "repository": "https://github.com/jackspooner/router-contracts",
+    "commit": "af98823d71f8024287bf8cef883d7c9f4689337e"
+  }
+}

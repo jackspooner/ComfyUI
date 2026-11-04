@@ -67,7 +67,8 @@ from app.custom_node_manager import CustomNodeManager
 from app.subgraph_manager import SubgraphManager
 from app.node_replace_manager import NodeReplaceManager
 from app import maintenance_http
-from app.maintenance_queue import MaintenanceQueue
+from app import run_timing_http
+from app.run_timing_queue import create_timed_queue
 from typing import TYPE_CHECKING, Optional, Union
 from api_server.routes.internal.internal_routes import InternalRoutes
 from protocol import BinaryEventTypes
@@ -272,7 +273,7 @@ class PromptServer():
         self.internal_routes = InternalRoutes(self)
         self.supports = ["custom_nodes_from_web"]
         maintenance_store, maintenance_token = maintenance_http.configured_store()
-        self.prompt_queue = MaintenanceQueue(self, maintenance_store) if maintenance_store else execution.PromptQueue(self)
+        self.prompt_queue = create_timed_queue(self, maintenance_store, os.path.join(folder_paths.get_user_directory(), 'run-timing.sqlite'))
         self.loop = loop
         self.messages = asyncio.Queue()
         self.client_session:Optional[aiohttp.ClientSession] = None
@@ -331,6 +332,7 @@ class PromptServer():
             emit("assets.enabled", hashing_enabled=args.enable_asset_hashing)
         routes = web.RouteTableDef()
         self.routes = routes
+        run_timing_http.add_routes(routes, self.prompt_queue)
         if maintenance_store:
             maintenance_http.add_routes(routes, self.prompt_queue)
         self.last_node_id = None
