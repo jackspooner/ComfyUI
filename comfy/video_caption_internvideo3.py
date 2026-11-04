@@ -19,6 +19,7 @@ from comfy.text_encoders.qwen35 import Qwen35VisionModel
 from comfy.video_caption import namespace
 from comfy.video_caption_grounding import SalmonnPositions
 from comfy.video_caption_media import prepare_video
+from comfy.video_caption_json import prepare_json, json_prompt, check_json_prompt, select_token, json_result
 
 
 def rotary_frequencies(positions, dimension, theta, sections):
@@ -169,12 +170,14 @@ class InternVideoCaptioner:
         self.patcher = comfy.model_patcher.CoreModelPatcher(self.network, load_device=self.load_device, offload_device=offload,
             fast_disk=comfy.storage.state_dict_fast_disk(state_dict))
 
-    def caption(self, images, source_fps, audio, prompt, fps, max_pixels, max_tokens, max_events):
+    def caption(self, images, source_fps, audio, prompt, fps, max_pixels, max_tokens, max_events, response_format='text', json_schema=''):
         if audio is not None:
             raise ValueError('InternVideo3 has no audio encoder; use visual frames only')
-        patches, grid, timestamps = prepare_video(images, source_fps, fps, 16, max_pixels)
-        ids = internvideo_prompt(self.tokenizer, prompt, grid, timestamps)
         config = self.network.model.config
+        prepared = prepare_json(self.tokenizer, self.family, config.vocab_size, self.eos_tokens, response_format, json_schema)
+        patches, grid, timestamps = prepare_video(images, source_fps, fps, 16, max_pixels)
+        ids = internvideo_prompt(self.tokenizer, json_prompt(prompt, prepared), grid, timestamps)
+        check_json_prompt(prepared, ids)
         total = ids.shape[1] + max_tokens
         if total > config.max_position_embeddings:
             raise ValueError('InternVideo3 context exceeded; reduce frames, resolution or output tokens')
@@ -191,13 +194,20 @@ class InternVideoCaptioner:
         position_owner.config = self.config
         positions, delta = position_owner.get_rope_index(ids, video_grid_thw=grid)
         cache, output = None, []
+        attempt = None if prepared is None else prepared.new_attempt()
         for _ in range(max_tokens):
             comfy.model_management.throw_exception_if_processing_interrupted()
             hidden, cache = self.network.model.step(hidden, positions, cache)
-            token = int(self.network.model.lm_head(hidden[:, -1:]).argmax(-1).item())
+            token = select_token(self.network.model.lm_head(hidden[:, -1:])[:, -1], attempt)
+            complete = attempt.commit(token) if attempt is not None else False
             if token in self.eos_tokens:
                 break
             output.append(token)
+            if complete:
+                break
             hidden = self.network.model.embed_tokens(torch.tensor([[token]], device=self.load_device), out_dtype=self.dtype)
             positions = torch.full((3, 1, 1), ids.shape[1] + len(output) - 1 + int(delta[0]), device=self.load_device, dtype=torch.long)
-        return dict(text=self.tokenizer.decode(output, skip_special_tokens=True).strip(), events=[], generated_tokens=len(output))
+        result = dict(text=self.tokenizer.decode(output, skip_special_tokens=True).strip(), events=[], generated_tokens=len(output))
+        if attempt is not None:
+            result.update(json_result(attempt))
+        return result

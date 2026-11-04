@@ -20,6 +20,8 @@ from comfy.text_encoders.qwen_vl import Qwen2VLVisionTransformer
 from comfy.video_caption_audio import CaptionAudioEncoder
 from comfy.video_caption_grounding import PadGrounding, SalmonnPositions
 from comfy.video_caption_media import prepare_video, prepare_audio, media_prompt
+from comfy.video_caption_json import prepare_json, json_prompt, check_json_prompt, select_token, json_result
+from comfy.text_json import StructuredOutputError
 
 
 def namespace(value):
@@ -182,12 +184,16 @@ class VideoCaptioner:
         self.patcher = comfy.model_patcher.CoreModelPatcher(self.network, load_device=self.load_device, offload_device=offload,
             fast_disk=comfy.storage.state_dict_fast_disk(state_dict))
 
-    def caption(self, images, source_fps, audio, prompt, fps, max_pixels, max_tokens, max_events):
+    def caption(self, images, source_fps, audio, prompt, fps, max_pixels, max_tokens, max_events, response_format='text', json_schema=''):
+        config = self.network.model.config
+        prepared = prepare_json(self.tokenizer, self.family, config.vocab_size, {self.network.config.eos_token_id}, response_format, json_schema)
+        prompt = json_prompt(prompt, prepared, per_event=self.family == 'padcaptioner_3b')
         patch = 16 if self.family == 'salmonn2_pro_8b' else 14
         patches, grid, timestamps = prepare_video(images, source_fps, fps, patch, max_pixels)
         features = prepare_audio(audio)
         audio_count = 0 if features is None else len(features) * 60
         ids, _ = media_prompt(self.tokenizer, self.family, prompt, grid, timestamps, audio_count, min(fps, source_fps))
+        check_json_prompt(prepared, ids)
         limit = self.network.model.config.max_position_embeddings
         output_reserve = max_tokens * max_events if self.family == 'padcaptioner_3b' else max_tokens
         if ids.shape[1] + output_reserve > limit:
@@ -203,26 +209,33 @@ class VideoCaptioner:
             position_owner = SalmonnPositions()
             position_owner.config = self.network.config
             positions, delta = position_owner.get_rope_index(ids, video_grid_thw=grid)
-            output = self._salmonn(ids, hidden, positions, int(delta[0]), deepstack, visual_mask, max_tokens)
-            return dict(text=self.tokenizer.decode(output, skip_special_tokens=True).strip(), events=[], generated_tokens=len(output))
-        return self._pad(ids, hidden, grid, min(fps, source_fps), max_tokens, max_events, audio_count)
+            attempt = None if prepared is None else prepared.new_attempt()
+            output = self._salmonn(ids, hidden, positions, int(delta[0]), deepstack, visual_mask, max_tokens, attempt)
+            result = dict(text=self.tokenizer.decode(output, skip_special_tokens=True).strip(), events=[], generated_tokens=len(output))
+            if attempt is not None:
+                result.update(json_result(attempt))
+            return result
+        return self._pad(ids, hidden, grid, min(fps, source_fps), max_tokens, max_events, audio_count, prepared)
 
-    def _salmonn(self, ids, hidden, positions, delta, deepstack, visual_mask, max_tokens):
+    def _salmonn(self, ids, hidden, positions, delta, deepstack, visual_mask, max_tokens, attempt=None):
         network = self.network
         cache = None
         output = []
         for step in range(max_tokens):
             hidden, cache, _ = network.model.step(hidden, positions, cache, deepstack=deepstack, visual_mask=visual_mask)
-            token = int(network.logits(hidden[:, -1:]).argmax(-1).item())
+            token = select_token(network.logits(hidden[:, -1:])[:, -1], attempt)
+            complete = attempt.commit(token) if attempt is not None else False
             if token == network.config.eos_token_id:
                 break
             output.append(token)
+            if complete:
+                break
             hidden = network.model.embed_tokens(torch.tensor([[token]], device=ids.device), out_dtype=network.dtype)
             positions = torch.full((3, 1, 1), ids.shape[1] + step + delta, device=ids.device, dtype=torch.long)
             deepstack = None
         return output
 
-    def _pad(self, ids, hidden, grid, fps, max_tokens, max_events, audio_count):
+    def _pad(self, ids, hidden, grid, fps, max_tokens, max_events, audio_count, prepared=None):
         network = self.network
         time, height, width = grid[0].tolist()
         per_frame = height * width // 4
@@ -258,6 +271,8 @@ class VideoCaptioner:
             positions = torch.full((3, 1, 1), cache[0][2] + int(delta[0]), device=ids.device, dtype=torch.long)
             output, cache, snapshots = network.model.step(embedding, positions, cache, capture=True)
         if not planned:
+            if prepared is not None:
+                raise StructuredOutputError('incomplete', 'PadCaptioner planned no events; no constrained caption was generated.')
             return dict(text='', events=[], generated_tokens=0)
         branches = len(planned)
         prefix = cache[0][2]
@@ -266,6 +281,7 @@ class VideoCaptioner:
         for index, interval in enumerate(planned):
             embedding[0, index] += session._aggregate_interval_feature(0, interval)
         tokens = [[] for _ in planned]
+        attempts = [None if prepared is None else prepared.new_attempt() for _ in planned]
         finished = [False] * branches
         for step in range(max_tokens):
             positions = torch.full((3, 1, branches), prefix + step + int(delta[0]), device=ids.device, dtype=torch.long)
@@ -277,11 +293,16 @@ class VideoCaptioner:
                 network.config.vision_start_token_id, network.config.vision_end_token_id]
             logits[:, banned] = torch.finfo(logits.dtype).min
             selected = logits.argmax(-1)
+            if prepared is not None:
+                for index, attempt in enumerate(attempts):
+                    if not finished[index]:
+                        selected[index] = select_token(logits[index:index + 1], attempt)
             for index, token in enumerate(selected.tolist()):
                 if not finished[index]:
-                    if token == network.config.eos_token_id:
+                    complete = attempts[index].commit(token) if attempts[index] is not None else False
+                    if token == network.config.eos_token_id or complete:
                         finished[index] = True
-                    else:
+                    if token != network.config.eos_token_id:
                         tokens[index].append(token)
                 else:
                     selected[index] = network.config.eos_token_id
@@ -291,5 +312,13 @@ class VideoCaptioner:
         events = [dict(intervals=[[a * session.duration, (b + 1) * session.duration] for a, b in intervals],
             text=self.tokenizer.decode(body, skip_special_tokens=True).strip(), truncated=not finished[index])
             for index, (intervals, body) in enumerate(zip(planned, tokens))]
-        return dict(text='\n'.join(f"{event['intervals']}: {event['text']}" for event in events), events=events,
-                    generated_tokens=sum(map(len, tokens)), planned_events=branches)
+        result = dict(text='\n'.join(f"{event['intervals']}: {event['text']}" for event in events), events=events,
+                      generated_tokens=sum(map(len, tokens)), planned_events=branches)
+        if prepared is not None:
+            for event, attempt in zip(events, attempts):
+                event.update(json_result(attempt, scope='event_caption'))
+            structured = {'events': [dict(intervals=event['intervals'], caption=event['structured']) for event in events]}
+            result.update(text=json.dumps(structured, ensure_ascii=False, separators=(',', ':')), structured=structured,
+                structured_output={**prepared.evidence, 'scope': 'event_caption', 'validated': True,
+                    'finish_reason': 'all_events_complete', 'event_count': branches})
+        return result
