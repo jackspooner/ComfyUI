@@ -2,10 +2,17 @@
 
 Built with Fish Audio. This fork adds native local Drama 3 inference, voice
 references, multi-speaker text, chunked long-form speech and whole-take revisions.
-The current NVFP4 candidate failed dialogue/long-form quality acceptance; see the
+The original NVFP4 candidate failed dialogue/long-form quality acceptance; see the
 [measured acceptance record](drama3-acceptance.md). It uses ComfyUI-managed generation and codec models; no Fish application, server,
 model download or internet request runs inside a node. Existing Fish S2 workflows
 and the separate custom-node package are unchanged.
+
+The converter also supports `--precision mxfp8` and the loader accepts the
+corresponding `drama3_mxfp8` package. MXFP8 retains E4M3 values with E8M0 scales
+per 32 weights and quantizes matrix inputs with the installed Comfy Kitchen
+Blackwell kernels. It trades a larger checkpoint and layer offload for less
+quantization error; numerical fixtures do not establish speech quality. The
+2026-11-03 package/queue results are recorded separately from the NVFP4 failure.
 
 ## Checkpoints and preparation
 
@@ -35,6 +42,12 @@ recomputed per call. Embedded tokenizer/config/license assets remove any runtime
 dependency on the source directory. Native execution requires a Blackwell CUDA
 GPU with the installed Comfy Kitchen NVFP4 kernels. Other devices are unverified;
 the node does not change precision or choose another runtime automatically.
+
+For the MXFP8 candidate use `--precision mxfp8` and a fresh
+`drama3_mxfp8.safetensors` output. Allow approximately 41 GB for that package in
+addition to source assets. Every externally linked source shard must match its
+pinned verified hash; no unchecked symlink escapes are accepted. Conversion is
+CPU-only and reuses an existing verified codec package.
 
 The converter first checks every pinned source file against published LFS SHA256
 or Git blob hashes in `scripts/drama3-source.json`, then validates shard inventories,
@@ -79,6 +92,16 @@ remain in the returned history. Further explicit references are appended to thos
 in history, allowing multiple clips for a speaker. Model and codec operations
 must not mutate supplied history/reference tensors. A failed or canceled call
 returns no updated history. Branching from a previous history remains supported.
+
+`Drama3SaveHistory` also returns a JSON receipt in history UI text, including the
+exact `historyName`, hash, take count and finish reasons. It contains no VQ tokens;
+the safetensors history must remain available for reload.
+
+Durable native batching uses `Drama3PrepareHistory`, `Drama3GenerateCodes` and
+`Drama3DecodeHistory`. Their LATENT outputs are private CPU tensor trees containing
+references, prior takes or newly generated codes, without model handles/GPU caches.
+Ordinary `Drama3Generate` uses the same generation and decode functions. Sampling,
+seed, context overflow, interruption and latest-take decode semantics are identical.
 
 Prompt rows include text, voice-reference frames and earlier takes. The upstream
 prompt builder allows 8192 rows; generated frames also fit the runtime capacity.

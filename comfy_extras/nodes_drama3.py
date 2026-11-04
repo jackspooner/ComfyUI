@@ -1,6 +1,8 @@
 """Local Drama 3 speech, references and explicit revision histories."""
 from pathlib import Path
 import hashlib
+import json
+import torch
 import folder_paths
 from comfy_api.latest import ComfyExtension, io, ui
 from comfy.fish_audio import runtime, history as take_history
@@ -14,7 +16,7 @@ class Drama3Loader(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(node_id='Drama3Loader', display_name='Load Drama 3', category='audio/drama3',
-            description='Load an offline converted NVFP4 generator and matching BF16 Fish codec. Blackwell CUDA required.',
+            description='Load an offline converted NVFP4 or MXFP8 generator and matching BF16 Fish codec. Blackwell CUDA required.',
             inputs=[io.Combo.Input('model_name', options=[n for n in folder_paths.get_filename_list('text_encoders') if n.lower().endswith('.safetensors')]),
                     io.Combo.Input('codec_name', options=[n for n in folder_paths.get_filename_list('vae') if n.lower().endswith('.safetensors')])],
             outputs=[ModelType.Output()])
@@ -75,7 +77,56 @@ class Drama3SaveHistory(io.ComfyNode):
         if not path.resolve().is_relative_to(Path(folder_paths.get_output_directory()).resolve()):
             raise ValueError('History destination must stay inside the output directory')
         take_history.save(history, path)
-        return io.NodeOutput(ui={'files': [ui.SavedResult(file, subfolder, io.FolderType.output)]})
+        receipt = dict(historyName=f'{(Path(subfolder) / file).as_posix()} [output]',
+                       sha256=hashlib.sha256(path.read_bytes()).hexdigest(), takes=len(history.takes),
+                       finishReasons=list(history.takes[-1].settings.get('finish_reasons', [])) if history.takes else [])
+        return io.NodeOutput(ui={'files': [ui.SavedResult(file, subfolder, io.FolderType.output)], 'text': [json.dumps(receipt)]})
+
+
+class Drama3PrepareHistory(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        refs = io.Autogrow.TemplatePrefix(input=ReferenceType.Input('reference'), prefix='reference_', min=0, max=100)
+        return io.Schema(node_id='Drama3PrepareHistory', category='audio/drama3/stages', inputs=[ModelType.Input('model'),
+            io.Autogrow.Input('references', template=refs, optional=True), HistoryType.Input('history', optional=True)],
+            outputs=[io.Latent.Output()])
+
+    @classmethod
+    def execute(cls, model, references=None, history=None):
+        prior = history or take_history.History(model.compatibility)
+        refs = tuple(ref for ref in (references or {}).values() if ref is not None)
+        prepared = take_history.History(prior.compatibility, prior.references + refs, prior.takes)
+        take_history.validate(prepared, model.compatibility)
+        return io.NodeOutput({'samples': torch.zeros(1), 'drama3_history': take_history.state(prepared)})
+
+
+class Drama3GenerateCodes(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        schema = Drama3Generate.define_schema()
+        schema.node_id = 'Drama3GenerateCodes'
+        schema.inputs = [item for item in schema.inputs if item.id not in ('references', 'history')]
+        schema.inputs.append(io.Latent.Input('state'))
+        schema.outputs = [io.Latent.Output()]
+        return schema
+
+    @classmethod
+    def execute(cls, model, state, text, seed, temperature, top_p, top_k, max_frames, single_chunk):
+        history = take_history.from_state(state['drama3_history'])
+        updated = runtime.generate_codes(model, text, (), history, seed, temperature, top_p, top_k, max_frames, single_chunk)
+        return io.NodeOutput({'samples': torch.zeros(1), 'drama3_history': take_history.state(updated)})
+
+
+class Drama3DecodeHistory(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(node_id='Drama3DecodeHistory', category='audio/drama3/stages',
+            inputs=[ModelType.Input('model'), io.Latent.Input('state')], outputs=[io.Audio.Output(), HistoryType.Output()])
+
+    @classmethod
+    def execute(cls, model, state):
+        history = take_history.from_state(state['drama3_history'])
+        return io.NodeOutput(runtime.decode_history(model, history), history)
 
 
 def history_files():
@@ -119,7 +170,8 @@ def resolve_history(history_name):
 
 class Drama3Extension(ComfyExtension):
     async def get_node_list(self):
-        return [Drama3Loader, Drama3EncodeReference, Drama3Generate, Drama3SaveHistory, Drama3LoadHistory]
+        return [Drama3Loader, Drama3EncodeReference, Drama3Generate, Drama3SaveHistory, Drama3LoadHistory,
+                Drama3PrepareHistory, Drama3GenerateCodes, Drama3DecodeHistory]
 
 
 async def comfy_entrypoint():
