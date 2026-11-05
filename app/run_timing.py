@@ -415,6 +415,8 @@ class RunTimingStore:
                     stage['reused'] = stage['id'] in cached_nodes
                     if stage['reused']:
                         stage.update(phase='succeeded', durationSeconds=0)
+                        if any(key in stage.get('workload', {}).get('resolved', {}) for key in ('imageLoader.maskSelectionRequired', 'imageEncode.nativePlanRequired')):
+                            apply_metrics(record, stage, {'resolved': {}, 'measurements': {}, 'reasons': []}, utc())
                 self._save(record)
         except Exception:
             self.issue = 'timing_cache_observation_unavailable'
@@ -475,6 +477,19 @@ class RunTimingStore:
             elif observe_control_metrics(state, event, facts, self.control_origins.get(prompt_id, {}).get(facts.get('binding'))):
                 pass
             elif observe_reference_metrics(state, event, facts):
+                snapshots = state.setdefault('image_snapshots', set())
+                repeated = {'image_loaded': 'image_outputs', 'image_mask_selected': 'image_mask_outputs',
+                            'video_decode_work': 'image_video_count', 'image_pillow_work': 'image_pillow_count',
+                            'vae_encode_plan': 'image_encode_plans', 'vae_processed_input': 'vae_inputs'}
+                reasons = frozenset(state['reasons'])
+                if (event in ('image_loaded', 'image_mask_selected', 'vae_encode_plan') and event not in snapshots
+                        or event in repeated and state.get(repeated[event]) == 2
+                        or reasons != state.get('reference_reason_snapshot', frozenset())):
+                    # A second invocation invalidates previously complete input work.
+                    # Persist that transition once, without per-frame/forward writes.
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+                    snapshots.add(event)
+                state['reference_reason_snapshot'] = reasons
                 fallback = {'vae_tiled_fallback': 'vaeTiledFallbacks', 'vae_decode_tiled_fallback': 'vaeDecodeTiledFallbacks'}
                 if event in fallback and measurements.get(fallback[event]) == 1:
                     self.safe_stage(prompt_id, node_id, 'metrics')
@@ -626,6 +641,8 @@ class RunTimingStore:
                     previous = measurements.get('verifiedReuseHits', {}).get('value', 0)
                     measurements['verifiedReuseHits'] = {'value': previous + 1, 'availableAt': 'live',
                                                          'observedAt': utc(), 'source': 'native_cache'}
+                if stage['reused'] is True and any(key in stage.get('workload', {}).get('resolved', {}) for key in ('imageLoader.maskSelectionRequired', 'imageEncode.nativePlanRequired')):
+                    apply_metrics(record, stage, metrics or {'resolved': {}, 'measurements': {}, 'reasons': []}, utc())
             elif action in ('finished', 'failed'):
                 # A cache finish without start is reuse, not a measured execution.
                 if stage['startedOffsetSeconds'] is None:

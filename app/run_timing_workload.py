@@ -3,9 +3,14 @@ import math
 from app.run_timing_audio import waveform_features
 from app.run_timing_vision import MOGE_NODES, MOGE_CONTROLS
 
-EXTRACTOR_VERSION = 'comfy-explicit-6'
+EXTRACTOR_VERSION = 'comfy-explicit-7'
+IMAGE_LOADERS = {'LoadImage', 'LoadImageOutput', 'LoadImageMask'}
+IMAGE_INPUTS = {'VAEEncode': ('pixels',), 'VAEEncodeTiled': ('pixels',), 'VAEEncodeForInpaint': ('pixels', 'mask'),
+                'ControlNetApply': ('image',), 'ControlNetApplyAdvanced': ('image',),
+                'MoGeInference': ('image',), 'MoGePanoramaInference': ('image',)}
 MEASUREMENT_ONLY_REASONS = frozenset((
     'audio_output_unmeasured', 'audio_output_metadata_unavailable', 'stage_completion_unobserved',
+    'image_preparation_measurement_unavailable',
 ))
 AUDIO_NODES = {'LoadAudio': 'preparation', 'EmptyLatentAudio': 'preparation',
                'VAEEncodeAudio': 'encoding', 'VAEDecodeAudio': 'decoding', 'VAEDecodeAudioTiled': 'decoding',
@@ -21,6 +26,7 @@ NODE_STAGES = {
     'EmptyLatentImage': 'preparation', 'EmptySD3LatentImage': 'preparation',
     'EmptyHunyuanLatentVideo': 'preparation', 'EmptyHunyuanVideo15Latent': 'preparation',
     'EmptyLTXVLatentVideo': 'preparation', 'LoadImage': 'preparation',
+    'LoadImageOutput': 'preparation', 'LoadImageMask': 'preparation',
     'PrimitiveInt': 'preparation', 'PrimitiveFloat': 'preparation', 'PrimitiveBoolean': 'preparation',
     'ControlNetApply': 'preparation', 'ControlNetApplyAdvanced': 'preparation',
     'CLIPTextEncode': 'encoding', 'VAEEncode': 'encoding', 'VAEEncodeTiled': 'encoding',
@@ -182,19 +188,26 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             # Step callbacks are measured later; configured steps do not assert NFE or CFG branch execution.
             stage_reasons.append('model_evaluations_unmeasured')
             reasons.add('model_evaluations_unmeasured')
-        if kind == 'LoadImage':
+        if kind in IMAGE_LOADERS:
             # Source paths are deliberately excluded. Processed reference shapes require runtime evidence.
             components.append({'kind': 'reference', 'identity': None, 'role': 'image_input', 'order': order, 'features': {'sourceStage': fact(node_id, kind)}})
+            node_facts['imageLoader.maskSelectionRequired'] = fact(kind == 'LoadImageMask', kind)
             stage_reasons.append('reference_processing_unmeasured')
             reasons.add('reference_processing_unmeasured')
         if kind == 'LoadAudio':
             components.append({'kind': 'reference', 'identity': None, 'role': 'audio_input', 'order': order,
                                'features': {'sourceStage': fact(node_id, kind)}})
             stage_reasons.append('audio_source_workload_unmeasured')
-        if kind in ('MoGeInference', 'MoGePanoramaInference'):
-            source = inputs.get('image')
+        for role in IMAGE_INPUTS.get(kind, ()):
+            source = inputs.get(role)
             features = {'sourceStage': fact(source[0], kind)} if isinstance(source, list) and len(source) == 2 and isinstance(source[0], str) and source[0] in graph else {}
-            components.append({'kind': 'reference', 'identity': None, 'role': node_id + ':image', 'order': order, 'features': features})
+            components.append({'kind': 'reference', 'identity': None, 'role': node_id + ':' + role, 'order': order, 'features': features})
+            if not features:
+                stage_reasons.append('reference_source_unresolved')
+        if kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint'):
+            node_facts['imageEncode.nativePlanRequired'] = fact(True, kind)
+            stage_reasons.append('image_encode_workload_unmeasured')
+        if kind in ('MoGeInference', 'MoGePanoramaInference'):
             stage_reasons.append('moge_workload_unmeasured')
             if kind == 'MoGePanoramaInference':
                 stage_reasons.append('moge_panorama_merge_work_unmeasured')
@@ -234,7 +247,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         input_reasons = workload_reasons(stage_reasons)
         reasons.update(input_reasons)
         stage_workload = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
-                          'profile': 'vision' if kind in MOGE_NODES else 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
+                          'profile': 'vision' if kind in MOGE_NODES or kind in IMAGE_LOADERS or kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint') else 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
                                      next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
                           'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                           'modelIdentity': None, 'requested': {}, 'resolved': node_facts, 'measurements': {},
@@ -266,10 +279,7 @@ def resolved_inputs(kind, inputs, observed_at):
     if kind in MOGE_NODES:
         facts = {}
     references = []
-    image_inputs = {'VAEEncode': ('pixels',), 'VAEEncodeTiled': ('pixels',), 'VAEEncodeForInpaint': ('pixels', 'mask'),
-                    'ControlNetApply': ('image',), 'ControlNetApplyAdvanced': ('image',),
-                    'MoGeInference': ('image',), 'MoGePanoramaInference': ('image',)}
-    for key in image_inputs.get(kind, ()):
+    for key in IMAGE_INPUTS.get(kind, ()):
         shape = getattr(inputs.get(key), 'shape', ())
         if len(shape) not in (3, 4) or not all(type(value) is int and value > 0 for value in shape):
             continue
