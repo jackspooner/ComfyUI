@@ -22,6 +22,7 @@ from comfy.ldm.moge.model import MoGeModel
 from comfy.ldm.moge.geometry import triangulate_grid_mesh
 from comfy.ldm.moge.panorama import get_panorama_cameras, split_panorama_image, merge_panorama_depth, spherical_uv_to_directions, _uv_grid
 import comfy.model_management
+from comfy import execution_metrics
 
 MoGeModelType = io.Custom("MOGE_MODEL")
 MoGeGeometry = io.Custom("MOGE_GEOMETRY")
@@ -157,6 +158,8 @@ class MoGePanoramaInference(io.ComfyNode):
         splits = split_panorama_image(img_chw, extrinsics, intrinsics, split_resolution)
 
         n_views = splits.shape[0]
+        execution_metrics.observe_shape('moge_node_plan', img_chw.unsqueeze(0), operation='panorama',
+                                       views=n_views, batch_size=batch_size, merge_shape=(merge_h, merge_w))
 
         # Weight each lsmr solve by 4^level so the final-resolution solve doesn't leave the bar idle.
         merge_levels: list[tuple[int, int]] = []
@@ -269,6 +272,7 @@ class MoGeInference(io.ComfyNode):
         image = image[..., :3]
         bchw = image.movedim(-1, -3).contiguous()
         B = bchw.shape[0]
+        execution_metrics.observe_shape('moge_node_plan', bchw, operation='perspective', views=B, batch_size=batch_size)
         fov = None if fov_x_degrees <= 0 else float(fov_x_degrees)
 
         pbar = comfy.utils.ProgressBar(B)
@@ -388,6 +392,7 @@ class SaveMoGeDepthPNG(io.ComfyNode):
             raise ValueError("moge_geometry must contain depth and mask")
         if depth.shape[0] != 1:
             raise ValueError(f"SaveMoGeDepthPNG takes one image (got batch of {depth.shape[0]})")
+        execution_metrics.observe_shape('moge_export_input', depth, mask_shape=tuple(mask.shape))
 
         encoded, minimum, maximum = _encode_metric_depth(depth[0], mask[0])
         height, width = encoded.shape

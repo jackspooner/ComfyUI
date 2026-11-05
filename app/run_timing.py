@@ -21,6 +21,7 @@ from app.run_timing_references import observe_reference_metrics
 from app.run_timing_controls import observe_control_metrics
 from app.run_timing_text import observe_text_metrics
 from app.run_timing_audio import observe_audio_metrics
+from app.run_timing_vision import observe_moge_metrics
 
 
 def utc():
@@ -64,7 +65,7 @@ def selected_file_identity(key, value):
     categories = {'ckpt_name': 'checkpoints', 'checkpoint_name': 'checkpoints', 'unet_name': 'diffusion_models',
                   'diffusion_model': 'diffusion_models', 'vae_name': 'vae', 'lora_name': 'loras',
                   'clip_name': 'text_encoders', 'clip_name1': 'text_encoders', 'clip_name2': 'text_encoders', 'clip_name3': 'text_encoders',
-                  'control_net_name': 'controlnet'}
+                  'control_net_name': 'controlnet', 'moge_model_name': 'geometry_estimation'}
     category = categories.get(key)
     if not category:
         return None
@@ -149,7 +150,7 @@ def workload(graph):
         for key, value in inputs.items():
             if key in MODELS and isinstance(value, str) and value:
                 # Hash the owner-selected artifact identity; never store private paths.
-                identity = selected_file_identity(key, value)
+                identity = selected_file_identity('moge_model_name' if kind == 'LoadMoGeModel' and key == 'model_name' else key, value)
                 selected_files.append(identity is not None)
                 components.append(digest([kind, key, value, identity]))
             elif key in FEATURES and type(value) in (float, int) and math.isfinite(value) and value >= 0:
@@ -434,6 +435,9 @@ class RunTimingStore:
             stage['workload']['resolved'].update(facts)
             evidence['resolved'].update({node_id + '.' + key: value for key, value in facts.items()})
             for role, features in references:
+                previous = next((item for item in stage['workload']['components'] if item['kind'] == 'reference' and item['role'] == node_id + ':' + role), None)
+                if previous:
+                    features = {**previous['features'], **features}
                 component = {'kind': 'reference', 'identity': None, 'role': node_id + ':' + role,
                              'order': next(index for index, item in enumerate(record['stages']) if item['id'] == node_id), 'features': features}
                 stage['workload']['components'] = [item for item in stage['workload']['components'] if item['role'] != component['role']] + [component]
@@ -479,6 +483,14 @@ class RunTimingStore:
                 if event in ('audio_loaded', 'audio_vae_encode_input', 'audio_vae_decode_input') and event not in snapshots:
                     self.safe_stage(prompt_id, node_id, 'metrics')
                     snapshots.add(event)
+            elif observe_moge_metrics(state, event, facts):
+                snapshots = state.setdefault('moge_snapshots', set())
+                ready = state.get('moge_workload_complete', False)
+                if (event in ('moge_node_plan', 'moge_model_plan', 'moge_processed_input', 'moge_export_input') and event not in snapshots
+                        or ready != state.get('moge_ready_snapshot', False)):
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+                    snapshots.add(event)
+                    state['moge_ready_snapshot'] = ready
             elif observe_text_metrics(state, event, facts):
                 if event == 'text_generation_plan' or event == 'text_generation_progress' and self.now() - state.get('last_text_snapshot', float('-inf')) >= 5:
                     self.safe_stage(prompt_id, node_id, 'metrics')
