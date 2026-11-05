@@ -2,7 +2,7 @@
 import math
 from app.run_timing_audio import waveform_features
 
-EXTRACTOR_VERSION = 'comfy-explicit-4'
+EXTRACTOR_VERSION = 'comfy-explicit-5'
 MEASUREMENT_ONLY_REASONS = frozenset((
     'audio_output_unmeasured', 'audio_output_metadata_unavailable', 'stage_completion_unobserved',
 ))
@@ -150,6 +150,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             identity = file_identity(key, value)
             component_kind = 'lora' if key == 'lora_name' else 'controlnet' if key == 'control_net_name' else 'model'
             if identity is None:
+                stage_reasons.append('component_identity_unresolved')
                 reasons.add('component_identity_unresolved')
             component_facts = dict(node_facts)
             if component_kind == 'lora':
@@ -174,6 +175,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if kind == 'LoadImage':
             # Source paths are deliberately excluded. Processed reference shapes require runtime evidence.
             components.append({'kind': 'reference', 'identity': None, 'role': 'image_input', 'order': order, 'features': {'sourceStage': fact(node_id, kind)}})
+            stage_reasons.append('reference_processing_unmeasured')
             reasons.add('reference_processing_unmeasured')
         if kind == 'LoadAudio':
             components.append({'kind': 'reference', 'identity': None, 'role': 'audio_input', 'order': order,
@@ -199,6 +201,8 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             loader = graph.get(selection[0], {}) if isinstance(selection, list) and len(selection) == 2 and isinstance(selection[0], str) else {}
             selected = loader.get('inputs', {}).get('control_net_name') if node_kind(loader) in ('ControlNetLoader', 'DiffControlNetLoader') else None
             identity = file_identity('control_net_name', selected) if isinstance(selected, str) else None
+            if identity is None:
+                stage_reasons.append('component_identity_unresolved')
             strength = node_facts.get('strength', {}).get('value')
             features = dict(node_facts, bypassed=fact(None if strength is None else strength == 0, kind))
             components.append({'kind': 'controlnet', 'identity': identity, 'role': node_id + ':control',
