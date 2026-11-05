@@ -693,7 +693,8 @@ class RunTimingStore:
         rows = self.db.execute('SELECT seq,record FROM timing_events WHERE seq>? ORDER BY seq LIMIT ?', (after, limit + 1)).fetchall()
         selected, active = rows[:limit], []
         reasons = [self.issue] if self.issue else []
-        for index, item in enumerate(list(running) + sorted(pending, key=lambda value: value[0])):
+        # PromptQueue compares full tuples, including prompt IDs for tied priority.
+        for index, item in enumerate(list(running) + sorted(pending)):
             row = self.db.execute('SELECT record FROM timing_records WHERE id=?', (item[1],)).fetchone()
             if row:
                 record = json.loads(row[0])
