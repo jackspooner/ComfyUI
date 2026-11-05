@@ -5,6 +5,7 @@ this module performs no persistence, device queries or synchronization.
 """
 from contextlib import contextmanager
 from contextvars import ContextVar
+from time import monotonic
 
 _observer = None
 _stage = ContextVar('execution_metrics_stage', default=None)
@@ -21,6 +22,22 @@ def enabled():
 
 def current_stage():
     return _stage.get()
+
+
+@contextmanager
+def measure(event, **facts):
+    """Observe a CPU monotonic boundary without synchronizing devices."""
+    if not enabled():
+        yield
+        return
+    started = monotonic()
+    try:
+        yield
+    except BaseException:
+        emit(event, seconds=max(0, monotonic() - started), succeeded=False, **facts)
+        raise
+    else:
+        emit(event, seconds=max(0, monotonic() - started), succeeded=True, **facts)
 
 
 @contextmanager

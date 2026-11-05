@@ -84,6 +84,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
     components, resolved, requested, stages, base_models = [], {}, {}, [], []
     sampling_profiles = set()
     for order, node_id in enumerate(ordered):
+        component_start = len(components)
         node = graph[node_id]
         kind, inputs = node.get('class_type', ''), node.get('inputs', {})
         stage_kind = NODE_STAGES.get(kind, 'unknown')
@@ -140,7 +141,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                           'profile': next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
                           'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                           'modelIdentity': None, 'requested': {}, 'resolved': node_facts, 'measurements': {},
-                          'components': [], 'complete': not stage_reasons, 'reasons': stage_reasons}
+                          'components': components[component_start:], 'complete': not stage_reasons, 'reasons': stage_reasons}
         stages.append({'id': node_id, 'kind': stage_kind, 'dependsOn': sorted(set(links(graph, node))),
                        'resource': resource, 'workload': stage_workload, 'phase': 'queued',
                        'startedOffsetSeconds': None, 'completedOffsetSeconds': None, 'durationSeconds': None,

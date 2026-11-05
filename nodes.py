@@ -27,6 +27,7 @@ import comfy.sd
 import comfy.utils
 import comfy.latent_formats
 import comfy.controlnet
+import comfy.execution_metrics
 from comfy.comfy_types import IO, ComfyNodeABC, InputTypeDict, FileLocator
 from comfy_api.internal import register_versions, ComfyAPIWithVersion
 from comfy_api.version_list import supported_versions
@@ -740,6 +741,7 @@ class LoraLoader:
 
     def load_lora(self, model, clip, lora_name, strength_model, strength_clip):
         if strength_model == 0 and strength_clip == 0:
+            comfy.execution_metrics.emit('lora_bypass')
             return (model, clip)
 
         lora_path = folder_paths.get_full_path_or_raise("loras", lora_name)
@@ -752,11 +754,14 @@ class LoraLoader:
             else:
                 self.loaded_lora = None
 
+        comfy.execution_metrics.emit('lora_file_cache', reused=lora is not None)
         if lora is None:
-            lora, lora_metadata = comfy.utils.load_torch_file(lora_path, safe_load=True, return_metadata=True)
+            with comfy.execution_metrics.measure('lora_file_load'):
+                lora, lora_metadata = comfy.utils.load_torch_file(lora_path, safe_load=True, return_metadata=True)
             self.loaded_lora = (lora_path, lora, lora_metadata)
 
-        model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip, lora, strength_model, strength_clip, lora_metadata=lora_metadata)
+        with comfy.execution_metrics.measure('lora_patch_preparation'):
+            model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip, lora, strength_model, strength_clip, lora_metadata=lora_metadata)
         return (model_lora, clip_lora)
 
 class LoraLoaderModelOnly(LoraLoader):
