@@ -59,6 +59,17 @@ retain strengths, bypass and application mode; ControlNet intervals remain setti
 not an invented count of active model evaluations. Selection identities are hashed.
 Unknown custom nodes remain visible with `unsupported_workload_adapter`.
 
+Native stage model identities include only weight selections reachable through
+that stage's dependencies. Implementation identities hash the same dependency
+structure, input/output edges and reachable node-module content, retaining the
+core/Torch revision and any declared composite-owner implementation revision.
+They exclude unrelated and downstream branches; whole-run model and implementation
+provenance remains unchanged. No performance compatibility is inferred. The
+`dependency-stage-1` identity namespace separates these revisions from older
+whole-graph stage identities without broadening an extractor's workload coverage.
+Extraction shares node-kind source hashes and propagates model selections in
+dependency order; it does not rescan weight files for each stage.
+
 Optional `stages` preserve graph dependencies and the physical resource. The existing
 progress registry supplies start/finish offsets and monotonic elapsed durations.
 Cached nodes report reuse and zero executed duration. Overlapping stage durations
