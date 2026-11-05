@@ -506,8 +506,10 @@ class RunTimingStore:
                 pass
             elif observe_h3_allocation_metrics(state, event, facts):
                 reasons = frozenset(state['reasons'])
-                first = {'h3_av_temporal_plan': 'h3_temporal_count', 'h3_av_allocation_plan': 'h3_plan_count',
+                first = {'h3_av_allocation_plan': 'h3_plan_count',
                          'h3_av_allocation_output': 'h3_output_count'}
+                # The allocation-plan snapshot includes the preceding temporal
+                # facts; do not journal a second incomplete plan per tiny allocation.
                 if (event in first and state.get(first[event]) == 1
                         or reasons != state.get('h3_allocation_reason_snapshot', frozenset())):
                     self.safe_stage(prompt_id, node_id, 'metrics')
