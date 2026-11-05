@@ -400,3 +400,18 @@ def test_owner_phase_profile_and_source_identity_do_not_claim_opaque_workload_su
     assert stage['kind'] == 'publication' and stage['workload']['profile'] == 'diffusion_video'
     assert not stage['workload']['complete']
     assert 'unsupported_workload_adapter' in stage['reasons']
+
+
+def test_invalid_owner_declarations_remain_explicit_coverage_failures(tmp_path):
+    from app import run_timing
+    expanded = {'operation': {'class_type': 'OwnerOperation', 'inputs': {}}}
+    def resolver(*_):
+        return {'workload': run_timing.workload(expanded), 'stageGraph': expanded,
+                'workloadProfile': 'unregistered-profile', 'implementationRevision': 'x' * 513}
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    with patch.object(run_timing, 'WORKLOAD_RESOLVERS', [resolver]):
+        store.event('accepted', (1, 'invalid', {}, {}, []))
+    evidence = store.page('0', 100, [], [])['observations'][0]['workload']['evidence']
+    assert not evidence['complete']
+    assert 'declared_timing_profile_invalid' in evidence['reasons']
+    assert 'declared_timing_implementation_invalid' in evidence['reasons']
