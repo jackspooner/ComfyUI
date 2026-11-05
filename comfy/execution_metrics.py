@@ -24,6 +24,14 @@ def current_stage():
     return _stage.get()
 
 
+def observe_shape(event, tensor, **facts):
+    if enabled():
+        try:
+            emit(event, shape=tuple(tensor.shape), **facts)
+        except Exception:
+            emit('tensor_shape_unavailable', operation=event)
+
+
 @contextmanager
 def measure(event, **facts):
     """Observe a CPU monotonic boundary without synchronizing devices."""

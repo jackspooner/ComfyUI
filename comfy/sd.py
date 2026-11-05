@@ -546,6 +546,7 @@ class CLIP:
                     # perform encoding as normal
                     o = self.cond_stage_model.encode_token_weights(tokens)
                     cond, pooled = o[:2]
+                    comfy.execution_metrics.observe_shape('conditioning_encoded', cond)
                     pooled_dict = {"pooled_output": pooled}
                     if len(o) > 2:
                         pooled_dict.update(o[2])
@@ -584,6 +585,7 @@ class CLIP:
             o = self.cond_stage_model.encode_token_weights(tokens)
 
         cond, pooled = o[:2]
+        comfy.execution_metrics.observe_shape('conditioning_encoded', cond)
         if return_dict:
             out = {"cond": cond, "pooled_output": pooled}
             if len(o) > 2:
@@ -1555,7 +1557,12 @@ class VAE:
         steps += pixel_samples.shape[0] * comfy.utils.get_tiled_scale_steps(pixel_samples.shape[3], pixel_samples.shape[2], tile_x * 2, tile_y // 2, overlap)
         pbar = comfy.utils.ProgressBar(steps)
 
-        encode_fn = lambda a: self.first_stage_model.encode((self.process_input(a)).to(self.vae_dtype).to(self.device)).to(dtype=self.vae_output_dtype())
+        def encode_fn(a):
+            pixels = self.process_input(a).to(self.vae_dtype).to(self.device)
+            comfy.execution_metrics.observe_shape('vae_forward_attempt', pixels, tiled=True)
+            result = self.first_stage_model.encode(pixels)
+            comfy.execution_metrics.emit('vae_forward_completed', tiled=True)
+            return result.to(dtype=self.vae_output_dtype())
         samples = comfy.utils.tiled_scale(pixel_samples, encode_fn, tile_x, tile_y, overlap, upscale_amount = (1/self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device, pbar=pbar)
         samples += comfy.utils.tiled_scale(pixel_samples, encode_fn, tile_x * 2, tile_y // 2, overlap, upscale_amount = (1/self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device, pbar=pbar)
         samples += comfy.utils.tiled_scale(pixel_samples, encode_fn, tile_x // 2, tile_y * 2, overlap, upscale_amount = (1/self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device, pbar=pbar)
@@ -1768,6 +1775,8 @@ class VAE:
             else:
                 pixel_samples = pixel_samples.unsqueeze(2)
 
+        comfy.execution_metrics.observe_shape('vae_processed_input', pixel_samples, tiled=False,
+                                             tile_count_complete=self.latent_dim == 2 and not getattr(self.first_stage_model, 'comfy_has_chunked_io', False))
         with model_management.cuda_device_context(self.device):
             try:
                 memory_used = self.memory_used_encode(pixel_samples.shape, self.vae_dtype)
@@ -1778,11 +1787,13 @@ class VAE:
                 samples = None
                 for x in range(0, pixel_samples.shape[0], batch_number):
                     pixels_in = self.process_input(pixel_samples[x:x + batch_number]).to(self.vae_dtype)
+                    comfy.execution_metrics.observe_shape('vae_forward_attempt', pixels_in, tiled=False)
                     if getattr(self.first_stage_model, 'comfy_has_chunked_io', False):
                         out = self.first_stage_model.encode(pixels_in, device=self.device)
                     else:
                         pixels_in = pixels_in.to(self.device)
                         out = self.first_stage_model.encode(pixels_in)
+                    comfy.execution_metrics.emit('vae_forward_completed', tiled=False)
                     out = out.to(self.output_device).to(dtype=self.vae_output_dtype())
                     if samples is None:
                         samples = torch.empty((pixel_samples.shape[0],) + tuple(out.shape[1:]), device=self.output_device, dtype=self.vae_output_dtype())
@@ -1798,6 +1809,7 @@ class VAE:
                 do_tile = True
 
             if do_tile:
+                comfy.execution_metrics.emit('vae_tiled_fallback', tile_count_complete=self.latent_dim == 2 and self.extra_1d_channel is None and not getattr(self.first_stage_model, 'comfy_has_chunked_io', False))
                 comfy.model_management.soft_empty_cache()
                 if self.latent_dim == 3:
                     tile = 256
@@ -1840,11 +1852,15 @@ class VAE:
         with model_management.cuda_device_context(self.device):
             if dims == 1:
                 args.pop("tile_y")
+                comfy.execution_metrics.observe_shape('vae_processed_input', pixel_samples, tiled=True, tile_count_complete=False)
                 samples = self.encode_tiled_1d(pixel_samples, **args)
             elif dims == 2:
+                comfy.execution_metrics.observe_shape('vae_processed_input', pixel_samples, tiled=True,
+                                                     tile_count_complete=not getattr(self.first_stage_model, 'comfy_has_chunked_io', False))
                 samples = self.encode_tiled_(pixel_samples, **args)
             elif dims == 3:
                 if self.handles_tiling:
+                    comfy.execution_metrics.observe_shape('vae_processed_input', pixel_samples, tiled=True, tile_count_complete=False)
                     samples = self._encode_tiled_owned(pixel_samples, **self._owned_tiled_args(tile_x, tile_y, overlap, tile_t, overlap_t))
                 else:
                     if tile_t is not None:
@@ -1861,7 +1877,9 @@ class VAE:
                     maximum = pixel_samples.shape[2]
                     maximum = self.upscale_ratio[0](self.downscale_ratio[0](maximum))
 
-                    samples = self.encode_tiled_3d(pixel_samples[:,:,:maximum], **args)
+                    processed = pixel_samples[:,:,:maximum]
+                    comfy.execution_metrics.observe_shape('vae_processed_input', processed, tiled=True, tile_count_complete=False)
+                    samples = self.encode_tiled_3d(processed, **args)
 
         if self.format_encoded is not None:
             samples = self.format_encoded(samples)

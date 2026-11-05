@@ -97,7 +97,9 @@ consumer must support this additive contract before producer activation; older
 strict readers may reject the extra fields. No source change alone activates it.
 Focused CPU verification: `python -m pytest tests-unit/app_test/run_timing_test.py
 tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py
-tests-unit/comfy_test/lora_execution_metrics_test.py -q`
+tests-unit/comfy_test/lora_execution_metrics_test.py
+tests-unit/comfy_test/reference_execution_metrics_test.py
+tests-unit/comfy_test/vision_features_test.py -q`
 using the prepared interpreter. Fixtures use tiny CPU tensors and mocked sampling;
 they do not establish real-model or performance acceptance.
 For fixture runs while the serving GPU is occupied, select CPU before importing
@@ -109,8 +111,18 @@ GPU probe and does not change the serving process.
 Resolved node-input observers attribute processed VAE/control image and mask
 dimensions, batch sizes and encoded conditioning-token shapes without retaining
 tensor contents or source paths. Only explicit adapters observe arguments; unknown
-nodes do not acquire workload coverage from input names. Internal crops/tiles and
-reference encoders still need their own measurements. Optional progress handlers
+nodes do not acquire workload coverage from input names. Native reference hooks
+also observe loaded-image dimensions, VAE encode shapes after native cropping and
+temporal truncation, conditioning output positions, vision-forward attempts and
+verified feature-cache hits. Each VAE invocation retains its own axis shapes;
+positions are conditioning output lengths, not tokenizer input counts. Standard
+2D tiled VAE encoding counts actual attempted and completed forwards across its
+existing three passes; OOM fallback is separate. Internal model tilers and 1D/3D
+tilers report incomplete tile counting. Counts accumulate in memory until existing
+stage snapshots, without per-tile database writes or device synchronization.
+These observations do not remove broad reference-coverage reasons or establish
+complete role/crop/token attribution, decode coverage or tile remaining progress.
+Optional progress handlers
 remain compatible with older implementations, and observer failures cannot stop
 node execution.
 

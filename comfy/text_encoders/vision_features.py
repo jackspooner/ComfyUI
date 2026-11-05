@@ -1,5 +1,6 @@
 """Bounded image-only features for one explicitly scoped conditioning preparation."""
 import torch
+from comfy import execution_metrics
 
 
 def clone_features(value):
@@ -69,16 +70,19 @@ class VisionFeatures:
         if (self.closed or torch.is_grad_enabled() or visual.training or device.type not in ("cpu", "cuda")
                 or any(module._forward_hooks or module._forward_pre_hooks for module in visual.modules())):
             self.encodes += 1
+            execution_metrics.observe_shape('vision_forward', image, cache_eligible=False)
             return visual(image.to(device, dtype=torch.float32), grid)
         grid_identity = (grid.dtype, tuple(grid.shape), tuple(grid.flatten().tolist())) if isinstance(grid, torch.Tensor) else tuple(grid)
         identity = (id(visual), grid_identity, str(device), dtype, image.dtype, str(image.device), tuple(image.shape))
         for key, pixels, features in self.entries:
             if key == identity and torch.equal(pixels.contiguous().view(torch.uint8), image.contiguous().view(torch.uint8)):
                 self.hits += 1
+                execution_metrics.observe_shape('vision_feature_reused', image)
                 return clone_features(features)
         cpu_rng = torch.get_rng_state()
         device_rng = torch.cuda.get_rng_state(device) if device.type == "cuda" else None
         self.encodes += 1
+        execution_metrics.observe_shape('vision_forward', image, cache_eligible=True)
         result = visual(image.to(device, dtype=torch.float32), grid)
         deterministic = torch.equal(cpu_rng, torch.get_rng_state())
         if device_rng is not None:

@@ -257,3 +257,33 @@ def test_lora_live_component_facts_and_completed_preparation_times_remain_separa
     measured = stage['workload']['measurements']['loraFileLoadSeconds']
     assert measured['value'] == .2 and measured['source'] == 'native_lora'
     assert measured['availableAt'] == 'completion'
+
+
+def test_processed_reference_boundaries_and_tile_coverage_do_not_use_contents(tmp_path):
+    value = {'image': {'class_type': 'LoadImage', 'inputs': {'image': '/PRIVATE/image.png'}},
+             'encode': {'class_type': 'VAEEncode', 'inputs': {'pixels': ['image', 0]}}}
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', value, {}, ['encode'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'image', 'started')
+    store.safe_metric('prompt', 'image', 'image_loaded', {'shape': (1, 10, 14, 3)})
+    store.safe_stage('prompt', 'image', 'finished')
+    store.safe_stage('prompt', 'encode', 'started')
+    store.safe_inputs('prompt', 'encode', 'VAEEncode', {'pixels': SimpleNamespace(shape=(1, 10, 14, 3))})
+    store.safe_metric('prompt', 'encode', 'vae_processed_input', {'shape': (1, 3, 8, 12), 'tiled': True, 'tile_count_complete': True})
+    before = store.db.total_changes
+    for _ in range(12):
+        store.safe_metric('prompt', 'encode', 'vae_forward_attempt', {'shape': (1, 3, 4, 4), 'tiled': True})
+        store.safe_metric('prompt', 'encode', 'vae_forward_completed', {'tiled': True})
+    assert store.db.total_changes == before
+    store.safe_stage('prompt', 'encode', 'finished')
+    record = store.page('0', 100, [], [])['observations'][-1]
+    stage = next(stage for stage in record['stages'] if stage['id'] == 'encode')
+    component = stage['workload']['components'][0]
+    assert component['features']['height']['value'] == 10
+    assert component['features']['vaeEncode.0.axis.2']['value'] == 8
+    assert component['features']['vaeEncode.0.axis.3']['value'] == 12
+    assert stage['workload']['measurements']['vaeTileForwardCompleted']['value'] == 12
+    assert stage['workload']['measurements']['vaeTileCountingComplete']['value'] is True
+    assert '/PRIVATE' not in json.dumps(record)
