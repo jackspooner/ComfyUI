@@ -265,17 +265,34 @@ class RunTimingStore:
                 observed = {key: value for key, value in record['workload']['features'].items() if key.startswith('observed.')}
                 record['workload'] = resolved['workload']
                 record['workload']['features'].update(observed)
+                owner_revision = resolved.get('implementationRevision')
+                if isinstance(owner_revision, str) and 0 < len(owner_revision) <= 512:
+                    record['workload']['profileRevision'] = digest([record['workload']['profileRevision'], owner_revision])
                 if isinstance(resolved.get('stageGraph'), dict):
                     available_at = 'submission' if record['phase'] == 'queued' else 'execution_start' if phase == 'started' else 'completion' if phase not in ('accepted', 'observation') else 'live'
                     evidence, stages = describe(resolved['stageGraph'], record['workload'], self.resource,
                                                 utc(), selected_file_identity, digest, available_at,
                                                 resolved.get('loaderAliases'))
                     metadata = resolved.get('stageMetadata', {})
+                    profile = resolved.get('workloadProfile')
+                    if profile in ('diffusion_image', 'diffusion_video', 'text', 'audio', 'vision', '3d'):
+                        evidence['profile'] = profile
+                    elif profile is not None:
+                        evidence.update(complete=False, reasons=sorted(set(evidence['reasons']) | {'declared_timing_profile_invalid'}))
+                    if owner_revision is not None and not (isinstance(owner_revision, str) and 0 < len(owner_revision) <= 512):
+                        evidence.update(complete=False, reasons=sorted(set(evidence['reasons']) | {'declared_timing_implementation_invalid'}))
                     for stage in stages:
                         # Only declared correlations are accepted; raw graphs and
                         # owner-private manifests never enter persisted telemetry.
                         if isinstance(metadata.get(stage['id'], {}).get('sharedOperationId'), str):
                             stage['sharedOperationId'] = metadata[stage['id']]['sharedOperationId']
+                        declared_kind = metadata.get(stage['id'], {}).get('kind')
+                        if stage['kind'] == 'unknown' and declared_kind in ('loading', 'preparation', 'encoding', 'inference', 'sampling', 'decoding', 'publication'):
+                            # An owner can name an opaque operation's boundary;
+                            # its unsupported workload reason remains intact.
+                            stage['kind'] = declared_kind
+                        if profile == evidence['profile'] and stage['workload']['profile'] == 'unknown':
+                            stage['workload']['profile'] = profile
                     record['workload']['evidence'], record['stages'] = evidence, stages
                 record['relatedOperationIds'] = sorted(set(record.get('relatedOperationIds', [])) | set(resolved.get('relatedOperationIds', [])))
                 for key in ('batchId', 'stageId', 'sharedOperationId', 'dependsOn'):
