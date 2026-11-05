@@ -411,6 +411,20 @@ class RunTimingStore:
         except Exception:
             self.issue = 'timing_input_observation_unavailable'
 
+    def safe_resolve_started(self, prompt_id, graph):
+        """Retry a saved owner selection at its first nested execution boundary."""
+        try:
+            row = self.db.execute('SELECT record FROM timing_records WHERE id=?', (prompt_id,)).fetchone()
+            if not row:
+                return
+            record = json.loads(row[0])
+            if 'workload_resolution_unavailable' not in record['coverageReasons']:
+                return
+            self.resolve_workload(record, graph, 'started')
+            self._save(record)
+        except Exception:
+            self.issue = 'timing_workload_observation_unavailable'
+
     def safe_metric(self, prompt_id, node_id, event, facts):
         try:
             if prompt_id not in self.clocks:
