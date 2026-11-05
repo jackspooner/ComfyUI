@@ -422,11 +422,12 @@ class RunTimingStore:
                 if state['plans'] > 1:
                     state['reasons'].append('multiple_sampling_invocations')
                 shape = facts.get('shape')
-                for index, stream_shape in enumerate(facts.get('shapes') or []):
-                    if isinstance(stream_shape, tuple) and all(type(value) is int and value > 0 for value in stream_shape):
-                        for axis, size in enumerate(stream_shape):
-                            state['resolved']['stream.' + str(index) + '.axis.' + str(axis)] = size
-                if len(facts.get('shapes') or []) > 1:
+                shapes = facts.get('shapes') or []
+                if len(shapes) > 1:
+                    for index, stream_shape in enumerate(shapes):
+                        if isinstance(stream_shape, tuple) and all(type(value) is int and value > 0 for value in stream_shape):
+                            for axis, size in enumerate(stream_shape):
+                                state['resolved']['stream.' + str(index) + '.axis.' + str(axis)] = size
                     state['reasons'].append('joint_stream_comparison_unsupported')
                 if isinstance(shape, tuple) and len(shape) in (4, 5) and all(type(value) is int and value > 0 for value in shape):
                     state['resolved'].update(batch=shape[0], latentChannels=shape[1], latentWidth=shape[-1],
