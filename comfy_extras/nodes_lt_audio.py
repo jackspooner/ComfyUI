@@ -1,6 +1,7 @@
 import folder_paths
 import comfy.utils
 import comfy.model_management
+import comfy.execution_metrics
 import torch
 
 from comfy_api.latest import ComfyExtension, io
@@ -80,8 +81,11 @@ class LTXVAudioVAEDecode(io.ComfyNode):
         audio_latent = samples["samples"]
         if audio_latent.is_nested:
             audio_latent = audio_latent.unbind()[-1]
+        comfy.execution_metrics.observe_shape('audio_vae_decode_input', audio_latent, layout='bctf',
+                                              tiled=False, normalize=False)
         audio = audio_vae.decode(audio_latent).movedim(-1, 1).to(audio_latent.device)
         output_audio_sample_rate = audio_vae.first_stage_model.output_sample_rate
+        comfy.execution_metrics.observe_shape('audio_decoded', audio, sample_rate=int(output_audio_sample_rate))
         return io.NodeOutput(
             {
                 "waveform": audio,
@@ -157,6 +161,8 @@ class LTXVEmptyLatentAudio(io.ComfyNode):
             (batch_size, z_channels, num_audio_latents, audio_freq),
             device=comfy.model_management.intermediate_device(),
         )
+        comfy.execution_metrics.observe_shape('audio_latent_prepared', audio_latents, layout='bctf',
+                                              precision=str(audio_latents.dtype), device=str(audio_latents.device))
 
         return io.NodeOutput(
             {

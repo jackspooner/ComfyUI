@@ -46,12 +46,96 @@ def test_audio_encode_source_determines_sampling_modality_but_not_latent_dimensi
     assert 'audioLatentLength' not in stages[-1]['workload']['resolved']
 
 
+def test_ltx_audio_nodes_are_explicit_without_guessing_vae_configuration():
+    graph = {'load': {'class_type': 'LTXVAudioVAELoader', 'inputs': {'ckpt_name': 'audio-vae'}},
+             'latent': {'class_type': 'LTXVEmptyLatentAudio', 'inputs': {
+                 'audio_vae': ['load', 0], 'frames_number': 97, 'frame_rate': 25.0, 'batch_size': 2}},
+             'sample': {'class_type': 'KSampler', 'inputs': {'latent_image': ['latent', 0], 'steps': 2}},
+             'decode': {'class_type': 'LTXVAudioVAEDecode', 'inputs': {'samples': ['sample', 0], 'audio_vae': ['load', 0]}}}
+    evidence, stages = description(graph)
+    assert [stage['kind'] for stage in stages] == ['loading', 'preparation', 'sampling', 'decoding']
+    assert all(stage['workload']['profile'] == 'audio' for stage in stages)
+    assert evidence['profile'] == 'audio'
+    assert 'unsupported_workload_adapter' not in evidence['reasons']
+    assert 'audio_latent_workload_unmeasured' in stages[1]['workload']['reasons']
+    assert 'audio_decode_workload_unmeasured' in stages[-1]['workload']['reasons']
+    assert 'audioLatentLength' not in stages[1]['workload']['resolved']
+    assert stages[1]['workload']['requested'] == {'frames_number': 97, 'frame_rate': 25.0, 'batch_size': 2}
+    assert stages[0]['workload']['components'][0]['identity'] == digest(['ckpt_name', 'audio-vae'])
+
+
+@pytest.mark.parametrize('layout,shape,expected', [
+    ('bctf', (2, 8, 12, 16), {'audioLatentLength': 12, 'audioLatentFrequencyBins': 16}),
+    ('bcat', (2, 32, 2, 12), {'audioLatentLength': 12, 'audioLatentChannels': 2}),
+])
+def test_declared_native_four_dimensional_audio_sampling_layouts(tmp_path, layout, shape, expected):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    graph = {'encode': {'class_type': 'VAEEncodeAudio', 'inputs': {}},
+             'sample': {'class_type': 'KSampler', 'inputs': {'latent_image': ['encode', 0]}}}
+    item = (1, 'prompt', graph, {}, ['sample'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'sample', 'started')
+    store.safe_metric('prompt', 'sample', 'sampling_plan', {'shape': shape, 'audio_layout': layout,
+        'evaluations': 2, 'branches': 1, 'precision': 'torch.bfloat16'})
+    stage = latest(store)['stages'][-1]
+    facts = stage['workload']['resolved']
+    assert stage['workload']['complete']
+    assert facts['audioLatentLayout']['value'] == layout
+    assert facts['batch']['value'] == shape[0] and facts['latentChannels']['value'] == shape[1]
+    for key, value in expected.items():
+        assert facts[key]['value'] == value and facts[key]['availableAt'] == 'execution_start'
+    assert not any(key in facts for key in ('latentWidth', 'latentHeight', 'latentFrames'))
+    if layout == 'bctf':
+        assert 'audioLatentChannels' not in facts
+    else:
+        assert 'audioLatentFrequencyBins' not in facts
+
+
 def test_audio_reference_loader_does_not_reclassify_text_inference_as_audio():
     evidence, stages = description({'audio': {'class_type': 'LoadAudio', 'inputs': {'audio': 'private.wav'}},
                                     'text': {'class_type': 'TextGenerate', 'inputs': {'audio': ['audio', 0]}}})
     assert evidence['profile'] == 'text'
     assert stages[0]['workload']['profile'] == 'audio'
     assert stages[1]['workload']['profile'] == 'text'
+
+
+def test_prepared_ltx_audio_shapes_are_live_and_repetition_invalidates_once(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'latent': {'class_type': 'LTXVEmptyLatentAudio', 'inputs': {}}}, {}, ['latent'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'latent', 'started')
+    facts = dict(shape=(2, 8, 91, 16), layout='bctf', precision='torch.float32', device='cpu')
+    store.safe_metric('prompt', 'latent', 'audio_latent_prepared', facts)
+    stage = latest(store)['stages'][0]
+    assert stage['workload']['complete']
+    assert stage['workload']['resolved']['audioPrepared.0.audioLatentLength']['value'] == 91
+    assert stage['workload']['resolved']['audioPrepared.0.audioLatentFrequencyBins']['availableAt'] == 'live'
+    store.safe_metric('prompt', 'latent', 'audio_latent_prepared', facts)
+    assert 'multiple_audio_invocations' in latest(store)['stages'][0]['workload']['reasons']
+    for _ in range(20):
+        store.safe_metric('prompt', 'latent', 'audio_latent_prepared', facts)
+    changes = store.db.total_changes
+    for _ in range(40):
+        store.safe_metric('prompt', 'latent', 'audio_latent_prepared', facts)
+    assert store.db.total_changes == changes
+    assert len(store.metric_states[('prompt', 'latent')]['resolved']) <= 16 * 7
+
+
+@pytest.mark.parametrize('layout,shape', [('bctf', (1, 8, 12)), ('bcat', (1, 32, 3, 12)),
+                                        ('unregistered', (1, 8, 12, 16)), ('bctf', (1, 8, 0, 16))])
+def test_layout_declarations_cannot_resolve_incompatible_or_unknown_shapes(tmp_path, layout, shape):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    graph = {'encode': {'class_type': 'VAEEncodeAudio', 'inputs': {}},
+             'sample': {'class_type': 'KSampler', 'inputs': {'latent_image': ['encode', 0]}}}
+    item = (1, 'prompt', graph, {}, ['sample'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'sample', 'started')
+    store.safe_metric('prompt', 'sample', 'sampling_plan', dict(shape=shape, audio_layout=layout,
+        evaluations=2, branches=1, precision='torch.bfloat16'))
+    assert 'audio_latent_layout_unresolved' in latest(store)['stages'][-1]['workload']['reasons']
 
 
 @pytest.mark.parametrize('kind', ['VAEEncodeAudio', 'SaveAudio', 'SaveAudioMP3', 'SaveAudioOpus', 'PreviewAudio'])
@@ -75,38 +159,43 @@ def test_invalid_waveform_metadata_stays_unknown(shape, rate):
 
 def test_processed_audio_is_live_and_decoded_output_never_becomes_input_evidence(tmp_path):
     store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
-    graph = {'encode': {'class_type': 'VAEEncodeAudio', 'inputs': {}},
+    graph = {'load': {'class_type': 'LoadAudio', 'inputs': {'audio': 'fixture.wav'}},
+             'encode': {'class_type': 'VAEEncodeAudio', 'inputs': {'audio': ['load', 0]}},
              'decode': {'class_type': 'VAEDecodeAudio', 'inputs': {'samples': ['encode', 0]}}}
     item = (1, 'prompt', graph, {}, ['decode'])
     store.event('accepted', item)
     accepted = latest(store)
     store.event('started', item)
+    store.safe_stage('prompt', 'load', 'started')
+    store.safe_metric('prompt', 'load', 'audio_loaded', {'shape': (1, 2, 12000), 'sample_rate': 12000})
+    store.safe_stage('prompt', 'load', 'finished')
     store.safe_stage('prompt', 'encode', 'started')
     store.safe_metric('prompt', 'encode', 'audio_vae_encode_input',
                       {'shape': (1, 2, 24000), 'sample_rate': 24000, 'source_sample_rate': 12000})
     live = latest(store)
-    assert live['stages'][0]['workload']['resolved']['audioProcessed.0.durationSeconds']['availableAt'] == 'live'
-    assert 'audio_processed_workload_unmeasured' not in live['stages'][0]['reasons']
-    assert not accepted['stages'][0]['workload']['resolved']
+    assert live['stages'][1]['workload']['resolved']['audioProcessed.0.durationSeconds']['availableAt'] == 'live'
+    assert 'audio_processed_workload_unmeasured' not in live['stages'][1]['reasons']
+    assert live['stages'][1]['workload']['components'][0]['features']['sourceStage']['value'] == 'load'
+    assert not accepted['stages'][1]['workload']['resolved']
     store.safe_stage('prompt', 'encode', 'finished')
     store.safe_stage('prompt', 'decode', 'started')
     store.safe_metric('prompt', 'decode', 'audio_vae_decode_input',
                       {'shape': (1, 64, 12), 'tiled': False, 'normalize': True})
     before_output = latest(store)
-    assert 'audio_decode_workload_unmeasured' not in before_output['stages'][1]['reasons']
-    assert 'audio_output_unmeasured' in before_output['stages'][1]['reasons']
-    assert before_output['stages'][1]['workload']['complete']
-    assert 'audio_output_unmeasured' not in before_output['stages'][1]['workload']['reasons']
+    assert 'audio_decode_workload_unmeasured' not in before_output['stages'][2]['reasons']
+    assert 'audio_output_unmeasured' in before_output['stages'][2]['reasons']
+    assert before_output['stages'][2]['workload']['complete']
+    assert 'audio_output_unmeasured' not in before_output['stages'][2]['workload']['reasons']
     assert before_output['workload']['evidence']['complete']
     store.safe_metric('prompt', 'decode', 'audio_decoded', {'shape': (1, 2, 24000), 'sample_rate': 24000})
     store.safe_stage('prompt', 'decode', 'metrics')
     measured = latest(store)
-    output = measured['stages'][1]['workload']['measurements']['audioOutput.0.durationSeconds']
+    output = measured['stages'][2]['workload']['measurements']['audioOutput.0.durationSeconds']
     assert output['value'] == 1 and output['availableAt'] == 'completion'
     assert not any('audioOutput' in key for key in measured['workload']['evidence']['resolved'])
-    assert not before_output['stages'][1]['workload']['measurements']
+    assert not before_output['stages'][2]['workload']['measurements']
     store.safe_stage('prompt', 'decode', 'finished')
-    stage = latest(store)['stages'][1]
+    stage = latest(store)['stages'][2]
     assert stage['workload']['complete'] and stage['reasons'] == []
     schema = json.loads((Path(__file__).parents[2] / 'app/run_timing.schema.json').read_text())
     jsonschema.validate(store.page('0', 100, [], []), schema['$defs']['TimingObservationPage'])
@@ -175,6 +264,7 @@ def test_runtime_audio_sampling_shape_keeps_reliable_counts_without_spatial_infe
     if len(shape) == 3:
         assert stage['workload']['resolved']['audioLatentLength']['value'] == 12
         assert stage['workload']['resolved']['audioLatentChannels']['value'] == 1
+        assert 'audioLatentLayout' not in stage['workload']['resolved']  # Preserve the established 3D population.
         assert 'latent_shape_unresolved' not in stage['reasons']
     else:
         assert 'audioLatentLength' not in stage['workload']['resolved']
