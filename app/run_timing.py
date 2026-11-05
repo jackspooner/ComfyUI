@@ -15,7 +15,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
-from app.run_timing_workload import describe, resolved_inputs
+from app.run_timing_workload import describe, resolved_inputs, workload_reasons
 from app.run_timing_metrics import apply_metrics
 from app.run_timing_references import observe_reference_metrics
 from app.run_timing_controls import observe_control_metrics
@@ -363,11 +363,12 @@ class RunTimingStore:
                     stage['phase'] = 'unknown' if record['phase'] == 'succeeded' else record['phase']
                     stage['reasons'].append('stage_execution_unobserved')
                 if stage['reasons'] and stage.get('workload'):
-                    stage['workload'].update(complete=False, reasons=stage['reasons'])
+                    input_reasons = workload_reasons(stage['reasons'])
+                    stage['workload'].update(complete=not input_reasons, reasons=input_reasons)
             evidence = record['workload'].get('evidence')
             if evidence:
-                reasons = set(evidence['reasons']) | {reason for stage in record.get('stages', []) for reason in stage['reasons']}
-                evidence.update(complete=not reasons, reasons=sorted(reasons))
+                reasons = workload_reasons(set(evidence['reasons']) | {reason for stage in record.get('stages', []) for reason in stage['reasons']})
+                evidence.update(complete=not reasons, reasons=reasons)
             self.stage_snapshots.pop(prompt_id, None)
             self.control_origins.pop(prompt_id, None)
             for key in [key for key in self.metric_states if key[0] == prompt_id]:
@@ -543,7 +544,9 @@ class RunTimingStore:
                 for source, target in (('memory_strategy', 'memoryStrategy'), ('offload_device', 'offloadDevice'), ('load_device', 'loadDevice')):
                     if isinstance(facts.get(source), str):
                         state['resolved'][target] = facts[source][:128]
-                state['precision'] = facts.get('precision')
+                if isinstance(facts.get('precision'), str) and facts['precision']:
+                    state['precision'] = facts['precision'][:128]
+                    state.setdefault('sources', {})['executionPrecision'] = 'native_sampler'
                 self.safe_stage(prompt_id, node_id, 'metrics')
             elif event == 'model_forward':
                 for source, target, default in (('elements', 'modelForwardElements', 0), ('conditional', 'conditionalForwardCalls', 0), ('unconditional', 'unconditionalForwardCalls', 0)):

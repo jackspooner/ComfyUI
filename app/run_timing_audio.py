@@ -47,7 +47,7 @@ def observe_audio_metrics(state, event, facts):
     else:
         values = waveform_features(facts.get('shape'), facts.get('sample_rate'))
         if values is None:
-            reason('audio_waveform_metadata_unavailable')
+            reason('audio_output_metadata_unavailable' if event == 'audio_decoded' else 'audio_waveform_metadata_unavailable')
             return True
         if event == 'audio_vae_encode_input':
             source_rate = facts.get('source_sample_rate')

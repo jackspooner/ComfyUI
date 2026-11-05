@@ -1,6 +1,7 @@
 """Bind native scalar observations to the existing queue/context owner."""
 from comfy import execution_metrics
 from comfy_execution.utils import get_executing_context
+from app.run_timing_workload import workload_reasons
 
 
 def apply_metrics(record, stage, state, observed_at, completed=False):
@@ -49,6 +50,9 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
                 target['components'] = [item for item in target['components'] if item['role'] != role] + [component]
     if state.get('precision'):
         record['workload']['precision'] = state['precision']
+        precision = fact(state['precision'], 'execution_start', 'executionPrecision')
+        workload['resolved']['executionPrecision'] = precision
+        evidence['resolved'][stage['id'] + '.executionPrecision'] = precision
     reasons = set(stage['reasons'])
     if 'modelEvaluations' in state.get('resolved', {}) and 'cfgBranches' in state['resolved']:
         reasons.discard('model_evaluations_unmeasured')
@@ -86,11 +90,13 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         if expected is not None and state.get('measurements', {}).get('cfgBranchEvaluations') != expected * state['resolved']['cfgBranches']:
             reasons.add('cfg_behavior_unmeasured')
     stage['reasons'] = sorted(reasons)
-    workload.update(complete=not reasons, reasons=stage['reasons'])
+    input_reasons = workload_reasons(reasons)
+    workload.update(complete=not input_reasons, reasons=input_reasons)
     remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved',
                 'text_loop_coverage_unresolved', 'text_input_modalities_unmeasured', 'audio_input_unmeasured', *audio_requirements}
-    remaining.update(reason for item in record.get('stages', []) for reason in item['reasons'])
-    evidence.update(complete=not remaining, reasons=sorted(remaining))
+    remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
+    input_reasons = workload_reasons(remaining)
+    evidence.update(complete=not input_reasons, reasons=input_reasons)
     if state.get('progress') and stage['kind'] in ('sampling', 'inference'):
         stage['progress'] = dict(state['progress'])
 
