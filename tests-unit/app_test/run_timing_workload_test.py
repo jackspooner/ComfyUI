@@ -343,3 +343,22 @@ def test_text_progress_keeps_unknown_final_length_and_modality_coverage(tmp_path
     assert stage['progress'] == {'unit': 'generated_tokens', 'completed': 2, 'total': None, 'reliable': True}
     assert 'text_loop_coverage_unresolved' not in stage['reasons']
     assert 'text_input_modalities_unmeasured' in stage['reasons']
+
+
+def test_vae_fallback_changes_live_regime_without_backdating_it_to_start(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'encode': {'class_type': 'VAEEncode', 'inputs': {}}}, {}, ['encode'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'encode', 'started')
+    store.safe_metric('prompt', 'encode', 'vae_processed_input', {'shape': (1, 3, 8, 12), 'tiled': False, 'tile_count_complete': True})
+    store.safe_stage('prompt', 'encode', 'metrics')
+    before = store.page('0', 100, [], [])['observations'][-1]
+    store.safe_metric('prompt', 'encode', 'vae_tiled_fallback', {'tile_count_complete': False})
+    store.safe_stage('prompt', 'encode', 'finished')
+    after = store.page('0', 100, [], [])['observations'][-1]
+    initial = before['stages'][0]['workload']['resolved']['vaeEncode.0.tiled']
+    changed = after['stages'][0]['workload']['resolved']['vaeEncode.0.tiled']
+    assert initial['value'] is False and initial['availableAt'] == 'execution_start'
+    assert changed['value'] is True and changed['availableAt'] == 'live'
+    assert after['stages'][0]['workload']['measurements']['vaeTileCountingComplete']['value'] is False
