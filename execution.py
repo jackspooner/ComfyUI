@@ -300,6 +300,8 @@ async def _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, f
             # V1
             else:
                 f = getattr(obj, func)
+            if func == obj.FUNCTION:
+                get_progress_state().inputs_ready(unique_id, inputs)
             if inspect.iscoroutinefunction(f):
                 async def async_wrapper(f, prompt_id, unique_id, list_index, args):
                     with CurrentNodeContext(prompt_id, unique_id, list_index):
@@ -700,6 +702,11 @@ class PromptExecutor:
             if timing is not None:
                 with queue.mutex:
                     timing.safe_cache(data.get('prompt_id'), data.get('nodes', []))
+                    try:
+                        from app.run_timing_progress import attach_timing_progress
+                        attach_timing_progress(queue)
+                    except Exception:
+                        timing.issue = 'timing_progress_observation_unavailable'
         data = {
             **data,
             "timestamp": int(time.time() * 1000),
