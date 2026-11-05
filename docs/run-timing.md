@@ -116,7 +116,10 @@ node execution.
 
 Read-only composite resolvers may return an internal `stageGraph` and optional
 `stageMetadata` shared-operation IDs. Only extracted evidence is persisted. The
-description uses native expansion IDs so later progress can correlate. A bounded
+optional `loaderAliases` maps explicitly audited wrappers to native loading-node
+adapters; non-loader targets are ignored. This declaration belongs to the resolver,
+is not a heuristic based on names, and does not replace implementation provenance.
+The description uses native expansion IDs so later progress can correlate. A bounded
 selection saved by the owner is retried at the first nested start event, with
 execution-start availability. Read/completion-only resolution carries live/completion
 availability, never backdated submission facts. `comfy.execution_metrics.stage_scope` is an optional
