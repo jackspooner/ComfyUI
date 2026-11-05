@@ -108,8 +108,9 @@ node execution.
 Read-only composite resolvers may return an internal `stageGraph` and optional
 `stageMetadata` shared-operation IDs. Only extracted evidence is persisted. The
 description uses native expansion IDs so later progress can correlate. A bounded
-selection learned after submission carries live/completion availability, never
-backdated submission facts. `comfy.execution_metrics.stage_scope` is an optional
+selection saved by the owner is retried at the first nested start event, with
+execution-start availability. Read/completion-only resolution carries live/completion
+availability, never backdated submission facts. `comfy.execution_metrics.stage_scope` is an optional
 telemetry-only context for existing owner-controlled nested node calls; it preserves
 the executing node context and scheduler, observes start/finish/failure and verified
 reuse, and routes scalar sampling observations to that described substage.
