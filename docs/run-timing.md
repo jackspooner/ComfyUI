@@ -62,10 +62,13 @@ Shared registry percentages can mix loading and sampling, so they remain unrelia
 `node_units` and cannot justify a remaining-time estimate.
 
 Native scalar hooks count noise evaluations, model forward calls/elements and
-conditional/unconditional branch work. The standard KSampler adapter observes the
+conditional/unconditional branch work. The generic native CFGGuider boundary,
+including standard and custom samplers, observes the
 actual latent shape after native correction, model dtype, dynamic/standard memory
 strategy and load/offload devices. Explicit Euler plans describe their resolved
-noise-evaluation count; unsupported samplers/CFG hooks retain coverage reasons.
+noise-evaluation count by native sampler-function identity; unsupported samplers,
+custom guiders and CFG hooks retain coverage reasons. Joint AV streams retain
+separate axis shapes and remain incomplete for broadened workload comparison.
 Repeated sampling within one node remains incomplete. Counts are CPU observations,
 not synchronized GPU kernel timings. GPU worker-thread observations without a
 native executing context remain unattributed. No device synchronization is added.
@@ -101,3 +104,14 @@ nodes do not acquire workload coverage from input names. Internal crops/tiles an
 reference encoders still need their own measurements. Optional progress handlers
 remain compatible with older implementations, and observer failures cannot stop
 node execution.
+
+Read-only composite resolvers may return an internal `stageGraph` and optional
+`stageMetadata` shared-operation IDs. Only extracted evidence is persisted. The
+description uses native expansion IDs so later progress can correlate. A bounded
+selection learned after submission carries live/completion availability, never
+backdated submission facts. `comfy.execution_metrics.stage_scope` is an optional
+telemetry-only context for existing owner-controlled nested node calls; it preserves
+the executing node context and scheduler, observes start/finish/failure and verified
+reuse, and routes scalar sampling observations to that described substage.
+Missing descriptions remain unavailable. Receipt presence alone cannot prove reuse.
+Terminal storage failures clear only the attempt's in-memory timing state.

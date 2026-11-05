@@ -14,31 +14,68 @@ def reset_observer():
 
 def test_sampling_metrics_preserve_result_callback_and_inference_count(monkeypatch):
     model = SimpleNamespace(model_dtype=lambda: torch.bfloat16, is_dynamic=lambda: True,
-                            offload_device='cpu', load_device='cpu')
-    sampler = samplers.KSampler.__new__(samplers.KSampler)
-    sampler.model, sampler.device, sampler.sampler, sampler.scheduler = model, 'cpu', 'euler', 'normal'
-    sampler.sigmas, sampler.model_options = torch.tensor([1., .5, 0.]), {}
+                            offload_device='cpu', load_device='cpu', model=object(), hook_mode=None,
+                            restore_hook_patches=lambda: None)
+    guider = samplers.CFGGuider.__new__(samplers.CFGGuider)
+    guider.model_patcher, guider.cfg, guider.model_options = model, 1, {}
+    guider.original_conds = {'positive': [{}], 'negative': [{}]}
     calls, callbacks, observations = [], [], []
-    monkeypatch.setattr(samplers, 'sampler_object', lambda name: name)
     expected = object()
-
-    def sample(*args, **kwargs):
-        calls.append(args)
-        kwargs['callback'](0, None, None, 2)
+    sampler = samplers.KSAMPLER(samplers.k_diffusion_sampling.sample_euler)
+    def native_sample(noise, latent, sampler, sigmas, denoise_mask, callback, *args, **kwargs):
+        calls.append(1)
+        callback(0, None, None, 2)
         return expected
-
-    monkeypatch.setattr(samplers, 'sample', sample)
+    monkeypatch.setattr(samplers.comfy.sampler_helpers, 'prepare_model_patcher', lambda *_: None)
+    monkeypatch.setattr(samplers, 'filter_registered_hooks_on_conds', lambda *_: None)
+    monkeypatch.setattr(samplers.comfy.patcher_extension.WrapperExecutor, 'new_class_executor',
+                        lambda *_: SimpleNamespace(execute=native_sample))
+    def sample():
+        return guider.sample(torch.zeros(1, 4, 8, 8), torch.zeros(1, 4, 8, 8), sampler, torch.tensor([1., .5, 0.]),
+                             callback=lambda *values: callbacks.append(values))
     execution_metrics.set_observer(lambda event, facts: observations.append((event, facts)))
-    assert sampler.sample(None, [object()], [object()], 1, latent_image=torch.zeros(1, 4, 8, 8),
-                          callback=lambda *values: callbacks.append(values)) is expected
+    assert sample() is expected
     assert len(calls) == len(callbacks) == 1
     plan = dict(observations)['sampling_plan']
     assert plan['shape'] == (1, 4, 8, 8)
     assert plan['evaluations'] == 2 and plan['branches'] == 1
     assert dict(observations)['sampling_progress'] == {'completed': 1, 'total': 2}
     execution_metrics.set_observer(lambda *_: (_ for _ in ()).throw(OSError('telemetry offline')))
-    assert sampler.sample(None, [object()], [object()], 1, latent_image=torch.zeros(1, 4, 8, 8)) is expected
+    assert sample() is expected
     assert len(calls) == 2
+
+
+def test_nested_sampling_streams_and_custom_guiders_do_not_invent_cfg_work():
+    class CustomGuider(samplers.CFGGuider):
+        pass
+    guider = CustomGuider.__new__(CustomGuider)
+    guider.model_patcher = SimpleNamespace(model_dtype=lambda: torch.bfloat16, is_dynamic=lambda: False,
+                                           offload_device='cpu', load_device='cpu')
+    guider.cfg, guider.model_options, guider.original_conds = 1, {}, {'positive': [{}]}
+    observations = []
+    execution_metrics.set_observer(lambda event, facts: observations.append((event, facts)))
+    shapes = [(1, 128, 4, 8, 8), (1, 8, 40)]
+    callback = samplers.sampling_metrics_callback(guider, shapes, samplers.KSAMPLER(lambda: None), torch.zeros(3), None)
+    callback(1, None, None, 2)
+    facts = dict(observations)['sampling_plan']
+    assert facts['shape'] is None and facts['shapes'] == shapes
+    assert facts['evaluations'] is None and facts['branches'] is None
+
+
+def test_nested_stage_scope_restores_context_and_preserves_exceptions():
+    observations = []
+    execution_metrics.set_observer(lambda event, facts: observations.append((event, execution_metrics.current_stage())))
+    with execution_metrics.stage_scope('outer', 'Outer'):
+        with execution_metrics.stage_scope('inner', 'Inner', reused=True):
+            assert execution_metrics.current_stage() == 'inner'
+        assert execution_metrics.current_stage() == 'outer'
+    assert execution_metrics.current_stage() is None
+    with pytest.raises(ValueError, match='original'):
+        with execution_metrics.stage_scope('failure', 'Failure'):
+            raise ValueError('original')
+    assert ('stage_reused', 'inner') in observations
+    assert observations[-1] == ('stage_failed', 'failure')
+    assert execution_metrics.current_stage() is None
 
 
 def test_native_cfg_evaluation_reports_actual_conditional_branches(monkeypatch):

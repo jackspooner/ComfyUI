@@ -2,11 +2,72 @@ import copy
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from threading import Lock
+from unittest.mock import patch
 
 import jsonschema
 
 from app.run_timing import RunTimingStore, digest
 from app.run_timing_workload import describe, resolved_inputs
+
+
+def test_composite_graph_survives_acceptance_and_nested_metrics_keep_execution_context(tmp_path):
+    from app import run_timing
+    from app.run_timing_metrics import attach_runtime_metrics
+    from comfy import execution_metrics
+    from comfy_execution.utils import CurrentNodeContext, get_executing_context
+    expanded = {'composite.sample': graph()['sample']}
+    expanded['composite.sample']['inputs'] = {'steps': 2}
+    resolver = lambda *_: {'workload': run_timing.workload(expanded), 'stageGraph': expanded,
+                          'stageMetadata': {'composite.sample': {'sharedOperationId': 'shared-sample'}}}
+    now = [0.0]
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'), now=lambda: now[0])
+    item = (1, 'prompt', {'outer': {'class_type': 'UnknownComposite', 'inputs': {}}}, {}, ['outer'])
+    with patch.object(run_timing, 'WORKLOAD_RESOLVERS', [resolver]):
+        store.event('accepted', item)
+    store.event('started', item)
+    attach_runtime_metrics(SimpleNamespace(timing=store, mutex=Lock()))
+    try:
+        with CurrentNodeContext('prompt', 'outer'):
+            with execution_metrics.stage_scope('composite.sample', 'KSampler', {'steps': 2}):
+                assert get_executing_context().node_id == 'outer'
+                now[0] = 3
+                execution_metrics.emit('noise_evaluation', branches=1)
+        record = store.page('0', 100, [], [])['observations'][-1]
+        assert [stage['id'] for stage in record['stages']] == ['composite.sample']
+        stage = record['stages'][0]
+        assert stage['sharedOperationId'] == 'shared-sample'
+        assert stage['durationSeconds'] == 3 and stage['phase'] == 'succeeded'
+        assert stage['workload']['measurements']['noiseEvaluations']['value'] == 1
+        with CurrentNodeContext('prompt', 'outer'):
+            with execution_metrics.stage_scope('composite.sample', 'KSampler', reused=True):
+                pass
+        stage = store.page('0', 100, [], [])['observations'][-1]['stages'][0]
+        assert stage['reused'] is False and stage['durationSeconds'] == 3
+        assert stage['workload']['measurements']['verifiedReuseHits']['value'] == 1
+        now[0] = 10
+        store.safe_stage('prompt', 'composite.sample', 'started')
+        now[0] = 12
+        store.safe_stage('prompt', 'composite.sample', 'finished')
+        stage = store.page('0', 100, [], [])['observations'][-1]['stages'][0]
+        assert stage['durationSeconds'] == 5
+        assert 'multiple_stage_invocations' in stage['reasons']
+    finally:
+        execution_metrics.set_observer(None)
+
+
+def test_terminal_storage_failure_cleans_only_attempt_memory(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', graph(), {}, ['decode'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.metric_states[('prompt', 'sample')] = {}
+    store.metric_states[('other', 'sample')] = {}
+    store.db.close()
+    store.safe_event('finished', item, SimpleNamespace(completed=True, messages=[]))
+    assert 'prompt' not in store.clocks
+    assert ('prompt', 'sample') not in store.metric_states
+    assert ('other', 'sample') in store.metric_states
 
 
 def graph():
