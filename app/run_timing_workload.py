@@ -14,6 +14,9 @@ NODE_STAGES = {
     'ControlNetApply': 'preparation', 'ControlNetApplyAdvanced': 'preparation',
     'CLIPTextEncode': 'encoding', 'VAEEncode': 'encoding', 'VAEEncodeTiled': 'encoding',
     'VAEEncodeForInpaint': 'encoding', 'KSampler': 'sampling', 'KSamplerAdvanced': 'sampling',
+    'SamplerCustom': 'sampling', 'SamplerCustomAdvanced': 'sampling', 'BasicGuider': 'preparation',
+    'CFGGuider': 'preparation', 'DualCFGGuider': 'preparation', 'KSamplerSelect': 'preparation',
+    'BasicScheduler': 'preparation', 'RandomNoise': 'preparation', 'DisableNoise': 'preparation',
     'VAEDecode': 'decoding', 'VAEDecodeTiled': 'decoding', 'SaveImage': 'publication', 'PreviewImage': 'publication',
 }
 CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_step', 'end_at_step',
@@ -31,7 +34,7 @@ def links(graph, node):
             if isinstance(value, list) and len(value) == 2 and isinstance(value[0], str) and value[0] in graph]
 
 
-def describe(graph, base, resource, observed_at, file_identity, digest):
+def describe(graph, base, resource, observed_at, file_identity, digest, available_at='submission'):
     reasons, ordered, visiting = set(), [], set()
 
     def visit(node_id):
@@ -56,7 +59,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest):
         return None
 
     def fact(value, source):
-        return {'value': value, 'availableAt': 'submission', 'observedAt': observed_at, 'source': source}
+        return {'value': value, 'availableAt': available_at, 'observedAt': observed_at, 'source': source}
 
     def latent_shape(node_id, seen=()):
         if node_id in seen or node_id not in graph:
@@ -72,7 +75,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest):
             return {'latentWidth': values['width'] // spatial, 'latentHeight': values['height'] // spatial,
                     'latentFrames': (values['length'] - 1) // temporal + 1, 'latentChannels': channels,
                     'batch': values['batch_size']}
-        if kind in ('KSampler', 'KSamplerAdvanced'):
+        if kind in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced'):
             value = inputs.get('latent_image')
             if isinstance(value, list) and len(value) == 2:
                 return latent_shape(value[0], (*seen, node_id))
@@ -114,7 +117,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest):
             components.append({'kind': component_kind, 'identity': identity, 'role': key, 'order': order, 'features': component_facts})
             if component_kind == 'model':
                 base_models.append([key, identity])
-        if kind in ('KSampler', 'KSamplerAdvanced'):
+        if kind in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced'):
             shape = latent_shape(node_id)
             if not shape:
                 reasons.add('latent_shape_unresolved')
@@ -170,7 +173,7 @@ def resolved_inputs(kind, inputs, observed_at):
         width, height = (shape[-1], shape[-2]) if key == 'mask' else (shape[-2], shape[-3])
         batch = shape[0] if key == 'mask' or len(shape) == 4 else 1
         references.append((key, {'width': fact(width), 'height': fact(height), 'batch': fact(batch)}))
-    if kind in ('KSampler', 'KSamplerAdvanced'):
+    if kind in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced'):
         for role in ('positive', 'negative'):
             conditioning = inputs.get(role)
             if not isinstance(conditioning, list):
