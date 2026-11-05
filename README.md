@@ -263,6 +263,9 @@ concat/separate preparation records source roles/output slots, actual shapes,
 precisions/devices, fitting and mask work; output verification stays completion
 evidence. Unknown formats, custom subclasses and unobserved cached preparation
 retain gaps.
+Native H3 empty-AV timing retains the computed frame grid and separate planned
+video/audio allocations. Requested size/length stays audit intent; actual
+precision/device and output verification establish observed coverage.
 Workload completeness excludes known missing output measurements or end spans;
 their stage reasons remain visible. Missing input work and unobserved execution
 still prevent complete comparison. Sampling/text precision is also stage-scoped.
