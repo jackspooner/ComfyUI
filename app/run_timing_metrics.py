@@ -44,6 +44,10 @@ def attach_runtime_metrics(queue):
         if context is not None:
             node_id = execution_metrics.current_stage() or context.node_id
             with queue.mutex:
+                if event == 'stage_started':
+                    item = next((item for item in queue.currently_running.values() if item[1] == context.prompt_id), None)
+                    if item is not None:
+                        queue.timing.safe_resolve_started(context.prompt_id, item[2])
                 if event == 'stage_inputs':
                     queue.timing.safe_inputs(context.prompt_id, node_id, facts['class_type'], facts['inputs'])
                 elif event.startswith('stage_'):
