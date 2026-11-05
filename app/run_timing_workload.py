@@ -138,8 +138,17 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             components.append({'kind': 'reference', 'identity': None, 'role': 'image_input', 'order': order, 'features': {'sourceStage': fact(node_id, kind)}})
             reasons.add('reference_processing_unmeasured')
         if kind in ('ControlNetApply', 'ControlNetApplyAdvanced'):
-            stage_reasons.append('control_active_steps_unmeasured')
-            reasons.add('control_active_steps_unmeasured')
+            selection = inputs.get('control_net')
+            loader = graph.get(selection[0], {}) if isinstance(selection, list) and len(selection) == 2 and isinstance(selection[0], str) else {}
+            selected = loader.get('inputs', {}).get('control_net_name') if node_kind(loader) in ('ControlNetLoader', 'DiffControlNetLoader') else None
+            identity = file_identity('control_net_name', selected) if isinstance(selected, str) else None
+            strength = node_facts.get('strength', {}).get('value')
+            features = dict(node_facts, bypassed=fact(None if strength is None else strength == 0, kind))
+            components.append({'kind': 'controlnet', 'identity': identity, 'role': node_id + ':control',
+                               'order': order, 'features': features})
+            if strength != 0:
+                stage_reasons.append('control_active_steps_unmeasured')
+                reasons.add('control_active_steps_unmeasured')
         for key, value in node_facts.items():
             resolved[node_id + '.' + key] = value
         stage_workload = {'version': 2, 'extractorVersion': 'comfy-explicit-2', 'observedAt': observed_at,

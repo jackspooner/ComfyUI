@@ -34,6 +34,18 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
             role = component['role'] if component['role'] == 'image_input' else component['role'].removeprefix(stage['id'] + ':')
             for key, value in state['reference_features'].get(role, {}).items():
                 component['features'][key] = {**value, 'observedAt': observed_at}
+    if state.get('control_features'):
+        order = next(index for index, item in enumerate(record['stages']) if item['id'] == stage['id'])
+        for prefix, values in state['control_features'].items():
+            role = stage['id'] + ':' + prefix
+            origin = next((item for item in record['stages'] if item['id'] == values['sourceStage']), None)
+            original = next((item for item in origin['workload']['components'] if item['kind'] == 'controlnet'), None) if origin and origin.get('workload') else None
+            features = {key: {'value': value, 'availableAt': 'live', 'observedAt': observed_at, 'source': 'native_controlnet'}
+                        for key, value in values.items()}
+            component = {'kind': 'controlnet', 'identity': original['identity'] if original else None,
+                         'role': role, 'order': order, 'features': features}
+            for target in (workload, evidence):
+                target['components'] = [item for item in target['components'] if item['role'] != role] + [component]
     if state.get('precision'):
         record['workload']['precision'] = state['precision']
     reasons = set(stage['reasons'])
