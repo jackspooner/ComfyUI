@@ -20,7 +20,7 @@ from app.run_timing_metrics import apply_metrics
 from app.run_timing_references import observe_reference_metrics
 from app.run_timing_controls import observe_control_metrics
 from app.run_timing_text import observe_text_metrics
-from app.run_timing_audio import observe_audio_metrics, audio_latent_features
+from app.run_timing_audio import observe_audio_metrics, audio_latent_features, joint_av_features
 from app.run_timing_ltx_audio import observe_ltx_audio_metrics
 from app.run_timing_vision import observe_moge_metrics
 from app.run_timing_stream import TimingStreamHub
@@ -575,12 +575,17 @@ class RunTimingStore:
                 shape = facts.get('shape')
                 shapes = facts.get('shapes') or []
                 if len(shapes) > 1:
-                    for index, stream_shape in enumerate(shapes):
-                        if isinstance(stream_shape, tuple) and all(type(value) is int and value > 0 for value in stream_shape):
-                            for axis, size in enumerate(stream_shape):
-                                state['resolved']['stream.' + str(index) + '.axis.' + str(axis)] = size
-                    state['reasons'].append('joint_stream_comparison_unsupported')
-                if state.get('profile') == 'audio':
+                    joint = joint_av_features(shapes, facts.get('audio_layout')) if facts.get('stream_layout') == 'video_audio' else None
+                    if joint is not None:
+                        state['resolved'].update(joint)
+                        state['sampling_profile'] = 'diffusion_video'
+                    else:
+                        for index, stream_shape in enumerate(shapes[:4]):
+                            if isinstance(stream_shape, tuple) and all(type(value) is int and value > 0 for value in stream_shape):
+                                for axis, size in enumerate(stream_shape[:8]):
+                                    state['resolved']['stream.' + str(index) + '.axis.' + str(axis)] = size
+                        state['reasons'].append('joint_stream_comparison_unsupported')
+                elif state.get('profile') == 'audio':
                     audio_features = audio_latent_features(shape, facts.get('audio_layout'))
                     if audio_features is not None:
                         state['resolved'].update(audio_features)
