@@ -3,6 +3,7 @@ from comfy import execution_metrics
 from comfy_execution.utils import get_executing_context
 from app.run_timing_workload import workload_reasons
 from app.run_timing_image import image_pipeline_complete
+from app.run_timing_clip_vision import clip_vision_plan_complete
 
 
 def apply_metrics(record, stage, state, observed_at, completed=False):
@@ -82,6 +83,17 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         reasons.discard('audio_input_unmeasured')
     if state.get('moge_workload_complete'):
         reasons.discard('moge_workload_unmeasured')
+    if 'visionEncode.nativePlanRequired' in workload['resolved']:
+        if clip_vision_plan_complete(state):
+            reasons.discard('clip_vision_workload_unmeasured')
+            measured = state['measurements']
+            if completed and (measured.get('visionEncodeForwardCompleted') != 1
+                              or measured.get('visionEncodeForwardFailed', 0)
+                              or measured.get('visionPreprocessCompleted') != 1
+                              or state.get('clip_vision_outputs') != 1):
+                reasons.add('clip_vision_execution_unresolved')
+        else:
+            reasons.add('clip_vision_workload_unmeasured')
     if 'imageEncode.nativePlanRequired' in workload['resolved']:
         values, measured = state['resolved'], state['measurements']
         reused = stage['reused'] is True and stage['startedOffsetSeconds'] is None
@@ -126,7 +138,7 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved',
                 'text_loop_coverage_unresolved', 'text_input_modalities_unmeasured', 'audio_input_unmeasured',
                 'moge_workload_unmeasured', 'moge_publication_input_unmeasured', 'reference_processing_unmeasured',
-                'image_encode_workload_unmeasured', *audio_requirements}
+                'image_encode_workload_unmeasured', 'clip_vision_workload_unmeasured', *audio_requirements}
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)
     evidence.update(complete=not input_reasons, reasons=input_reasons)
