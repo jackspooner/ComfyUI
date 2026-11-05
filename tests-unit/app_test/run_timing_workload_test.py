@@ -362,3 +362,20 @@ def test_vae_fallback_changes_live_regime_without_backdating_it_to_start(tmp_pat
     assert initial['value'] is False and initial['availableAt'] == 'execution_start'
     assert changed['value'] is True and changed['availableAt'] == 'live'
     assert after['stages'][0]['workload']['measurements']['vaeTileCountingComplete']['value'] is False
+
+
+def test_supported_text_embedding_work_is_available_before_outcomes(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'text': {'class_type': 'TextGenerate', 'inputs': {'max_length': 5}}}, {}, ['text'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'text', 'started')
+    store.safe_metric('prompt', 'text', 'text_embedding_started', {})
+    store.safe_metric('prompt', 'text', 'text_embedding_row', {'positions': 3, 'text': 3, 'image': 0, 'audio': 0, 'unknown': 0, 'padding': 0})
+    store.safe_metric('prompt', 'text', 'text_generation_plan', {'input_positions': 3, 'batch': 1, 'output_limit': 5, 'kv_capacity': 8})
+    stage = store.page('0', 100, [], [])['observations'][-1]['stages'][0]
+    assert stage['workload']['resolved']['inputTextPositions']['value'] == 3
+    assert stage['workload']['resolved']['inputTextPositions']['availableAt'] == 'execution_start'
+    assert 'generatedTokens' not in stage['workload']['measurements']
+    assert 'text_input_modalities_unmeasured' not in stage['reasons']
+    assert 'text_loop_coverage_unresolved' not in stage['reasons']

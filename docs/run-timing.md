@@ -174,8 +174,13 @@ durations are not synchronized GPU execution timings. Generated token counts reu
 the native Python token list after the existing token read, without another device
 read. `generated_tokens` progress has a null total: the output allowance is a ceiling,
 not a known final length. Durable progress remains bounded to five seconds plus
-stage transitions. Other native loops, speculative decoding and per-modality input
-counts remain unmeasured; multiple invocations stay incomplete. Text progress is
+stage transitions. Standard `SDClipModel.process_tokens` supplies per-row expanded
+text/image/audio, unknown-embedding and padding position counts using existing CPU
+metadata. Counts qualify only when their rows/positions match the actual generation
+input. Unrecognized embeddings, overridden preparation without these observations,
+other native loops and speculative decoding remain incomplete; multiple invocations
+stay incomplete. These modality counts do not establish complete reference roles
+or video-frame attribution. Text progress is
 observable but does not yet refine MediaTools empirical residuals. No sampler,
 stopping rule, output token, constraint or failure/retry behavior is changed.
 Run `text_generation_length_test.py` and `text_json_native_test.py` alongside the
