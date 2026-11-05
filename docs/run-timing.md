@@ -247,7 +247,49 @@ Unresolved selected model/LoRA/control identities and unmeasured LoadImage refer
 processing also mark their owning stage's workload incomplete. These gaps cannot
 be dropped by a consumer selecting a stage dependency subgraph. Loaded-image shape
 observations alone do not clear reference-processing coverage or establish crop,
-tile and role attribution. Older extractor records retain their original evidence.
+tile and role attribution. Extractor 7 can resolve supported image-input work as
+described below. Older extractor records retain their original evidence.
+
+## Native image input and standard 2D VAE work
+
+Extractor `comfy-explicit-7` explicitly describes `LoadImage`, `LoadImageOutput`
+and `LoadImageMask`. Native decoder version-1 summaries retain constant-size
+counts of decoded and processed video frames/pixels, source geometry/format/bit
+depth/codec, conversion, alignment padding, rotation/crop/resize, alpha frames
+and decoded/resampled/retained audio samples. Audio decode work remains visible
+even when an image loader discards the returned audio. No frame values, paths,
+per-frame durable writes, device queries or GPU synchronization are added.
+
+Complete full-decoder work, matching output/alpha/default-mask shapes and the
+declared native pipeline version can clear that loader's processing gap. Animated
+WebP's PIL fallback additionally requires its own consistent source modes,
+geometry and decoded/selected-frame counts. Mask loading requires an observed
+channel/mode and matching selection shape. Mixed geometry/formats, decode errors,
+missing/legacy metadata, partial extraction and repeated calls stay incomplete.
+The first repeated-work boundary invalidates previously complete live evidence;
+later repeats do not cause per-call writes. Whole-stage verified reuse clears
+only its source-work gap, marks `sourceReused` and retains zero executed duration
+without inventing a decode measurement.
+
+Explicit VAE/control/MoGe reference components retain their graph `sourceStage`
+and processed input shapes. Standard 2D VAE encoding reports one actual native
+input/plan: post-crop shape, precision/devices, selected batch size and forward
+count, or the existing three-pass tiler's sizes/overlap and native step count.
+Only a matching complete input/plan clears `image_encode_workload_unmeasured`;
+successful completion also requires matching attempted/completed forwards.
+Internal/1D/3D tilers, OOM fallback, missing plans and repeated calls retain gaps.
+This does not establish complete conditioning/reference-role coverage for every
+composite workflow, model identity, residency or a whole-run completion estimate.
+
+Source decode, output preparation and channel-clone durations are CPU-monotonic
+measurements, separate from workload matching. A missing preparation duration is
+a measurement-only reason; it does not erase separately observed input work.
+First output/mask/plan boundaries use existing correlated native snapshots.
+Source delivery and CPU parity do not establish activation, GPU throughput or
+forecast accuracy. Run `tests-unit/app_test/run_timing_image_test.py`,
+`tests-unit/comfy_test/image_loader_execution_metrics_test.py` and
+`tests-unit/comfy_test/reference_execution_metrics_test.py` with the CPU launcher
+above, plus decoder/external-image regressions and schema freshness checks.
 
 ## Native MoGe workload boundaries
 

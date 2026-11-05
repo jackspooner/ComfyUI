@@ -1563,6 +1563,10 @@ class VAE:
             result = self.first_stage_model.encode(pixels)
             comfy.execution_metrics.emit('vae_forward_completed', tiled=True)
             return result.to(dtype=self.vae_output_dtype())
+        comfy.execution_metrics.observe_shape('vae_encode_plan', pixel_samples, tiled=True, forwards=steps,
+                                             batch_size=1, tile_x=tile_x, tile_y=tile_y, overlap=overlap,
+                                             complete=not getattr(self.first_stage_model, 'comfy_has_chunked_io', False),
+                                             precision=str(self.vae_dtype), load_device=str(self.device), output_device=str(self.output_device))
         samples = comfy.utils.tiled_scale(pixel_samples, encode_fn, tile_x, tile_y, overlap, upscale_amount = (1/self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device, pbar=pbar)
         samples += comfy.utils.tiled_scale(pixel_samples, encode_fn, tile_x * 2, tile_y // 2, overlap, upscale_amount = (1/self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device, pbar=pbar)
         samples += comfy.utils.tiled_scale(pixel_samples, encode_fn, tile_x // 2, tile_y * 2, overlap, upscale_amount = (1/self.downscale_ratio), out_channels=self.latent_channels, output_device=self.output_device, pbar=pbar)
@@ -1786,6 +1790,11 @@ class VAE:
                 batch_number = int(free_memory / max(1, memory_used))
                 batch_number = max(1, batch_number)
                 samples = None
+                comfy.execution_metrics.observe_shape('vae_encode_plan', pixel_samples, tiled=False,
+                                                     forwards=math.ceil(pixel_samples.shape[0] / batch_number),
+                                                     batch_size=min(batch_number, pixel_samples.shape[0]),
+                                                     complete=self.latent_dim == 2 and not getattr(self.first_stage_model, 'comfy_has_chunked_io', False),
+                                                     precision=str(self.vae_dtype), load_device=str(self.device), output_device=str(self.output_device))
                 for x in range(0, pixel_samples.shape[0], batch_number):
                     pixels_in = self.process_input(pixel_samples[x:x + batch_number]).to(self.vae_dtype)
                     comfy.execution_metrics.observe_shape('vae_forward_attempt', pixels_in, tiled=False)

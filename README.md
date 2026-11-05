@@ -241,6 +241,14 @@ shapes, compute/activation precision and v3 refinement entry shapes. Requested
 controls ignored by v1/v2 remain audit data. Loading/forward elapsed time is
 separate from matching inputs; depth-PNG publication observes its geometry input.
 Panorama merge work, incomplete references and other vision/3D paths retain gaps.
+Extractor `comfy-explicit-7` adds bounded native image decode/processing work for
+`LoadImage`, `LoadImageOutput` and `LoadImageMask`, including decoded video/audio
+work, alpha/default masks and the PIL fallback. Supported complete observations
+can clear their own reference-processing gap; output shape alone cannot. Standard
+2D VAE encoding observes its actual batch/tile plan and verifies completed forward
+counts. Repeated calls, mixed decoder metadata, internal/1D/3D tilers and OOM
+fallback retain incomplete coverage. CPU preparation durations remain separate
+from workload facts; verified whole-stage reuse records no executed source work.
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
 [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).

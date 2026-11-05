@@ -41,7 +41,7 @@ def test_explicit_moge_selections_keep_requests_out_of_effective_work_and_paths_
         return digest([key, value])
     evidence, stages = describe(graph(), {'profileRevision': 'fixture'}, resource, 'now', identity, digest)
     assert evidence['profile'] == 'vision'
-    assert evidence['extractorVersion'] == 'comfy-explicit-6'
+    assert evidence['extractorVersion'] == 'comfy-explicit-7'
     assert calls == [('moge_model_name', '/PRIVATE/moge.safetensors')]
     stage = next(stage for stage in stages if stage['id'] == 'infer')
     assert stage['kind'] == 'inference' and stage['workload']['profile'] == 'vision'
