@@ -15,6 +15,12 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     evidence = record['workload'].get('evidence')
     if workload is None or evidence is None:
         return
+    if state.get('sampling_profile') == 'diffusion_video':
+        workload['profile'] = 'diffusion_video'
+        profiles = {item['workload']['profile'] for item in record.get('stages', [])
+                    if item.get('workload') and (item['kind'] == 'sampling'
+                                               or item['kind'] == 'inference' and item['workload']['profile'] == 'text')}
+        evidence['profile'] = next(iter(profiles)) if len(profiles) == 1 else 'unknown'
     for key, value in state.get('resolved', {}).items():
         workload['resolved'][key] = fact(value, state.get('availability', {}).get(key, 'execution_start'), key)
         evidence['resolved'][stage['id'] + '.' + key] = workload['resolved'][key]

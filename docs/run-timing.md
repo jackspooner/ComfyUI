@@ -241,8 +241,8 @@ layouts: LTX `[batch, features, time, frequency]` (`bctf`) and H3
 `[batch, features, stereo, time]` (`bcat`). Frequency bins never become audio
 channels. Unknown formats/custom subclasses retain raw axes and an unresolved
 layout reason. The sampler never
-fabricates spatial/video axes from an audio tensor. Unsupported shapes and joint
-AV streams remain incomplete. An audio
+fabricates spatial/video axes from an audio tensor. Unsupported shapes remain
+incomplete. An audio
 reference loader does not change a text-generation operation's main profile.
 
 `LTXVAudioVAELoader`, `LTXAVTextEncoderLoader`, `LTXVAudioVAEEncode`,
@@ -263,7 +263,20 @@ audio coverage changes are saved once without per-forward journal writes.
 Run `tests-unit/comfy_test/ltx_audio_execution_metrics_test.py` with the audio
 collector, native audio and sampling metrics suites. CPU fixtures use real tiny
 mel processing with stub model forwards; they do not establish model accuracy,
-native joint-AV matching, tiled internals or live deployment acceptance.
+tiled internals or live deployment acceptance.
+
+For exact native LTX/H3 formats, the sampler declares ordered `video_audio`
+streams. The collector requires exactly one BCTHW video stream and one declared
+BCTF/BCAT audio stream with equal positive batches. Video dimensions remain the
+ordinary sampling fields; `jointAV.audio.*` retains audio batch, feature channels,
+time and frequency/stereo axes separately. These are execution-start workload
+facts, never decoded outcomes. Native joint evidence sets that sampling stage's
+video profile; unrelated image/text stages still make whole-run modality unknown.
+MediaTools policy 6 permits only exact joint matches, without broadened diffusion
+bounds or stream scaling. Unknown format/order, reversed/extra streams, malformed
+axes, unequal batches, custom guider behavior and repeated calls keep gaps.
+This does not make unsupported concat/separate/custom preparation nodes complete;
+their missing dependencies still prevent stage populations from qualifying.
 
 Native audio VAE encode hooks observe actual post-resample B/C/sample dimensions
 as live facts, preserving original-rate input metadata separately. H3's reference
