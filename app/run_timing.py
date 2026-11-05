@@ -20,6 +20,7 @@ from app.run_timing_metrics import apply_metrics
 from app.run_timing_references import observe_reference_metrics
 from app.run_timing_controls import observe_control_metrics
 from app.run_timing_text import observe_text_metrics
+from app.run_timing_audio import observe_audio_metrics
 
 
 def utc():
@@ -469,7 +470,14 @@ class RunTimingStore:
             elif observe_control_metrics(state, event, facts, self.control_origins.get(prompt_id, {}).get(facts.get('binding'))):
                 pass
             elif observe_reference_metrics(state, event, facts):
-                pass
+                fallback = {'vae_tiled_fallback': 'vaeTiledFallbacks', 'vae_decode_tiled_fallback': 'vaeDecodeTiledFallbacks'}
+                if event in fallback and measurements.get(fallback[event]) == 1:
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+            elif observe_audio_metrics(state, event, facts):
+                snapshots = state.setdefault('audio_snapshots', set())
+                if event in ('audio_loaded', 'audio_vae_encode_input', 'audio_vae_decode_input') and event not in snapshots:
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+                    snapshots.add(event)
             elif observe_text_metrics(state, event, facts):
                 if event == 'text_generation_plan' or event == 'text_generation_progress' and self.now() - state.get('last_text_snapshot', float('-inf')) >= 5:
                     self.safe_stage(prompt_id, node_id, 'metrics')
@@ -513,7 +521,18 @@ class RunTimingStore:
                             for axis, size in enumerate(stream_shape):
                                 state['resolved']['stream.' + str(index) + '.axis.' + str(axis)] = size
                     state['reasons'].append('joint_stream_comparison_unsupported')
-                if isinstance(shape, tuple) and len(shape) in (4, 5) and all(type(value) is int and value > 0 for value in shape):
+                if state.get('profile') == 'audio':
+                    if isinstance(shape, tuple) and len(shape) == 3 and all(type(value) is int and value > 0 for value in shape):
+                        state['resolved'].update(batch=shape[0], latentChannels=shape[1], audioLatentLength=shape[-1],
+                                                 audioLatentChannels=1)
+                    else:
+                        # Four-dimensional audio VAEs can use time/frequency or
+                        # channel/time axes. Keep the actual axes without choosing
+                        # an unsupported model-specific layout from rank alone.
+                        if isinstance(shape, tuple) and 1 <= len(shape) <= 8 and all(type(value) is int and value > 0 for value in shape):
+                            state['resolved'].update({'audioLatent.axis.' + str(axis): value for axis, value in enumerate(shape)})
+                        state['reasons'].append('audio_latent_layout_unresolved')
+                elif isinstance(shape, tuple) and len(shape) in (4, 5) and all(type(value) is int and value > 0 for value in shape):
                     state['resolved'].update(batch=shape[0], latentChannels=shape[1], latentWidth=shape[-1],
                                              latentHeight=shape[-2], latentFrames=shape[2] if len(shape) == 5 else 1)
                 for source, target in (('evaluations', 'modelEvaluations'), ('branches', 'cfgBranches')):
@@ -577,7 +596,8 @@ class RunTimingStore:
                     if stage['phase'] == 'succeeded':
                         stage['reasons'] = sorted(set(stage['reasons']) | {'multiple_stage_invocations'})
                         stage['workload'].update(complete=False, reasons=stage['reasons'])
-                    state.update(span_start=elapsed, prior_duration=stage['durationSeconds'] or 0)
+                    state.update(span_start=elapsed, prior_duration=stage['durationSeconds'] or 0,
+                                 profile=stage['workload']['profile'])
                     stage.update(phase='running', reused=False)
                     if stage['startedOffsetSeconds'] is None:
                         stage['startedOffsetSeconds'] = elapsed
