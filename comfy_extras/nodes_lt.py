@@ -2,6 +2,7 @@ import nodes
 import node_helpers
 import torch
 import comfy.audio
+import comfy.execution_metrics
 import comfy.ldm.lightricks.duration_head
 import comfy.model_management
 import comfy.model_sampling
@@ -950,12 +951,24 @@ class LTXVConcatAVLatent(io.ComfyNode):
         video_noise_mask = video_latent.get("noise_mask", None)
         audio_noise_mask = audio_latent.get("noise_mask", None)
 
-        if video_samples.is_nested:  # already an AV latent: keep its video and swap the audio stream
+        nested_video = video_samples.is_nested
+        target_audio, streams = None, None
+        if nested_video:  # already an AV latent: keep its video and swap the audio stream
             streams = video_samples.unbind()
             video_samples = streams[0]
             if video_noise_mask is not None:
                 video_noise_mask = video_noise_mask.unbind()[0]
-            audio_samples, audio_noise_mask = cls.fit_audio(streams[1], audio_samples, audio_noise_mask)
+            target_audio = streams[1]
+
+        comfy.execution_metrics.observe_shapes('av_concat_plan', {
+            'video': video_samples, 'audio': audio_samples,
+            **({'target_audio': target_audio} if nested_video else {}),
+            **({'video_mask': video_noise_mask} if video_noise_mask is not None else {}),
+            **({'audio_mask': audio_noise_mask} if audio_noise_mask is not None else {}),
+        }, streams=streams, input_streams=1)
+        if nested_video:
+            with comfy.execution_metrics.measure('av_concat_fit'):
+                audio_samples, audio_noise_mask = cls.fit_audio(target_audio, audio_samples, audio_noise_mask)
 
         if video_noise_mask is not None or audio_noise_mask is not None:
             if video_noise_mask is None:
@@ -965,6 +978,11 @@ class LTXVConcatAVLatent(io.ComfyNode):
             output["noise_mask"] = comfy.nested_tensor.NestedTensor((video_noise_mask, audio_noise_mask))
 
         output["samples"] = comfy.nested_tensor.NestedTensor((video_samples, audio_samples))
+        comfy.execution_metrics.observe_shapes('av_concat_output', {
+            'video': video_samples, 'audio': audio_samples,
+            **({'video_mask': video_noise_mask} if video_noise_mask is not None else {}),
+            **({'audio_mask': audio_noise_mask} if audio_noise_mask is not None else {}),
+        })
 
         return io.NodeOutput(output)
 
@@ -999,6 +1017,11 @@ class LTXVSeparateAVLatent(io.ComfyNode):
                 masks = masks.unbind()
                 video_latent["noise_mask"] = masks[0]
                 audio_latent["noise_mask"] = masks[1]
+        shapes = {'video': latents[0], 'audio': latents[1]}
+        if video_latent.get('noise_mask') is not None:
+            shapes.update(video_mask=video_latent['noise_mask'], audio_mask=audio_latent['noise_mask'])
+        comfy.execution_metrics.observe_shapes('av_separate_plan', shapes, streams=latents)
+        comfy.execution_metrics.observe_shapes('av_separate_output', shapes)
         return io.NodeOutput(video_latent, audio_latent)
 
 

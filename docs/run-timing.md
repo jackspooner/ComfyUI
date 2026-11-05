@@ -141,6 +141,8 @@ tests-unit/comfy_test/control_execution_metrics_test.py
 tests-unit/comfy_test/text_execution_metrics_test.py
 tests-unit/app_test/run_timing_audio_test.py
 tests-unit/comfy_test/audio_execution_metrics_test.py
+tests-unit/app_test/run_timing_av_test.py
+tests-unit/comfy_test/av_preparation_execution_metrics_test.py
 tests-unit/comfy_test/vision_features_test.py -q`
 using the prepared interpreter. Fixtures use tiny CPU tensors and mocked sampling;
 they do not establish real-model or performance acceptance.
@@ -275,8 +277,22 @@ video profile; unrelated image/text stages still make whole-run modality unknown
 MediaTools policy 6 permits only exact joint matches, without broadened diffusion
 bounds or stream scaling. Unknown format/order, reversed/extra streams, malformed
 axes, unequal batches, custom guider behavior and repeated calls keep gaps.
-This does not make unsupported concat/separate/custom preparation nodes complete;
-their missing dependencies still prevent stage populations from qualifying.
+`LTXVConcatAVLatent` and `LTXVSeparateAVLatent` have explicit preparation adapters.
+Graph components retain video/audio roles, source stage and output slot, including
+the separate node's audio output. Native plans observe raw video/audio/mask shapes,
+input precision/device and an existing joint stream's target audio shape. Fitting
+records its actual trim/pad axis and CPU monotonic boundary; missing masks generated
+by the node remain part of its observed work. Completion-only output shapes,
+precisions and devices verify the plan without becoming input matching facts.
+No tensor values, GPU synchronization, model execution or new cache is added.
+Malformed/extra streams, unequal batches, conflicting outputs, repeated fitting/
+invocations and failed probes keep explicit gaps, saved on coverage transitions.
+Cached preparation without input-shape proof remains incomplete; a zero-duration
+reuse marker does not invent that proof. Unknown custom preparation dependencies
+still prevent stage populations from qualifying. Policy 6 consumes these facts
+through its existing exact dependency comparison. Source/preparation work remains
+exact there, so different completed fitting inputs may still split equal final
+sampling shapes; no broader equivalence or accuracy claim is implied.
 
 Native audio VAE encode hooks observe actual post-resample B/C/sample dimensions
 as live facts, preserving original-rate input metadata separately. H3's reference

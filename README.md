@@ -258,9 +258,11 @@ actual VAE allocation, internal resampling/mel work and decoder/vocoder plans.
 Native latent-format provenance distinguishes LTX time/frequency and H3 stereo/time
 axes without guessing from rank or labels. Frame/rate requests stay audit intent
 once actual LTX allocation is observed. Declared native two-stream LTX/H3 sampling
-records ordered video and audio work separately for exact comparison. Unknown
-formats, custom subclasses and unsupported joint preparation adapters retain gaps;
-output shapes stay completion evidence.
+records ordered video and audio work separately for exact comparison. Native
+concat/separate preparation records source roles/output slots, actual shapes,
+precisions/devices, fitting and mask work; output verification stays completion
+evidence. Unknown formats, custom subclasses and unobserved cached preparation
+retain gaps.
 Workload completeness excludes known missing output measurements or end spans;
 their stage reasons remain visible. Missing input work and unobserved execution
 still prevent complete comparison. Sampling/text precision is also stage-scoped.
