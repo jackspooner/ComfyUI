@@ -5,7 +5,7 @@ import torch
 
 from comfy import execution_metrics, sd
 from comfy.nested_tensor import NestedTensor
-from comfy_extras import nodes_audio, nodes_minimax_h3
+from comfy_extras import nodes_audio, nodes_minimax_h3, nodes_lt_audio
 
 
 @pytest.fixture(autouse=True)
@@ -34,6 +34,57 @@ def test_encode_observes_processed_rate_and_shape_with_one_resample_and_vae_call
     assert result.result[0]['samples'] is latent
     assert calls == [('resample', 12000, 24000), ('encode',)]
     assert events == [('audio_vae_encode_input', {'shape': (2, 2, 24), 'sample_rate': 24000, 'source_sample_rate': 12000})]
+
+
+def test_ltx_empty_latent_uses_resolved_vae_configuration_and_observes_actual_axes(monkeypatch):
+    from comfy.ldm.lightricks.vae.audio_vae import AudioVAE
+    monkeypatch.setattr(nodes_lt_audio.comfy.model_management, 'intermediate_device', lambda: 'cpu')
+    calls, events = [], []
+    def length(frames, rate):
+        calls.append((frames, rate))
+        return AudioVAE.num_of_latents_from_frames(SimpleNamespace(latents_per_second=23.4375), frames, rate)
+    vae = SimpleNamespace(latent_channels=8, first_stage_model=SimpleNamespace(latent_frequency_bins=16,
+                          num_of_latents_from_frames=length))
+    execution_metrics.set_observer(lambda event, facts: events.append((event, facts)))
+    result = nodes_lt_audio.LTXVEmptyLatentAudio.execute(97, 25, 2, vae).result[0]
+    assert result['samples'].shape == (2, 8, 91, 16)
+    assert result['type'] == 'audio' and calls == [(97, 25)]
+    assert events == [('audio_latent_prepared', dict(shape=(2, 8, 91, 16), layout='bctf', precision='torch.float32', device='cpu'))]
+    execution_metrics.set_observer(lambda *_: (_ for _ in ()).throw(OSError('observer unavailable')))
+    torch.testing.assert_close(nodes_lt_audio.LTXVEmptyLatentAudio.execute(97, 25, 2, vae).result[0]['samples'], result['samples'])
+
+
+def test_ltx_decode_keeps_stream_selection_native_rate_and_unnormalized_output():
+    audio = torch.ones(1, 8, 3, 16)
+    source = torch.tensor([[[2., -3.], [4., -5.]]])
+    events, calls = [], []
+    def decode(value):
+        assert value is audio
+        calls.append(1)
+        return source.clone()
+    vae = SimpleNamespace(decode=decode, first_stage_model=SimpleNamespace(output_sample_rate=48000))
+    execution_metrics.set_observer(lambda event, facts: events.append((event, facts)))
+    result = nodes_lt_audio.LTXVAudioVAEDecode.execute(
+        {'samples': NestedTensor((torch.zeros(1, 128, 1, 1, 1), audio)), 'sample_rate': 12345}, vae).result[0]
+    torch.testing.assert_close(result['waveform'], source.movedim(-1, 1))
+    assert result['sample_rate'] == 48000 and calls == [1]
+    assert events == [('audio_vae_decode_input', dict(shape=(1, 8, 3, 16), layout='bctf', tiled=False, normalize=False)),
+                      ('audio_decoded', dict(shape=(1, 2, 2), sample_rate=48000))]
+
+
+def test_ltx_encode_inherits_the_existing_single_resample_and_encode_boundary(monkeypatch):
+    events, calls = [], []
+    def resample(value, source_rate, target_rate):
+        calls.append((source_rate, target_rate))
+        return value
+    monkeypatch.setattr(nodes_audio.comfy.audio, 'resample', resample)
+    waveform = torch.zeros(1, 2, 12)
+    latent = torch.zeros(1, 8, 3, 16)
+    vae = SimpleNamespace(audio_sample_rate=44100, encode=lambda value: calls.append(tuple(value.shape)) or latent)
+    execution_metrics.set_observer(lambda event, facts: events.append((event, facts)))
+    assert nodes_lt_audio.LTXVAudioVAEEncode.execute({'waveform': waveform, 'sample_rate': 24000}, vae).result[0]['samples'] is latent
+    assert calls == [(24000, 44100), (1, 12, 2)]
+    assert events == [('audio_vae_encode_input', dict(shape=(1, 2, 12), sample_rate=44100, source_sample_rate=24000))]
 
 
 @pytest.mark.parametrize('tiled', [False, True])

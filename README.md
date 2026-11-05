@@ -253,6 +253,12 @@ Native audio adapters observe waveform duration/rate/channels, post-resample VAE
 inputs and completed decode outputs. Ordinary audio sampling keeps temporal latent
 length/channel groups separate from image/video axes. Tiled audio internals and
 unsupported synthesis paths retain explicit limitations; audio matching stays exact.
+Explicit LTX audio loading/encoding/decoding and empty-latent adapters retain the
+actual VAE allocation, internal resampling/mel work and decoder/vocoder plans.
+Native latent-format provenance distinguishes LTX time/frequency and H3 stereo/time
+axes without guessing from rank or labels. Frame/rate requests stay audit intent
+once actual LTX allocation is observed. Unknown formats, custom subclasses and
+joint AV matching remain incomplete; output shapes stay completion evidence.
 Workload completeness excludes known missing output measurements or end spans;
 their stage reasons remain visible. Missing input work and unobserved execution
 still prevent complete comparison. Sampling/text precision is also stage-scoped.

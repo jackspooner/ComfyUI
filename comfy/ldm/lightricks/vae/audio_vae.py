@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 import torch
 import comfy.audio
+import comfy.execution_metrics
 
 from comfy.ldm.mmaudio.vae.distributions import DiagonalGaussianDistribution
 from comfy.ldm.lightricks.symmetric_patchifier import AudioPatchifier
@@ -79,6 +80,8 @@ class AudioPreprocessor:
         self, waveform: torch.Tensor, waveform_sample_rate: int, device
     ) -> torch.Tensor:
         waveform = self.resample(waveform, waveform_sample_rate)
+        comfy.execution_metrics.observe_shape('ltx_audio_resampled', waveform, sample_rate=self.target_sample_rate,
+            source_sample_rate=waveform_sample_rate, mel_bins=self.mel_bins, hop_length=self.mel_hop_length, n_fft=self.n_fft)
 
         mel_transform = comfy.audio.MelSpectrogram(
             sample_rate=self.target_sample_rate,
@@ -147,12 +150,15 @@ class AudioVAE(torch.nn.Module):
         mel_spec = self.preprocessor.waveform_to_mel(
             waveform, waveform_sample_rate, device=waveform.device
         )
-
-        latents = self.autoencoder.encode(mel_spec)
+        comfy.execution_metrics.observe_shape('ltx_audio_mel', mel_spec,
+            precision=str(mel_spec.dtype), device=str(mel_spec.device))
+        with comfy.execution_metrics.measure('ltx_audio_encode_forward'):
+            latents = self.autoencoder.encode(mel_spec)
         posterior = DiagonalGaussianDistribution(latents)
         latent_mode = posterior.mode()
 
         normalized = self.normalizer.normalize(latent_mode)
+        comfy.execution_metrics.observe_shape('ltx_audio_latent_output', normalized)
         return normalized.to(input_device)
 
     def decode(self, latents: torch.Tensor) -> torch.Tensor:
@@ -162,7 +168,10 @@ class AudioVAE(torch.nn.Module):
         latents = self.normalizer.denormalize(latents)
 
         target_shape = self.target_shape_from_latents(original_shape)
-        mel_spec = self.autoencoder.decode(latents, target_shape=target_shape)
+        comfy.execution_metrics.observe_shape('ltx_audio_decode_plan', latents, target_shape=target_shape,
+            precision=str(latents.dtype), device=str(latents.device))
+        with comfy.execution_metrics.measure('ltx_audio_decode_forward'):
+            mel_spec = self.autoencoder.decode(latents, target_shape=target_shape)
 
         waveform = self.run_vocoder(mel_spec)
         return waveform
@@ -191,7 +200,9 @@ class AudioVAE(torch.nn.Module):
         elif audio_channels != 2:
             raise ValueError(f"Unsupported audio_channels: {audio_channels}")
 
-        return self.vocoder(vocoder_input)
+        comfy.execution_metrics.observe_shape('ltx_audio_vocoder_input', vocoder_input)
+        with comfy.execution_metrics.measure('ltx_audio_vocoder_forward'):
+            return self.vocoder(vocoder_input)
 
     @property
     def sample_rate(self) -> int:
