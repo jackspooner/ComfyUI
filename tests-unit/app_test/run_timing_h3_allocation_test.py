@@ -57,8 +57,11 @@ def test_allocator_requests_are_audit_only_until_native_effective_work_is_observ
 
 def test_live_allocation_metadata_resolves_work_without_promoting_output_shapes(tmp_path):
     store = start(tmp_path)
+    changes = store.db.total_changes
     store.safe_metric('prompt', 'latent', 'h3_av_temporal_plan', temporal())
+    assert store.db.total_changes == changes
     store.safe_metric('prompt', 'latent', 'h3_av_allocation_plan', plan())
+    assert store.db.total_changes > changes
     assert not latest(store)['stages'][0]['workload']['complete']
     store.safe_metric('prompt', 'latent', 'h3_av_allocate', {'seconds': .01, 'succeeded': True})
     store.safe_metric('prompt', 'latent', 'h3_av_allocation_output', output())
