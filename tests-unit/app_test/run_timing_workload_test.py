@@ -99,6 +99,63 @@ def description(value, **options):
                     '2026-11-05T00:00:00Z', lambda key, value: digest([key, value]), digest, **options)
 
 
+def test_native_stage_identities_exclude_unrelated_branches_but_retain_dependencies(tmp_path):
+    from app import run_timing
+    source = graph()
+    variants = [copy.deepcopy(source) for _ in range(6)]
+    variants[1]['other'] = {'class_type': 'VAELoader', 'inputs': {'vae_name': 'other'}}
+    variants[1]['decode']['inputs']['vae'] = ['other', 0]
+    variants[2]['base']['inputs']['ckpt_name'] = 'different-model'
+    variants[3]['latent']['class_type'] = 'EmptyHunyuanLatentVideo'
+    variants[4]['sample']['inputs']['model'] = ['lora2', 1]
+    variants[5] = {'renamed-' + key: value for key, value in variants[5].items()}
+    for node in variants[5].values():
+        for value in node['inputs'].values():
+            if isinstance(value, list):
+                value[0] = 'renamed-' + value[0]
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    with patch.object(run_timing, 'selected_file_identity', lambda key, value: digest([key, value])):
+        for index, value in enumerate(variants):
+            store.event('accepted', (1, str(index), value, {}, ['decode']))
+    records = store.page('0', 100, [], [])['observations']
+    sample = lambda record: next(stage['workload'] for stage in record['stages'] if stage['id'].endswith('sample'))
+    first, unrelated, changed_model, changed_dependency, changed_port, renamed = map(sample, records)
+    assert records[0]['workload']['profileRevision'] != records[1]['workload']['profileRevision']
+    assert records[0]['workload']['evidence']['modelIdentity'] != records[1]['workload']['evidence']['modelIdentity']
+    assert first['modelIdentity'] == unrelated['modelIdentity']
+    assert first['implementation'] == unrelated['implementation']
+    assert first['modelIdentity'] != changed_model['modelIdentity']
+    assert first['implementation'] != changed_dependency['implementation']
+    assert first['implementation'] != changed_port['implementation']
+    assert first['implementation'] == renamed['implementation']
+    assert first['modelIdentity'] == renamed['modelIdentity']
+    assert first['implementation']['compatibilityId'] is None
+
+
+def test_stage_source_identity_tracks_only_reachable_implementations(tmp_path, monkeypatch):
+    import sys
+    from app import run_timing
+    paths = [tmp_path / name for name in ('unrelated.py', 'dependency.py')]
+    for path in paths:
+        path.write_text('first implementation')
+    registry = {}
+    for kind, path in zip(('VAEDecode', 'CheckpointLoaderSimple'), paths):
+        module = 'timing_fixture_' + kind
+        monkeypatch.setitem(sys.modules, module, SimpleNamespace(__file__=str(path)))
+        registry[kind] = type(kind, (), {'__module__': module})
+    monkeypatch.setitem(sys.modules, 'nodes', SimpleNamespace(NODE_CLASS_MAPPINGS=registry))
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    store.event('accepted', (1, 'first', graph(), {}, ['decode']))
+    paths[0].write_text('changed unrelated implementation')
+    store.event('accepted', (1, 'second', graph(), {}, ['decode']))
+    paths[1].write_text('changed dependency implementation')
+    store.event('accepted', (1, 'third', graph(), {}, ['decode']))
+    revisions = [next(stage['workload']['implementation'] for stage in record['stages'] if stage['id'] == 'sample')
+                 for record in store.page('0', 100, [], [])['observations']]
+    assert revisions[0] == revisions[1]
+    assert revisions[0] != revisions[2]
+
+
 def test_owner_declared_loader_aliases_do_not_broaden_unknown_node_inference():
     value = {'pool': {'class_type': 'OwnedPoolLoader', 'inputs': {'clip_name': 'encoder', 'type': 'flux'}},
              'custom': {'class_type': 'LooksLikeSampler', 'inputs': {'lora_name': 'PRIVATE', 'steps': 20}}}
@@ -414,6 +471,7 @@ def test_owner_phase_profile_and_source_identity_do_not_claim_opaque_workload_su
         store.event('accepted', (1, 'second', {}, {}, []))
     values = store.page('0', 100, [], [])['observations']
     assert values[-1]['workload']['profileRevision'] != values[-2]['workload']['profileRevision']
+    assert values[-1]['stages'][0]['workload']['implementation'] != values[-2]['stages'][0]['workload']['implementation']
     stage = values[-1]['stages'][0]
     assert stage['kind'] == 'publication' and stage['workload']['profile'] == 'diffusion_video'
     assert not stage['workload']['complete']

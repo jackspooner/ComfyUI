@@ -215,8 +215,12 @@ describe supported native sampling/latent/loader/LoRA/ControlNet nodes explicitl
 Existing progress handlers measure node-stage elapsed time and cache reuse;
 unknown adapters and unmeasured reference processing remain incomplete. Unresolved
 loader/LoRA/control identity and LoadImage reference gaps are attached to their
-owning stages as well as the parent workload. Native sampling reports actual
-shapes, evaluation/CFG counters and distinct reliable
+owning stages as well as the parent workload.
+Stage model and implementation identities cover the stage's dependency graph;
+unrelated or later branches remain in whole-run provenance. Reachable node
+implementations, core/runtime revisions and declared composite-owner revisions
+remain boundaries, with no inferred performance compatibility. Native sampling
+reports actual shapes, evaluation/CFG counters and distinct reliable
 sampling progress; generic node progress remains unreliable. Composite descriptions
 can correlate native expansion IDs and optional nested-call telemetry scopes without
 replacing the executor's context. Joint AV stream shapes stay separate.
