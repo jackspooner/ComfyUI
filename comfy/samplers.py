@@ -20,6 +20,7 @@ import comfy.hooks
 import comfy.context_windows
 import comfy.multigpu
 import comfy.utils
+import comfy.execution_metrics
 from comfy.internal_logging import detail
 import scipy.stats
 import numpy
@@ -334,6 +335,9 @@ def _calc_cond_batch(model: BaseModel, conds: list[list[dict]], x_in: torch.Tens
             else:
                 output = model.apply_model(input_x, timestep_, **c).chunk(batch_chunks)
 
+            comfy.execution_metrics.emit('model_forward', elements=math.prod(input_x.shape),
+                                         conditional=cond_or_uncond.count(0), unconditional=cond_or_uncond.count(1))
+
             for o in range(batch_chunks):
                 cond_index = cond_or_uncond[o]
                 a = area[o]
@@ -524,6 +528,8 @@ def _calc_cond_batch_multigpu(model: BaseModel, conds: list[list[dict]], x_in: t
                         output = model_options['model_function_wrapper'](model_current.apply_model, {"input": input_x, "timestep": timestep_, "c": c, "cond_or_uncond": cond_or_uncond}).to(output_device).chunk(batch_chunks)
                     else:
                         output = model_current.apply_model(input_x, timestep_, **c).to(output_device).chunk(batch_chunks)
+                    comfy.execution_metrics.emit('model_forward', elements=math.prod(input_x.shape),
+                                                 conditional=cond_or_uncond.count(0), unconditional=cond_or_uncond.count(1))
                     # TODO: non-NVIDIA support -- the `.to(output_device)` copies
                     # above are async on CUDA, so the main thread's aggregation
                     # could race with in-flight transfers. CUDA-only QA has not
@@ -618,6 +624,8 @@ def sampling_function(model, x, timestep, uncond, cond, cond_scale, model_option
         out = model_options["sampler_calc_cond_batch_function"](args)
     else:
         out = calc_cond_batch(model, conds, x, timestep, model_options)
+
+    comfy.execution_metrics.emit('noise_evaluation', branches=sum(value is not None for value in conds))
 
     for fn in model_options.get("sampler_pre_cfg_function", []):
         args = {"conds":conds, "conds_out": out, "cond_scale": cond_scale, "timestep": timestep,
@@ -1460,5 +1468,24 @@ class KSampler:
                     return torch.zeros_like(noise)
 
         sampler = sampler_object(self.sampler)
+
+        if comfy.execution_metrics.enabled():
+            try:
+                shape = tuple(latent_image.shape) if latent_image is not None and not latent_image.is_nested else None
+                simple_cfg = len(positive) == 1 and len(negative) == 1 and not any(key in self.model_options for key in
+                    ('sampler_calc_cond_batch_function', 'sampler_cfg_function', 'sampler_pre_cfg_function', 'sampler_post_cfg_function', 'model_function_wrapper'))
+                branches = 1 if math.isclose(cfg, 1.0) and not self.model_options.get('disable_cfg1_optimization', False) else 2
+                comfy.execution_metrics.emit('sampling_plan', shape=shape, evaluations=max(0, len(sigmas) - 1) if self.sampler == 'euler' else None,
+                                             branches=branches if simple_cfg else None, precision=str(self.model.model_dtype()),
+                                             memory_strategy='dynamic' if self.model.is_dynamic() else 'standard',
+                                             offload_device=str(self.model.offload_device), load_device=str(self.model.load_device))
+            except Exception:
+                comfy.execution_metrics.emit('sampling_plan_unavailable')
+            original_callback = callback
+
+            def callback(step, x0, x, total_steps):
+                comfy.execution_metrics.emit('sampling_progress', completed=step + 1, total=total_steps)
+                if original_callback is not None:
+                    return original_callback(step, x0, x, total_steps)
 
         return sample(self.model, noise, positive, negative, cfg, self.device, sampler, sigmas, self.model_options, latent_image=latent_image, denoise_mask=denoise_mask, callback=callback, disable_pbar=disable_pbar, seed=seed)

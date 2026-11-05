@@ -66,6 +66,9 @@ class _ExecutionList:
 
 
 class _NoProgress:
+    def inputs_ready(self, *a, **k) -> None:
+        pass
+
     def start_progress(self, *a, **k) -> None:
         pass
 
