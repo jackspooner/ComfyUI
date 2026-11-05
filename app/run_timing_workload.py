@@ -18,12 +18,14 @@ NODE_STAGES = {
     'CFGGuider': 'preparation', 'DualCFGGuider': 'preparation', 'KSamplerSelect': 'preparation',
     'BasicScheduler': 'preparation', 'RandomNoise': 'preparation', 'DisableNoise': 'preparation',
     'VAEDecode': 'decoding', 'VAEDecodeTiled': 'decoding', 'SaveImage': 'publication', 'PreviewImage': 'publication',
+    'TextGenerate': 'inference', 'TextGenerateLTX2Prompt': 'inference',
 }
 CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_step', 'end_at_step',
             'add_noise', 'return_with_leftover_noise', 'width', 'height', 'length', 'batch_size',
             'tile_size', 'overlap', 'temporal_size', 'temporal_overlap', 'grow_mask_by',
             'strength_model', 'strength_clip', 'strength', 'start_percent', 'end_percent',
-            'weight_dtype', 'type', 'device'}
+            'weight_dtype', 'type', 'device', 'max_length', 'mtp', 'thinking', 'response_format',
+            'context_budget', 'fps', 'source_fps', 'auto_resize', 'min_short_edge'}
 LATENTS = {'EmptyLatentImage': (8, 1, 4), 'EmptySD3LatentImage': (8, 1, 16),
            'EmptyHunyuanLatentVideo': (8, 4, 16), 'EmptyHunyuanVideo15Latent': (16, 4, 32),
            'EmptyLTXVLatentVideo': (32, 8, 128)}
@@ -137,6 +139,10 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             # Source paths are deliberately excluded. Processed reference shapes require runtime evidence.
             components.append({'kind': 'reference', 'identity': None, 'role': 'image_input', 'order': order, 'features': {'sourceStage': fact(node_id, kind)}})
             reasons.add('reference_processing_unmeasured')
+        if kind in ('TextGenerate', 'TextGenerateLTX2Prompt'):
+            sampling_profiles.add('text')
+            stage_reasons.extend(('text_loop_coverage_unresolved', 'text_input_modalities_unmeasured'))
+            reasons.update(stage_reasons)
         if kind in ('ControlNetApply', 'ControlNetApplyAdvanced'):
             selection = inputs.get('control_net')
             loader = graph.get(selection[0], {}) if isinstance(selection, list) and len(selection) == 2 and isinstance(selection[0], str) else {}

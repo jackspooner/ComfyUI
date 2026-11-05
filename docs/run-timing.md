@@ -105,6 +105,7 @@ tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/control_execution_metrics_test.py
+tests-unit/comfy_test/text_execution_metrics_test.py
 tests-unit/comfy_test/vision_features_test.py -q`
 using the prepared interpreter. Fixtures use tiny CPU tensors and mocked sampling;
 they do not establish real-model or performance acceptance.
@@ -162,3 +163,18 @@ and uninstrumented adapters remain incomplete. Original interval checks and
 sampling results are preserved; no extra timestep reads or GPU synchronization
 are introduced. Active measurements stay live/completion evidence and do not
 become submission/start facts or erase broad control-coverage reasons.
+
+`BaseGenerate.generate` reports the actual embedding input positions, batch, resolved
+output allowance, execution precision and fresh per-generation KV capacity. It does
+not claim cross-request prefix reuse. Prefill and decode forward counts and CPU
+monotonic boundary durations are separate; asynchronous device work means these
+durations are not synchronized GPU execution timings. Generated token counts reuse
+the native Python token list after the existing token read, without another device
+read. `generated_tokens` progress has a null total: the output allowance is a ceiling,
+not a known final length. Durable progress remains bounded to five seconds plus
+stage transitions. Other native loops, speculative decoding and per-modality input
+counts remain unmeasured; multiple invocations stay incomplete. Text progress is
+observable but does not yet refine MediaTools empirical residuals. No sampler,
+stopping rule, output token, constraint or failure/retry behavior is changed.
+Run `text_generation_length_test.py` and `text_json_native_test.py` alongside the
+focused text timing checks to validate EOS, automatic budgets and constraints.

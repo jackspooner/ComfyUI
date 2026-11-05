@@ -53,6 +53,10 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         reasons.discard('model_evaluations_unmeasured')
     if all(key in state.get('resolved', {}) for key in ('latentWidth', 'latentHeight', 'latentFrames')):
         reasons.discard('latent_shape_unresolved')
+    if state.get('text_plans') == 1 and completed and state.get('measurements', {}).get('prefillForwardsCompleted') == 1:
+        generated = state['measurements'].get('generatedTokens')
+        if type(generated) is int and state['measurements'].get('decodeForwardsCompleted', 0) == max(0, generated - 1):
+            reasons.discard('text_loop_coverage_unresolved')
     reasons.update(state.get('reasons', []))
     if completed and state.get('measurements', {}).get('noiseEvaluations') != state.get('resolved', {}).get('modelEvaluations'):
         reasons.add('sampling_evaluation_count_unresolved')
@@ -62,10 +66,10 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
             reasons.add('cfg_behavior_unmeasured')
     stage['reasons'] = sorted(reasons)
     workload.update(complete=not reasons, reasons=stage['reasons'])
-    remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved'}
+    remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved', 'text_loop_coverage_unresolved'}
     remaining.update(reason for item in record.get('stages', []) for reason in item['reasons'])
     evidence.update(complete=not remaining, reasons=sorted(remaining))
-    if state.get('progress') and stage['kind'] == 'sampling':
+    if state.get('progress') and stage['kind'] in ('sampling', 'inference'):
         stage['progress'] = dict(state['progress'])
 
 

@@ -7,6 +7,7 @@ from typing import Optional, Any, Tuple
 import math
 from tqdm import tqdm
 import comfy.utils
+import comfy.execution_metrics
 import comfy_kitchen
 from comfy_kitchen.int8_decode import Int8DecodeCache
 
@@ -1280,6 +1281,9 @@ class BaseGenerate:
         max_length = self.resolve_max_length(max_length, embeds.shape[1])
         max_cache_len = embeds.shape[1] + max_length
         past_key_values = self.init_kv_cache(embeds.shape[0], max_cache_len, device, execution_dtype)
+        comfy.execution_metrics.emit('text_generation_plan', input_positions=embeds.shape[1], batch=embeds.shape[0],
+                                     output_limit=max_length, kv_capacity=max_cache_len, precision=str(execution_dtype),
+                                     prefix_reused=False, do_sample=do_sample)
 
         generator = torch.Generator(device=device).manual_seed(seed) if do_sample else None
 
@@ -1327,7 +1331,8 @@ class BaseGenerate:
                 if step == 0 and deepstack_embeds is not None:
                     extra["deepstack_embeds"] = deepstack_embeds
                     extra["visual_pos_masks"] = visual_pos_masks
-                x, _, past_key_values = self.model.forward(None, embeds=embeds, attention_mask=None, past_key_values=past_key_values, input_ids=current_input_ids, position_ids=position_ids, **extra, embeds_info=(embeds_info if step == 0 else None))
+                with comfy.execution_metrics.measure('text_prefill_forward' if step == 0 else 'text_decode_forward'):
+                    x, _, past_key_values = self.model.forward(None, embeds=embeds, attention_mask=None, past_key_values=past_key_values, input_ids=current_input_ids, position_ids=position_ids, **extra, embeds_info=(embeds_info if step == 0 else None))
                 logits = self.logits(x)[:, -1]
                 if penalty_mask is None and do_sample and penalize:
                     # allocated on the (unbracketed) first step; later steps only index_fill_ it
@@ -1346,6 +1351,7 @@ class BaseGenerate:
 
                 token_id = decode_tokens[0].item()
                 generated_token_ids.append(token_id)
+                comfy.execution_metrics.emit('text_generation_progress', generated=len(generated_token_ids))
                 complete = constraint.commit(token_id) if constraint is not None else False
 
                 if step == 0 and hasattr(self.model.embed_tokens, "_v"):
@@ -1363,6 +1369,7 @@ class BaseGenerate:
         finally:
             comfy.model_prefetch.cleanup_prefetch_queues()
 
+        comfy.execution_metrics.emit('text_generation_completed', generated=len(generated_token_ids))
         return generated_token_ids
 
     def processed_probs(self, logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, presence_penalty=0.0, penalty_mask=None, allowed_mask=None):
