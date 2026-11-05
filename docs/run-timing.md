@@ -250,6 +250,38 @@ observations alone do not clear reference-processing coverage or establish crop,
 tile and role attribution. Extractor 7 can resolve supported image-input work as
 described below. Older extractor records retain their original evidence.
 
+## Live transition delivery
+
+Optional loopback `GET /timing/observations/stream` uses SSE `data` JSON conforming
+to RouterContracts `TimingObservationStreamEvent`. The same local-only guard as
+cursor reads rejects browser/forwarded/remote requests. The first `ready` frame
+identifies source, process instance, resource and the current durable journal
+cursor. Only later committed snapshots are streamed; reconnection establishes a
+new baseline and never replays old events as live forecasts. Recover durable facts
+through ordinary cursor reads, preserving any expired-cursor or live-delivery gaps.
+
+Existing admission, start, stage/input/cache transitions and throttled progress
+writes publish immutable snapshots after their SQLite transaction commits. Failed
+commits emit nothing. Current queue/execution elapsed and GPU-hold wait exclusion
+are saved from the existing monotonic owner clocks, rather than relying on a later
+GET to refresh them. Interrupted records retain their last observed elapsed span
+with `phase=unknown`, restart reasons and no invented finish/end duration.
+
+At most four subscribers retain eight frames each; one JSON event is limited to
+1 MiB. Pending event-loop notifications are coalesced as well as frame buffers.
+Overflow/oversize emits a terminal `gap` (`timing_stream_overflow` or
+`timing_stream_event_too_large`) instead of blocking inference or accumulating
+unbounded work. Subscriber exhaustion returns 429 `timing_stream_limit`.
+Idle connections receive 15-second heartbeat comments; a blocked network write
+times out after five seconds. Observer/transport failures cannot fail or replay
+execution. No model/device queries, synchronization or outbound connections are
+added. No stream frame certifies a complete queue order or authorizes maintenance.
+
+MediaTools still owns forecasts; native streaming alone does not activate direct
+capture or prove accuracy. Run `tests-unit/app_test/run_timing_stream_test.py`
+with the CPU launcher above, plus existing timing/queue/restart regressions. The
+tests use temporary databases, fake clocks and loopback fixture servers.
+
 ## Native image input and standard 2D VAE work
 
 Extractor `comfy-explicit-7` explicitly describes `LoadImage`, `LoadImageOutput`
