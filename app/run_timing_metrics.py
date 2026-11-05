@@ -8,6 +8,7 @@ from app.run_timing_ltx_audio import ltx_audio_encode_complete, ltx_audio_decode
 from app.run_timing_av import av_preparation_complete, av_preparation_execution_complete
 from app.run_timing_h3_allocation import h3_allocation_complete
 from app.run_timing_h3_layout import h3_layout_complete
+from app.run_timing_model_loading import managed_loading_complete
 
 
 def apply_metrics(record, stage, state, observed_at, completed=False):
@@ -66,6 +67,11 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         workload['resolved']['executionPrecision'] = precision
         evidence['resolved'][stage['id'] + '.executionPrecision'] = precision
     reasons = set(stage['reasons'])
+    if 'managedLoading.required' in workload['resolved'] or state.get('managed_load_operations'):
+        if managed_loading_complete(state):
+            reasons.discard('managed_load_plan_unresolved')
+        else:
+            reasons.add('managed_load_plan_unresolved')
     if 'h3Layout.required' in workload['resolved']:
         if h3_layout_complete(state):
             reasons.discard('h3_packed_layout_unmeasured')
@@ -191,6 +197,7 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     remaining.discard('joint_preparation_workload_unmeasured')
     remaining.discard('h3_allocation_workload_unmeasured')
     remaining.discard('h3_packed_layout_unmeasured')
+    remaining.discard('managed_load_plan_unresolved')
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)
     evidence.update(complete=not input_reasons, reasons=input_reasons)

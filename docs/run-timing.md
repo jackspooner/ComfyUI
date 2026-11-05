@@ -115,6 +115,35 @@ separate from submission/start facts; completion-only values must not define an
 in-flight target's workload population. Telemetry construction/observer errors
 must leave inference and callbacks unchanged.
 
+Native sampler plans require the model-manager loading observation before workload
+coverage is complete. The requirement is committed in the sampling-plan snapshot,
+so geometry alone cannot briefly qualify an unobserved load. `managedLoading.*`
+describes up to 16 ordered manager calls with 64 entries each: registry-entry reuse,
+dynamic/standard strategy, load device, clone detaches, force flags, VRAM policy,
+the effective weight-load budget and the manager's already-computed loaded-byte
+counter where available. Unknown counters stay null with an explicit known flag;
+registry reuse does not prove warm physical GPU residency. Entries are ordinals
+within the owning stage, not inferred weight-file identities.
+
+Effective budgets and observed manager state remain strict comparison facts;
+zero retains the native full-load sentinel and negative budgets retain native
+reclaim semantics. Neither is a measured transfer-byte count. There is no broadened matching
+or scaling across these memory decisions. Initial inference requirements and
+weight requirements before pressure, post-load RAM/VRAM usage, success/failure
+counts and load/unload/clone-detach CPU elapsed are diagnostic measurements, never
+population inputs. Indexed and aggregate times can overlap; do not add them to
+replace the owner's end-to-end duration. These are measurements inside the existing
+node stage, with no added queue work or scheduling authority.
+
+Plans remain incomplete until entry selection/clone/allowance evidence is present.
+Malformed, repeated, over-limit or uncorrelated metadata retains explicit gaps.
+Writes are coalesced at plan/readiness/batch-usage boundaries; temporary operation
+bindings never enter durable records or retain models. Hooks use values the manager
+already computes and add no device queries, synchronization or transfers. Dynamic
+materialization details and physical residency/transfer/kernel timings remain
+unknown where unsupported. Verify with the loading suites below; tiny CPU stubs and
+call-trace parity do not establish actual GPU or deployed accuracy acceptance.
+
 Expanded evidence explicitly reports missing processed references, implicit
 dimensions and unsupported nodes. Standard LoRA loaders report actual file-cache
 reuse, file-load time and CPU patch-preparation time separately. Native parsed
@@ -145,6 +174,7 @@ Focused CPU verification: `python -m pytest tests-unit/app_test/run_timing_test.
 tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py
 tests-unit/app_test/run_timing_sampler_test.py tests-unit/comfy_test/sampling_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_layout_test.py tests-unit/comfy_test/h3_layout_execution_metrics_test.py
+tests-unit/app_test/run_timing_model_loading_test.py tests-unit/comfy_test/model_loading_execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/clip_vision_execution_metrics_test.py

@@ -30,6 +30,9 @@ def test_native_ancestral_node_options_reach_start_facts_without_outcome_leakage
         execution_metrics.set_observer(lambda event, facts: store.safe_metric('fixture', 'sample', event, facts))
         sampler = SamplerEulerAncestral.execute(eta, .5).result[0]
         samplers.sampling_metrics_callback(guider, [(1, 4, 2, 2)], sampler, torch.tensor([1., .5, 0.]), None)
+        # This focused sampler fixture has no model execution or managed weights.
+        execution_metrics.emit('managed_load_plan', operation=object(), models=0, force_patch_weights=False,
+                               force_full_load=False, requested_bytes=0, minimum_bytes=0)
         page = store.page('0', 100, [], [])
         record = page['observations'][-1]
         stage = next(value for value in record['stages'] if value['id'] == 'sample')
