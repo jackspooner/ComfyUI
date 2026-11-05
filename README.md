@@ -210,6 +210,9 @@ sampling reports actual shapes, evaluation/CFG counters and distinct reliable
 sampling progress; generic node progress remains unreliable. Composite descriptions
 can correlate native expansion IDs and optional nested-call telemetry scopes without
 replacing the executor's context. Joint AV stream shapes stay separate.
+Composite owners can declare phase profiles, opaque boundary kinds and bounded
+implementation provenance. These declarations preserve unsupported-workload
+reasons and do not establish performance compatibility.
 Standard LoRA loaders additionally distinguish file reuse/loading and CPU patch
 preparation, retaining supported parsed ranks as live component evidence. See
 [timing coverage and limitations](docs/run-timing.md). Reference observations include
