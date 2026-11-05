@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from execution import PromptQueue
 
 from app.run_timing import RunTimingStore, workload
 from app.run_timing_http import local_request
@@ -63,6 +64,28 @@ def test_queue_order_and_telemetry_failure(tmp_path):
     store.db.close()
     store.safe_event('started', item())
     assert store.issue == 'timing_store_unavailable'
+
+
+def test_equal_priority_order_matches_owner_heap_without_mutating_queue(tmp_path):
+    queue = PromptQueue(SimpleNamespace(queue_updated=lambda: None))
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    running = item('running')
+    queue.put(running)
+    queue.get(timeout=0)
+    store.event('accepted', running)
+    store.event('started', running)
+    for prompt in ('c', 'a', 'b'):
+        pending = item(prompt)
+        queue.put(pending)
+        store.event('accepted', pending)
+    before = queue.get_current_queue()
+    active = store.page('0', 100, *before)['active']['records']
+    assert queue.get_current_queue() == before
+    expected = ['running']
+    while result := queue.get(timeout=0):
+        expected.append(result[0][1])
+    assert [record['id'] for record in active] == expected
+    assert [record['queueOrder'] for record in active] == list(range(len(expected)))
 
 
 def test_features_are_parameter_sensitive_but_prompt_independent():
