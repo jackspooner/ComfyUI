@@ -2,9 +2,9 @@
 
 Deploy published non-draft, non-prerelease tags from the actual configured GitHub
 remote, retaining the fork's local memory-recovery patch. Do not deploy a later
-branch tip or downgrade a checkout containing the stable tag. The 27 October 2026
-release is [v0.43.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.43.0),
-release commit `426f5eea52a7ece1dd599fff4cb6cd1f352ddd24`.
+branch tip or downgrade a checkout containing the stable tag. The 4 November 2026
+release is [v0.44.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.44.0),
+release commit `2c75dc1b379a59e0880619d029607af5169a62ef`.
 
 Before changing source or packages, save Git revision/diffs, custom-node revisions,
 package inventory/constraints, service configuration, workflows and baseline
@@ -101,3 +101,20 @@ code, builder URL configuration and the persistent headless-use marker. CLI
 feature overrides cannot advertise that excluded path. Existing partner nodes
 remain their own explicit external integrations; no cloud deployment is activated
 by release maintenance. Upstream attribution and release ancestry are preserved.
+
+The v0.44.0 tag pins frontend 1.57.6, workflow templates 0.11.101 and embedded
+docs 0.5.16; Kitchen 0.2.40 and allocator 0.6.0 stay unchanged. Record the
+frontend actually served by the operator's floating selector separately.
+Preserve the fork's Contact Sheet nodes alongside H3 latent upscaling and
+p-h3-image conditioning. Sol-H3's whole-clip decoder has a different temporal
+ratio and memory estimate; existing stock-H3 inference does not certify it.
+VAE compute-dtype selection clones the VAE; check the LTX diffusion-decoder
+regression and native H3 decode paths before activation.
+
+Keep the existing five-output TextGenerate contract separate from the upstream
+two-output TextGenerateV2 node. Gemma's repeated-media path reuses native image
+preparation and retains fractional video timestamps and presampled frames.
+Run the Gemma template, generation length, conversation, media-budget,
+prefetch cleanup, frontend-manager and video bit-depth suites. New model
+weights, context-window quality, full-size video and partner services require
+their own acceptance; they are not established by the maintenance smoke test.
