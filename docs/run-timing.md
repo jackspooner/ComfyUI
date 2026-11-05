@@ -6,7 +6,9 @@ It covers every native prompt, including direct tools and staged execution, with
 changing queue ordering, node execution, cancellation or maintenance policy.
 GET `/timing/observations?after=0&limit=100` returns version-1 timing observations,
 a durable cursor and an ordered active snapshot. Limit is 1–500. Follow nextCursor
-until null. Expired cursors are explicitly marked. The endpoint accepts machine-local
+until null. Pending order follows the queue owner's full tuple comparison,
+including prompt-ID tie breaking for equal priorities, without changing the heap.
+Expired cursors are explicitly marked. The endpoint accepts machine-local
 non-browser requests only and performs no outbound requests. SSH loopback tunnels
 can expose a separately configured host to the owning MediaTools collector.
 
