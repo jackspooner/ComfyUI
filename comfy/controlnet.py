@@ -31,6 +31,7 @@ import comfy.storage
 import comfy.ops
 import comfy.latent_formats
 import comfy.model_base
+import comfy.execution_metrics
 
 import comfy.cldm.cldm
 import comfy.t2i_adapter.adapter
@@ -100,6 +101,7 @@ class ControlBase:
         self.extra_hooks: HookGroup = None
         self.preprocess_image = lambda a: a
         self.multigpu_clones: dict[torch.device, ControlBase] = {}
+        self._timing_binding = object()
 
     def set_cond_hint(self, cond_hint, strength=1.0, timestep_percent_range=(0.0, 1.0), vae=None, extra_concat=[]):
         self.cond_hint_original = cond_hint
@@ -112,6 +114,8 @@ class ControlBase:
         self.extra_concat_orig = extra_concat.copy()
         if self.concat_mask and len(self.extra_concat_orig) == 0:
             self.extra_concat_orig.append(torch.tensor([[[[1.0]]]]))
+        self._timing_binding = object()
+        comfy.execution_metrics.observe_control('control_bound', self._timing_binding)
         return self
 
     def pre_run(self, model, percent_to_timestep_function):
@@ -167,6 +171,7 @@ class ControlBase:
         return out
 
     def copy_to(self, c: ControlBase):
+        c._timing_binding = self._timing_binding
         c.cond_hint_original = self.cond_hint_original
         c.strength = self.strength
         c.timestep_percent_range = self.timestep_percent_range
@@ -258,6 +263,7 @@ class ControlNet(ControlBase):
 
         if self.timestep_range is not None:
             if t[0] > self.timestep_range[0] or t[0] < self.timestep_range[1]:
+                comfy.execution_metrics.observe_control('control_interval_skipped', self._timing_binding, adapter='controlnet')
                 if control_prev is not None:
                     return control_prev
                 else:
@@ -297,6 +303,7 @@ class ControlNet(ControlBase):
                 self.cond_hint = torch.cat([self.cond_hint] + to_concat, dim=1)
 
             self.cond_hint = self.cond_hint.to(device=x_noisy.device, dtype=dtype)
+            comfy.execution_metrics.observe_control('control_hint_prepared', self._timing_binding, self.cond_hint, adapter='controlnet')
         if x_noisy.shape[0] != self.cond_hint.shape[0]:
             self.cond_hint = broadcast_image_to(self.cond_hint, x_noisy.shape[0], batched_number)
 
@@ -310,7 +317,9 @@ class ControlNet(ControlBase):
         timestep = self.model_sampling_current.timestep(t)
         x_noisy = self.model_sampling_current.calculate_input(t, x_noisy)
 
+        comfy.execution_metrics.observe_control('control_forward_attempt', self._timing_binding, self.cond_hint, adapter='controlnet')
         control = self.control_model(x=x_noisy.to(dtype), hint=self.cond_hint, timesteps=timestep.to(dtype), context=comfy.model_management.cast_to_device(context, x_noisy.device, dtype), **extra)
+        comfy.execution_metrics.observe_control('control_applied', self._timing_binding, self.cond_hint, adapter='controlnet')
         return self.control_merge(control, control_prev, output_dtype=None)
 
     def copy(self):
@@ -919,6 +928,7 @@ class T2IAdapter(ControlBase):
 
         if self.timestep_range is not None:
             if t[0] > self.timestep_range[0] or t[0] < self.timestep_range[1]:
+                comfy.execution_metrics.observe_control('control_interval_skipped', self._timing_binding, adapter='t2i_adapter')
                 if control_prev is not None:
                     return control_prev
                 else:
@@ -933,13 +943,20 @@ class T2IAdapter(ControlBase):
             self.cond_hint = comfy.utils.common_upscale(self.cond_hint_original, width, height, self.upscale_algorithm, "center").float().to(self.device)
             if self.channels_in == 1 and self.cond_hint.shape[1] > 1:
                 self.cond_hint = torch.mean(self.cond_hint, 1, keepdim=True)
+            comfy.execution_metrics.observe_control('control_hint_prepared', self._timing_binding, self.cond_hint, adapter='t2i_adapter')
         if x_noisy.shape[0] != self.cond_hint.shape[0]:
             self.cond_hint = broadcast_image_to(self.cond_hint, x_noisy.shape[0], batched_number)
         if self.control_input is None:
             self.t2i_model.to(x_noisy.dtype)
             self.t2i_model.to(self.device)
+            comfy.execution_metrics.observe_control('control_forward_attempt', self._timing_binding, self.cond_hint, adapter='t2i_adapter')
             self.control_input = self.t2i_model(self.cond_hint.to(x_noisy.dtype))
+            comfy.execution_metrics.observe_control('control_features_encoded', self._timing_binding, adapter='t2i_adapter')
             self.t2i_model.cpu()
+        else:
+            comfy.execution_metrics.observe_control('control_features_reused', self._timing_binding, adapter='t2i_adapter')
+
+        comfy.execution_metrics.observe_control('control_applied', self._timing_binding, self.cond_hint, adapter='t2i_adapter')
 
         control_input = {}
         for k in self.control_input:

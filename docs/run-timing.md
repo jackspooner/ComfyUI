@@ -90,8 +90,8 @@ LoRAAdapter tensors provide min/max rank and supported-rank coverage without rea
 tensor values. These live component facts are separate from requested strengths
 and zero-strength bypass; completed durations never become submission/start facts.
 Patch preparation is registration, not later GPU weight materialization or kernel
-time. Other adapter formats may lack ranks. Control active steps and measured GPU
-transfers/residency are not yet provided by this adapter.
+time. Other adapter formats may lack ranks. Measured GPU transfers/residency are
+not yet provided by this adapter.
 An expanded envelope is not a claim of complete coverage. The collector/forecast
 consumer must support this additive contract before producer activation; older
 strict readers may reject the extra fields. No source change alone activates it.
@@ -99,6 +99,7 @@ Focused CPU verification: `python -m pytest tests-unit/app_test/run_timing_test.
 tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
+tests-unit/comfy_test/control_execution_metrics_test.py
 tests-unit/comfy_test/vision_features_test.py -q`
 using the prepared interpreter. Fixtures use tiny CPU tensors and mocked sampling;
 they do not establish real-model or performance acceptance.
@@ -140,3 +141,19 @@ the executing node context and scheduler, observes start/finish/failure and veri
 reuse, and routes scalar sampling observations to that described substage.
 Missing descriptions remain unavailable. Receipt presence alone cannot prove reuse.
 Terminal storage failures clear only the attempt's in-memory timing state.
+
+Native ControlNet and T2I adapters report actual interval skips, processed hint
+axis shapes, preparation counts, forward attempts and active calls. A temporary
+noise-evaluation scope deduplicates repeated CFG/batch calls for each control;
+these are measured evaluations, not percentages converted into step counts.
+T2I feature encodes and actual feature reuse remain distinct from active calls.
+Copied device controls preserve one application binding; a new `set_cond_hint`
+starts a new binding. The timing owner maps bindings to described application
+stages and selected native loader identities. Runtime handles and evaluation
+tokens are never persisted. Counters write only at existing stage snapshots.
+Zero-strength native application is a declared bypass. Cached applications without
+observed bindings, calls without native evaluation context, varying hint shapes
+and uninstrumented adapters remain incomplete. Original interval checks and
+sampling results are preserved; no extra timestep reads or GPU synchronization
+are introduced. Active measurements stay live/completion evidence and do not
+become submission/start facts or erase broad control-coverage reasons.

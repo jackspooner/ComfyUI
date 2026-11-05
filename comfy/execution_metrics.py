@@ -9,6 +9,7 @@ from time import monotonic
 
 _observer = None
 _stage = ContextVar('execution_metrics_stage', default=None)
+_evaluation = ContextVar('execution_metrics_evaluation', default=None)
 
 
 def set_observer(observer):
@@ -30,6 +31,28 @@ def observe_shape(event, tensor, **facts):
             emit(event, shape=tuple(tensor.shape), **facts)
         except Exception:
             emit('tensor_shape_unavailable', operation=event)
+
+
+@contextmanager
+def evaluation_scope():
+    """Temporary identity for one native noise evaluation, including CFG batches."""
+    if not enabled():
+        yield
+        return
+    token = _evaluation.set(object())
+    try:
+        yield
+    finally:
+        _evaluation.reset(token)
+
+
+def observe_control(event, binding, tensor=None, **facts):
+    if enabled():
+        facts.update(binding=binding, evaluation=_evaluation.get())
+        if tensor is None:
+            emit(event, **facts)
+        else:
+            observe_shape(event, tensor, **facts)
 
 
 @contextmanager

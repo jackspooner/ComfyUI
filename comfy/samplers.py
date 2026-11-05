@@ -619,11 +619,12 @@ def sampling_function(model, x, timestep, uncond, cond, cond_scale, model_option
         uncond_ = uncond
 
     conds = [cond, uncond_]
-    if "sampler_calc_cond_batch_function" in model_options:
-        args = {"conds": conds, "input": x, "sigma": timestep, "model": model, "model_options": model_options}
-        out = model_options["sampler_calc_cond_batch_function"](args)
-    else:
-        out = calc_cond_batch(model, conds, x, timestep, model_options)
+    with comfy.execution_metrics.evaluation_scope():
+        if "sampler_calc_cond_batch_function" in model_options:
+            args = {"conds": conds, "input": x, "sigma": timestep, "model": model, "model_options": model_options}
+            out = model_options["sampler_calc_cond_batch_function"](args)
+        else:
+            out = calc_cond_batch(model, conds, x, timestep, model_options)
 
     comfy.execution_metrics.emit('noise_evaluation', branches=sum(value is not None for value in conds))
 
