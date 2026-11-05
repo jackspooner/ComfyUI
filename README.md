@@ -233,6 +233,12 @@ preparation, retaining supported parsed ranks as live component evidence. See
 loaded-image dimensions, post-crop VAE encode shapes, actual standard 2D VAE tile
 forwards, conditioning output positions and native vision-feature reuse. Internal
 tilers and other reference paths retain explicit coverage limitations.
+Standard `CLIPVisionLoader`/`CLIPVisionEncode` stages resolve the native vision
+weight category, actual source/processed shapes, crop behavior, dtype/devices and
+encoded positions. Preprocessing/forward durations are CPU monotonic boundaries;
+encoded outputs remain completion evidence. Repeated calls, partial plans and
+unverified cached reference shapes stay incomplete. Tiny CPU fixtures verify
+output parity and observer failure isolation; real-model acceptance is separate.
 Native ControlNet/T2I observations additionally distinguish interval skips, active
 noise evaluations, forward calls and T2I feature reuse, with application-stage
 correlation where available. Uncorrelated controls remain incomplete.
