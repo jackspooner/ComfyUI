@@ -257,7 +257,8 @@ class RunTimingStore:
                 if isinstance(resolved.get('stageGraph'), dict):
                     available_at = 'submission' if record['phase'] == 'queued' else 'execution_start' if phase == 'started' else 'completion' if phase not in ('accepted', 'observation') else 'live'
                     evidence, stages = describe(resolved['stageGraph'], record['workload'], self.resource,
-                                                utc(), selected_file_identity, digest, available_at)
+                                                utc(), selected_file_identity, digest, available_at,
+                                                resolved.get('loaderAliases'))
                     metadata = resolved.get('stageMetadata', {})
                     for stage in stages:
                         # Only declared correlations are accepted; raw graphs and
