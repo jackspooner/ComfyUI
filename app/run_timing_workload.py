@@ -134,12 +134,13 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 and audio_latent(value[0], (*seen, node_id)))
 
     components, resolved, requested, stages, base_models = [], {}, {}, [], []
-    model_sources, stage_revisions, implementations = {}, {}, {}
+    model_sources, stage_revisions, implementations, stage_profiles = {}, {}, {}, {}
     sampling_profiles = set()
     for order, node_id in enumerate(ordered):
         component_start = len(components)
         node = graph[node_id]
         kind, inputs = node_kind(node), node.get('inputs', {})
+        node_profile = None
         stage_kind = NODE_STAGES.get(kind, 'unknown')
         stage_reasons = [] if stage_kind != 'unknown' else ['unsupported_workload_adapter']
         if stage_reasons:
@@ -187,8 +188,8 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 reasons.add('latent_shape_unresolved')
                 stage_reasons.append('latent_shape_unresolved')
             node_facts.update({key: fact(value, kind + '.latent_image') for key, value in shape.items()})
-            sampling_profiles.add('audio' if audio_latent(node_id) else
-                                  'diffusion_video' if shape.get('latentFrames', 1) > 1 else 'diffusion_image')
+            node_profile = 'audio' if audio_latent(node_id) else 'diffusion_video' if shape.get('latentFrames', 1) > 1 else 'diffusion_image'
+            sampling_profiles.add(node_profile)
             # Step callbacks are measured later; configured steps do not assert NFE or CFG branch execution.
             stage_reasons.append('model_evaluations_unmeasured')
             reasons.add('model_evaluations_unmeasured')
@@ -232,6 +233,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if kind in AUDIO_NODES and stage_kind == 'publication':
             stage_reasons.append('audio_input_unmeasured')
         if kind in ('TextGenerate', 'TextGenerateLTX2Prompt'):
+            node_profile = 'text'
             sampling_profiles.add('text')
             stage_reasons.extend(('text_loop_coverage_unresolved', 'text_input_modalities_unmeasured'))
             reasons.update(stage_reasons)
@@ -276,11 +278,21 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                                           and isinstance(value[0], str) and value[0] in graph)
             stage_revision = digest(['dependency-stage-1', implementations[declared], sorted(inputs), dependency_revisions])
         stage_revisions[node_id] = stage_revision
+        inherited_profiles = {stage_profiles[parent] for parent in parents
+                              if parent in stage_profiles and stage_profiles[parent] != 'unknown'}
+        if kind in MOGE_NODES or kind in IMAGE_LOADERS or kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint', 'CLIPVisionLoader', 'CLIPVisionEncode'):
+            stage_profile = 'vision'
+        elif kind in AUDIO_NODES or audio_latent(node_id):
+            stage_profile = 'audio'
+        elif kind == 'CLIPTextEncode':
+            stage_profile = 'text'
+        else:
+            stage_profile = node_profile or (next(iter(inherited_profiles)) if len(inherited_profiles) == 1 else 'unknown')
+        stage_profiles[node_id] = stage_profile
         input_reasons = workload_reasons(stage_reasons)
         reasons.update(input_reasons)
         stage_workload = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
-                          'profile': 'vision' if kind in MOGE_NODES or kind in IMAGE_LOADERS or kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint', 'CLIPVisionLoader', 'CLIPVisionEncode') else 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
-                                     next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
+                          'profile': stage_profile,
                           'implementation': {'revision': stage_revision, 'compatibilityId': None},
                           'modelIdentity': stage_model, 'requested': {}, 'resolved': node_facts, 'measurements': {},
                           'components': components[component_start:], 'complete': not input_reasons, 'reasons': input_reasons}

@@ -156,6 +156,23 @@ def test_stage_source_identity_tracks_only_reachable_implementations(tmp_path, m
     assert revisions[0] != revisions[2]
 
 
+def test_stage_profiles_ignore_unrelated_earlier_modalities():
+    value = graph()
+    prior = {'unrelated-model': {'class_type': 'UNETLoader', 'inputs': {'unet_name': 'other'}},
+             'unrelated-latent': {'class_type': 'EmptyLatentImage', 'inputs': {'width': 512, 'height': 512, 'batch_size': 1}},
+             'unrelated-sample': {'class_type': 'KSampler', 'inputs': {
+                 'model': ['unrelated-model', 0], 'latent_image': ['unrelated-latent', 0], 'steps': 2}}}
+    _, before = description(value)
+    evidence, after = description({**prior, **value})
+    assert evidence['profile'] == 'unknown'  # The whole execution mixes image/video.
+    for name in value:
+        original = next(stage for stage in before if stage['id'] == name)['workload']
+        observed = next(stage for stage in after if stage['id'] == name)['workload']
+        assert observed['profile'] == original['profile']
+    assert next(stage for stage in after if stage['id'] == 'sample')['workload']['profile'] == 'diffusion_video'
+    assert next(stage for stage in after if stage['id'] == 'unrelated-sample')['workload']['profile'] == 'diffusion_image'
+
+
 def test_owner_declared_loader_aliases_do_not_broaden_unknown_node_inference():
     value = {'pool': {'class_type': 'OwnedPoolLoader', 'inputs': {'clip_name': 'encoder', 'type': 'flux'}},
              'custom': {'class_type': 'LooksLikeSampler', 'inputs': {'lora_name': 'PRIVATE', 'steps': 20}}}
