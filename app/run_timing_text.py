@@ -4,14 +4,28 @@ import math
 
 def observe_text_metrics(state, event, facts):
     if event not in {'text_generation_plan', 'text_prefill_forward', 'text_decode_forward',
-                     'text_generation_progress', 'text_generation_completed'}:
+                     'text_generation_progress', 'text_generation_completed', 'text_embedding_started',
+                     'text_embedding_row', 'text_embedding_unavailable'}:
         return False
     sources = state.setdefault('sources', {})
     measurements = state['measurements']
     def reason(value):
         if value not in state['reasons']:
             state['reasons'].append(value)
-    if event == 'text_generation_plan':
+    if event == 'text_embedding_started':
+        state['embedding_rows'] = []
+    elif event == 'text_embedding_unavailable':
+        state['embedding_rows'] = None
+    elif event == 'text_embedding_row':
+        rows = state.get('embedding_rows')
+        keys = ('positions', 'text', 'image', 'audio', 'unknown', 'padding')
+        if rows is not None:
+            if (len(rows) < 128 and all(type(facts.get(key)) is int and facts[key] >= 0 for key in keys)
+                    and sum(facts[key] for key in keys[1:]) == facts['positions']):
+                rows.append({key: facts[key] for key in keys})
+            else:
+                state['embedding_rows'] = None
+    elif event == 'text_generation_plan':
         state['text_plans'] = state.get('text_plans', 0) + 1
         if state['text_plans'] > 1:
             reason('multiple_text_generation_invocations')
@@ -21,6 +35,15 @@ def observe_text_metrics(state, event, facts):
             if type(value) is int and value >= 0:
                 state['resolved'][key] = value
                 sources[key] = 'native_text_loop'
+        rows = state.pop('embedding_rows', None)
+        complete = bool(rows) and len(rows) == facts.get('batch') and sum(row['positions'] for row in rows) == facts.get('input_positions', 0) * facts.get('batch', 0)
+        state['resolved']['modalityCoverageComplete'] = complete and all(row['unknown'] == 0 for row in rows)
+        sources['modalityCoverageComplete'] = 'native_text_embedding'
+        if complete:
+            for name in ('text', 'image', 'audio', 'unknown', 'padding'):
+                key = 'input' + name.title() + 'Positions'
+                state['resolved'][key] = sum(row[name] for row in rows)
+                sources[key] = 'native_text_embedding'
         if type(facts.get('prefix_reused')) is bool:
             state['resolved']['prefixReused'] = facts['prefix_reused']
             sources['prefixReused'] = 'native_text_loop'

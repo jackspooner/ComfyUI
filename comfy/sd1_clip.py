@@ -7,6 +7,7 @@ import traceback
 import zipfile
 from . import model_management
 import comfy.clip_model
+import comfy.execution_metrics
 import json
 import logging
 import numbers
@@ -183,6 +184,7 @@ class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
         self.execution_device = None
 
     def process_tokens(self, tokens, device):
+        comfy.execution_metrics.emit('text_embedding_started')
         end_token = self.special_tokens.get("end", None)
         pad_token = self.special_tokens.get("pad", -1)
         if end_token is None:
@@ -274,6 +276,7 @@ class SDClipModel(torch.nn.Module, ClipTokenWeightEncoder):
             embeds_out.append(tokens_embed)
             attention_masks.append(attention_mask)
             num_tokens.append(sum(attention_mask))
+            comfy.execution_metrics.observe_embedding_row(tokens_embed.shape[1], num_tokens[-1], embeds_info)
 
         return torch.cat(embeds_out), torch.tensor(attention_masks, device=device, dtype=torch.long), num_tokens, embeds_info
 

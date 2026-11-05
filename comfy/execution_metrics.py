@@ -55,6 +55,27 @@ def observe_control(event, binding, tensor=None, **facts):
             observe_shape(event, tensor, **facts)
 
 
+def observe_embedding_row(positions, active, embeddings):
+    """Read existing CPU expansion metadata, never token IDs or tensor values."""
+    if not enabled():
+        return
+    try:
+        counts = {'image': 0, 'audio': 0, 'unknown': 0}
+        for entry in embeddings:
+            size = entry['size']
+            if type(size) is not int or size < 0:
+                raise ValueError('Unknown embedding expansion')
+            role = entry['type']
+            counts[role if role in ('image', 'audio') else 'unknown'] += size
+        text = active - sum(counts.values())
+        if type(positions) is not int or type(active) is not int or not 0 <= text <= active <= positions:
+            raise ValueError('Unknown embedding positions')
+        emit('text_embedding_row', positions=positions, text=text, image=counts['image'],
+             audio=counts['audio'], unknown=counts['unknown'], padding=positions - active)
+    except Exception:
+        emit('text_embedding_unavailable')
+
+
 @contextmanager
 def measure(event, **facts):
     """Observe a CPU monotonic boundary without synchronizing devices."""
