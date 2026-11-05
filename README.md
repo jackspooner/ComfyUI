@@ -231,6 +231,9 @@ Native audio adapters observe waveform duration/rate/channels, post-resample VAE
 inputs and completed decode outputs. Ordinary audio sampling keeps temporal latent
 length/channel groups separate from image/video axes. Tiled audio internals and
 unsupported synthesis paths retain explicit limitations; audio matching stays exact.
+Workload completeness excludes known missing output measurements or end spans;
+their stage reasons remain visible. Missing input work and unobserved execution
+still prevent complete comparison. Sampling/text precision is also stage-scoped.
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
 [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
