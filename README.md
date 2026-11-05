@@ -221,8 +221,9 @@ noise evaluations, forward calls and T2I feature reuse, with application-stage
 correlation where available. Uncorrelated controls remain incomplete.
 The shared native autoregressive text loop reports input positions, resolved output
 allowance, fresh KV allocation, prefill/decode forward boundaries and generated
-token counts. Final token length remains unknown while running; other loops and
-input-modality attribution retain coverage limitations.
+token counts. The standard encoder's expansion metadata attributes text/image/audio
+and padding positions before generation. Final token length remains unknown while
+running; other loops and unrecognized embeddings retain coverage limitations.
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
 [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
