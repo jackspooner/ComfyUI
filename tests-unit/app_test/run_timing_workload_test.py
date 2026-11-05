@@ -177,7 +177,7 @@ def test_native_sampling_metadata_counts_and_reliable_progress(tmp_path):
     store.event('started', item)
     store.safe_cache('prompt', [])
     store.safe_stage('prompt', 'sample', 'started')
-    store.safe_metric('prompt', 'sample', 'sampling_plan', {'shape': (1, 128, 13, 16, 32), 'evaluations': 2,
+    store.safe_metric('prompt', 'sample', 'sampling_plan', {'shape': (1, 128, 13, 16, 32), 'shapes': [(1, 128, 13, 16, 32)], 'evaluations': 2,
                       'branches': 1, 'precision': 'torch.bfloat16', 'memory_strategy': 'dynamic', 'load_device': 'cuda:0', 'offload_device': 'cpu'})
     before = store.db.total_changes
     for _ in range(2):
@@ -191,6 +191,7 @@ def test_native_sampling_metadata_counts_and_reliable_progress(tmp_path):
     record = store.page('0', 100, [], [])['observations'][-1]
     stage = next(stage for stage in record['stages'] if stage['id'] == 'sample')
     assert stage['workload']['resolved']['modelEvaluations']['value'] == 2
+    assert not any(key.startswith('stream.') for key in stage['workload']['resolved'])
     assert stage['workload']['resolved']['cfgBranches']['value'] == 1
     assert stage['workload']['measurements']['modelForwardCalls']['value'] == 2
     assert stage['workload']['measurements']['modelForwardElements']['value'] == 2048
