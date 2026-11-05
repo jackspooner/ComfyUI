@@ -52,6 +52,7 @@ def observe_text_metrics(state, event, facts):
             sources['textSampling'] = 'native_text_loop'
         if isinstance(facts.get('precision'), str):
             state['precision'] = facts['precision'][:128]
+            sources['executionPrecision'] = 'native_text_loop'
     elif event in ('text_prefill_forward', 'text_decode_forward'):
         seconds = facts.get('seconds')
         if type(seconds) in (int, float) and math.isfinite(seconds) and seconds >= 0:
