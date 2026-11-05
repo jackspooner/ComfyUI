@@ -7,7 +7,7 @@ from comfy.cli_args import args
 args.cpu = True
 from comfy.text_encoders.llama import BaseGenerate
 from comfy.text_encoders.qwen35 import Qwen35
-from comfy_extras.nodes_textgen import TextGenerate
+from comfy_extras.nodes_textgen import TextGenerate, TextGenerateV2
 
 
 class TinyGenerator(BaseGenerate):
@@ -106,3 +106,22 @@ def test_reasoning_split_reads_the_tokenized_template_tail(template, expected):
     assert output.result[:2] == expected
     assert output.result[4] == 'unfinished'
     assert tokens == {'qwen': [[(1, 1.0), (2, 1.0)]]}
+
+
+def test_v2_flattens_media_batches_without_changing_legacy_outputs():
+    captured = {}
+    def tokenize(prompt, **kwargs):
+        captured.update(kwargs)
+        return []
+    clip = SimpleNamespace(tokenize=tokenize, generate=lambda *args, **kwargs: [3],
+                           decode=lambda ids: 'answer')
+    image = torch.zeros(2, 1, 1, 3)
+    video = torch.ones(3, 1, 1, 3)
+    audio = {'waveform': torch.zeros(1, 1, 10), 'sample_rate': 16000}
+    output = TextGenerateV2.execute(clip, 'describe', 10, {'sampling_mode': 'off'},
+                                    images={'image1': image}, videos={'video1': video}, audios={'audio1': audio})
+    assert output.result == ('answer', '')
+    assert len(captured['images']) == 2
+    assert captured['videos'][0] is video and captured['audios'][0] is audio
+    assert len(TextGenerate.define_schema().outputs) == 5
+    assert len(TextGenerateV2.define_schema().outputs) == 2

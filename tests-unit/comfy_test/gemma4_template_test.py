@@ -59,3 +59,24 @@ def test_thinking_disabled_primes_a_thought_channel(variant):
 @pytest.mark.parametrize("thinking", [False, True])
 def test_skip_template_passes_text_through_unchanged(variant, thinking):
     assert build_template(variant, skip_template=True, thinking=thinking) == PROMPT
+
+
+def test_multiple_images_and_videos_keep_fractional_timestamps(monkeypatch):
+    monkeypatch.setattr(gemma4, "prepare_chat_image", lambda image, budget: {"type": "image", "data": image})
+    images = [torch.zeros(1, 1, 1, 3), torch.ones(1, 1, 1, 3)]
+    videos = [torch.zeros(24, 1, 1, 3), torch.ones(12, 1, 1, 3)]
+    template = build_template(gemma4.Gemma4_12B, images=images, videos=videos,
+                              source_fps=24, fps=4, skip_template=False)
+    assert template.count("<|image><|image|><image|>") == 2
+    assert template.count("<|image><|video|><image|>") == 6
+    assert template.count("00:00.25") == 2
+    assert "00:00.75" in template
+    assert len(images) == len(videos) == 2
+
+
+def test_presampled_video_does_not_resample_or_replace_timestamps(monkeypatch):
+    monkeypatch.setattr(gemma4, "prepare_chat_image", lambda image, budget: {"type": "image", "data": image})
+    template = build_template(gemma4.Gemma4_12B, video=torch.zeros(2, 1, 1, 3),
+                              video_timestamps=[0.25, 61.5], skip_template=False)
+    assert template.count("<|image><|video|><image|>") == 2
+    assert "00:00.25" in template and "01:01.5" in template
