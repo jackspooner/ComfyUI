@@ -69,6 +69,11 @@ provenance remains unchanged. No performance compatibility is inferred. The
 whole-graph stage identities without broadening an extractor's workload coverage.
 Extraction shares node-kind source hashes and propagates model selections in
 dependency order; it does not rescan weight files for each stage.
+Modality profiles use the stage's explicit adapter and reachable dependencies,
+not previously visited unrelated branches. An execution can have an unknown
+whole-run profile because it mixes image/video/text work while individual stages
+retain their known profiles. Unsupported nodes and unresolved workloads still
+retain their existing completeness reasons.
 
 Optional `stages` preserve graph dependencies and the physical resource. The existing
 progress registry supplies start/finish offsets and monotonic elapsed durations.
