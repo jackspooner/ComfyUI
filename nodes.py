@@ -1773,19 +1773,47 @@ class LoadImage:
         dtype = comfy.model_management.intermediate_dtype()
         device = comfy.model_management.intermediate_device()
 
-        components = InputImpl.VideoFromFile(image_path).get_components()
+        with comfy.execution_metrics.measure('image_source_decode', decoder='pyav'):
+            components = InputImpl.VideoFromFile(image_path).get_components()
         if components.images.shape[0] > 0:
-            comfy.execution_metrics.observe_shape('image_loaded', components.images)
-            return (components.images.to(device=device, dtype=dtype), (1.0 - components.alpha[..., -1]).to(device=device, dtype=dtype) if components.alpha is not None else torch.zeros((components.images.shape[0], 64, 64), dtype=dtype, device=device))
+            with comfy.execution_metrics.measure('image_output_prepare'):
+                output_image = components.images.to(device=device, dtype=dtype)
+                output_mask = (1.0 - components.alpha[..., -1]).to(device=device, dtype=dtype) if components.alpha is not None else torch.zeros((components.images.shape[0], 64, 64), dtype=dtype, device=device)
+            comfy.execution_metrics.observe_shape('image_loaded', output_image, pipeline_version=1, loader='pyav', mask_shape=tuple(output_mask.shape),
+                                                  alpha=components.alpha is not None, precision=str(output_image.dtype), device=str(output_image.device))
+            return (output_image, output_mask)
 
         # This code is left here to handle animated webp which pyav does not support loading
+        with comfy.execution_metrics.measure('image_source_decode', decoder='pillow'):
+            output_image, output_mask, alpha = self._load_image_pillow(image_path, dtype)
+        with comfy.execution_metrics.measure('image_output_prepare'):
+            output_image = output_image.to(device=device, dtype=dtype)
+            output_mask = output_mask.to(device=device, dtype=dtype)
+        comfy.execution_metrics.observe_shape('image_loaded', output_image, pipeline_version=1, loader='pillow', mask_shape=tuple(output_mask.shape),
+                                              alpha=alpha, precision=str(output_image.dtype), device=str(output_image.device))
+        return (output_image, output_mask)
+
+    def _load_image_pillow(self, image_path, dtype):
         img = node_helpers.pillow(Image.open, image_path)
 
         output_images = []
         output_masks = []
         w, h = None, None
+        work = dict(frames=0, decodedPixels=0, selectedFrames=0, alphaFrames=0,
+                    format=img.format or 'unknown', consistent=True) if comfy.execution_metrics.enabled() else None
+        signature = None
+        has_alpha = False
 
         for i in ImageSequence.Iterator(img):
+            if work is not None:
+                current = (i.size, i.mode)
+                if signature is None:
+                    signature = current
+                    work.update(sourceWidth=i.size[0], sourceHeight=i.size[1], mode=i.mode)
+                elif current != signature:
+                    work['consistent'] = False
+                work['frames'] += 1
+                work['decodedPixels'] += i.size[0] * i.size[1]
             i = node_helpers.pillow(ImageOps.exif_transpose, i)
 
             image = i.convert("RGB")
@@ -1800,18 +1828,24 @@ class LoadImage:
             image = np.array(image).astype(np.float32) / 255.0
             image = torch.from_numpy(image)[None,]
             if 'A' in i.getbands():
+                has_alpha = True
                 mask = np.array(i.getchannel('A')).astype(np.float32) / 255.0
                 mask = 1. - torch.from_numpy(mask)
+                if work is not None:
+                    work['alphaFrames'] += 1
             else:
                 mask = torch.zeros((64, 64), dtype=torch.float32, device="cpu")
             output_images.append(image.to(dtype=dtype))
             output_masks.append(mask.unsqueeze(0).to(dtype=dtype))
+            if work is not None:
+                work['selectedFrames'] += 1
 
         output_image = torch.cat(output_images, dim=0)
         output_mask = torch.cat(output_masks, dim=0)
 
-        comfy.execution_metrics.observe_shape('image_loaded', output_image)
-        return (output_image.to(device=device, dtype=dtype), output_mask.to(device=device, dtype=dtype))
+        if work is not None:
+            comfy.execution_metrics.emit('image_pillow_work', version=1, **work)
+        return output_image, output_mask, has_alpha
 
     @classmethod
     def IS_CHANGED(s, image):
@@ -1858,18 +1892,23 @@ class LoadImageMask(LoadImage):
         c = channel[0].upper()
 
         if c == 'A':
+            comfy.execution_metrics.observe_shape('image_mask_selected', mask_tensor, channel='alpha', mode='alpha_mask')
             return (mask_tensor,)
 
         channel_idx = {'R': 0, 'G': 1, 'B': 2}.get(c, 0)
 
         if channel_idx < image_tensor.shape[-1]:
-            return (image_tensor[..., channel_idx].clone(),)
+            with comfy.execution_metrics.measure('image_mask_prepare'):
+                selected = image_tensor[..., channel_idx].clone()
+            comfy.execution_metrics.observe_shape('image_mask_selected', selected, channel=('red', 'green', 'blue')[channel_idx], mode='channel_clone')
+            return (selected,)
         else:
             empty_mask = torch.zeros(
                 image_tensor.shape[:-1],
                 dtype=image_tensor.dtype,
                 device=image_tensor.device
             )
+            comfy.execution_metrics.observe_shape('image_mask_selected', empty_mask, channel=('red', 'green', 'blue')[channel_idx], mode='empty')
             return (empty_mask,)
 
     @classmethod

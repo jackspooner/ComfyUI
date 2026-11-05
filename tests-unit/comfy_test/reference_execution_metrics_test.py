@@ -36,6 +36,8 @@ def test_vae_reports_actual_cropped_input_without_changing_samples(monkeypatch, 
     torch.testing.assert_close(actual, expected)
     assert dict(events)['vae_processed_input'] == {'shape': (1, 3, 8, 12), 'tiled': False, 'tile_count_complete': not internal_chunks}
     assert dict(events)['vae_forward_attempt']['shape'] == (1, 3, 8, 12)
+    assert dict(events)['vae_encode_plan'] == dict(shape=(1, 3, 8, 12), tiled=False, forwards=1, batch_size=1,
+                                                 complete=not internal_chunks, precision='torch.float32', load_device='cpu', output_device='cpu')
     assert events[-1] == ('vae_forward_completed', {'tiled': False})
 
 
@@ -54,6 +56,7 @@ def test_standard_2d_vae_counts_real_tile_forwards_and_preserves_three_pass_blen
     actual = vae.encode_tiled_(torch.zeros(1, 3, 8, 8), tile_x=4, tile_y=4, overlap=0)
     torch.testing.assert_close(actual, torch.ones(1, 3, 8, 8))
     assert len(forwards) == 12
+    assert dict(events)['vae_encode_plan']['forwards'] == len(forwards)
     assert len([event for event, _ in events if event == 'vae_forward_attempt']) == len(forwards)
     assert len([event for event, _ in events if event == 'vae_forward_completed']) == len(forwards)
     execution_metrics.set_observer(lambda *_: (_ for _ in ()).throw(OSError('observer offline')))
@@ -70,7 +73,9 @@ def test_loaded_image_dimensions_and_vision_reuse_exclude_contents_and_paths(mon
     execution_metrics.set_observer(lambda event, facts: events.append((event, facts)))
     image, mask = nodes.LoadImage().load_image('private input')
     assert image is pixels and mask.shape == (2, 64, 64)
-    assert events == [('image_loaded', {'shape': (2, 10, 12, 3)})]
+    assert [event for event, _ in events] == ['image_source_decode', 'image_output_prepare', 'image_loaded']
+    assert events[-1] == ('image_loaded', {'shape': (2, 10, 12, 3), 'pipeline_version': 1, 'loader': 'pyav',
+                                        'mask_shape': (2, 64, 64), 'alpha': False, 'precision': 'torch.float32', 'device': 'cpu'})
     assert '/PRIVATE' not in str(events) and 'private input' not in str(events)
 
     class Visual(torch.nn.Module):

@@ -2549,6 +2549,317 @@
             "minLength": 1,
             "maxLength": 512
           }
+        },
+        "stageEstimates": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "comparisonPolicy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "totalStageCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "omittedStageCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "estimates": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "observationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "attemptId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "stageId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "sharedOperationId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "resource": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "hostId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      "gpuUuid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "instanceId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      "laneId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "hostId",
+                      "gpuUuid",
+                      "instanceId",
+                      "laneId"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "loading",
+                      "preparation",
+                      "encoding",
+                      "inference",
+                      "sampling",
+                      "decoding",
+                      "publication",
+                      "unknown"
+                    ]
+                  },
+                  "phase": {
+                    "enum": [
+                      "queued",
+                      "running",
+                      "succeeded",
+                      "failed",
+                      "cancelled",
+                      "unknown"
+                    ]
+                  },
+                  "reused": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "enum": [
+                      "available",
+                      "partial",
+                      "unavailable",
+                      "completed"
+                    ]
+                  },
+                  "measured": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "basis": {
+                        "enum": [
+                          "native_monotonic",
+                          "owner_monotonic",
+                          "legacy_provider_elapsed",
+                          "unknown"
+                        ]
+                      },
+                      "executionSeconds": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "basis",
+                      "executionSeconds"
+                    ]
+                  },
+                  "executionSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Forecast total stage execution seconds, excluding queue wait. Measured duration is separate."
+                  },
+                  "remainingExecutionSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Remaining execution work only; excludes queue wait and does not imply stage start or parent completion."
+                  },
+                  "range": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "executionSeconds": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "minItems": 2,
+                            "maxItems": 2
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "remainingExecutionSeconds": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "minItems": 2,
+                            "maxItems": 2
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "executionSeconds",
+                      "remainingExecutionSeconds"
+                    ]
+                  },
+                  "sampleCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 200,
+                    "description": "Usable comparable samples; empirical exact/related forecasts require at least five."
+                  },
+                  "basis": {
+                    "enum": [
+                      "exact",
+                      "related",
+                      "unavailable"
+                    ]
+                  },
+                  "remainingBasis": {
+                    "enum": [
+                      "queued_work",
+                      "elapsed",
+                      "sampling_progress",
+                      "completed",
+                      "unavailable"
+                    ]
+                  },
+                  "confidence": {
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low",
+                      "unknown"
+                    ]
+                  },
+                  "coverage": {
+                    "enum": [
+                      "complete",
+                      "partial",
+                      "unavailable"
+                    ]
+                  },
+                  "reasons": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    }
+                  }
+                },
+                "required": [
+                  "observationId",
+                  "attemptId",
+                  "stageId",
+                  "resource",
+                  "kind",
+                  "phase",
+                  "reused",
+                  "status",
+                  "measured",
+                  "executionSeconds",
+                  "remainingExecutionSeconds",
+                  "range",
+                  "sampleCount",
+                  "basis",
+                  "remainingBasis",
+                  "confidence",
+                  "coverage",
+                  "reasons"
+                ]
+              }
+            },
+            "coverage": {
+              "enum": [
+                "complete",
+                "partial",
+                "unavailable"
+              ]
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            }
+          },
+          "required": [
+            "version",
+            "comparisonPolicy",
+            "totalStageCount",
+            "omittedStageCount",
+            "estimates",
+            "coverage",
+            "reasons"
+          ]
         }
       },
       "required": [
@@ -2568,10 +2879,582 @@
         "coverage",
         "reasons"
       ]
+    },
+    "TimingStageEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "observationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "attemptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "stageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "sharedOperationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hostId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "gpuUuid": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "instanceId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "laneId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "required": [
+            "hostId",
+            "gpuUuid",
+            "instanceId",
+            "laneId"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "loading",
+            "preparation",
+            "encoding",
+            "inference",
+            "sampling",
+            "decoding",
+            "publication",
+            "unknown"
+          ]
+        },
+        "phase": {
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "reused": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "available",
+            "partial",
+            "unavailable",
+            "completed"
+          ]
+        },
+        "measured": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "basis": {
+              "enum": [
+                "native_monotonic",
+                "owner_monotonic",
+                "legacy_provider_elapsed",
+                "unknown"
+              ]
+            },
+            "executionSeconds": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "basis",
+            "executionSeconds"
+          ]
+        },
+        "executionSeconds": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Forecast total stage execution seconds, excluding queue wait. Measured duration is separate."
+        },
+        "remainingExecutionSeconds": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Remaining execution work only; excludes queue wait and does not imply stage start or parent completion."
+        },
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "executionSeconds": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "remainingExecutionSeconds": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "executionSeconds",
+            "remainingExecutionSeconds"
+          ]
+        },
+        "sampleCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200,
+          "description": "Usable comparable samples; empirical exact/related forecasts require at least five."
+        },
+        "basis": {
+          "enum": [
+            "exact",
+            "related",
+            "unavailable"
+          ]
+        },
+        "remainingBasis": {
+          "enum": [
+            "queued_work",
+            "elapsed",
+            "sampling_progress",
+            "completed",
+            "unavailable"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "unknown"
+          ]
+        },
+        "coverage": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      },
+      "required": [
+        "observationId",
+        "attemptId",
+        "stageId",
+        "resource",
+        "kind",
+        "phase",
+        "reused",
+        "status",
+        "measured",
+        "executionSeconds",
+        "remainingExecutionSeconds",
+        "range",
+        "sampleCount",
+        "basis",
+        "remainingBasis",
+        "confidence",
+        "coverage",
+        "reasons"
+      ]
+    },
+    "TimingStageEstimates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "comparisonPolicy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "totalStageCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "omittedStageCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "estimates": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "observationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "attemptId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "stageId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "sharedOperationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "hostId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "gpuUuid": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "instanceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "laneId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "hostId",
+                  "gpuUuid",
+                  "instanceId",
+                  "laneId"
+                ]
+              },
+              "kind": {
+                "enum": [
+                  "loading",
+                  "preparation",
+                  "encoding",
+                  "inference",
+                  "sampling",
+                  "decoding",
+                  "publication",
+                  "unknown"
+                ]
+              },
+              "phase": {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled",
+                  "unknown"
+                ]
+              },
+              "reused": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "available",
+                  "partial",
+                  "unavailable",
+                  "completed"
+                ]
+              },
+              "measured": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "basis": {
+                    "enum": [
+                      "native_monotonic",
+                      "owner_monotonic",
+                      "legacy_provider_elapsed",
+                      "unknown"
+                    ]
+                  },
+                  "executionSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "basis",
+                  "executionSeconds"
+                ]
+              },
+              "executionSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Forecast total stage execution seconds, excluding queue wait. Measured duration is separate."
+              },
+              "remainingExecutionSeconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Remaining execution work only; excludes queue wait and does not imply stage start or parent completion."
+              },
+              "range": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "executionSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "remainingExecutionSeconds": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "executionSeconds",
+                  "remainingExecutionSeconds"
+                ]
+              },
+              "sampleCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200,
+                "description": "Usable comparable samples; empirical exact/related forecasts require at least five."
+              },
+              "basis": {
+                "enum": [
+                  "exact",
+                  "related",
+                  "unavailable"
+                ]
+              },
+              "remainingBasis": {
+                "enum": [
+                  "queued_work",
+                  "elapsed",
+                  "sampling_progress",
+                  "completed",
+                  "unavailable"
+                ]
+              },
+              "confidence": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "unknown"
+                ]
+              },
+              "coverage": {
+                "enum": [
+                  "complete",
+                  "partial",
+                  "unavailable"
+                ]
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              }
+            },
+            "required": [
+              "observationId",
+              "attemptId",
+              "stageId",
+              "resource",
+              "kind",
+              "phase",
+              "reused",
+              "status",
+              "measured",
+              "executionSeconds",
+              "remainingExecutionSeconds",
+              "range",
+              "sampleCount",
+              "basis",
+              "remainingBasis",
+              "confidence",
+              "coverage",
+              "reasons"
+            ]
+          }
+        },
+        "coverage": {
+          "enum": [
+            "complete",
+            "partial",
+            "unavailable"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      },
+      "required": [
+        "version",
+        "comparisonPolicy",
+        "totalStageCount",
+        "omittedStageCount",
+        "estimates",
+        "coverage",
+        "reasons"
+      ]
     }
   },
   "x-source": {
     "repository": "https://github.com/jackspooner/router-contracts",
-    "commit": "cf0f102c4b6c3cfe0855be183f112347a8974f37"
+    "commit": "b98845670af0e13016561c49f5e23b0b1513d84c"
   }
 }
