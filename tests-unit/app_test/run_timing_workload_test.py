@@ -18,25 +18,32 @@ def test_composite_graph_survives_acceptance_and_nested_metrics_keep_execution_c
     from comfy_execution.utils import CurrentNodeContext, get_executing_context
     expanded = {'composite.sample': graph()['sample']}
     expanded['composite.sample']['inputs'] = {'steps': 2}
-    resolver = lambda *_: {'workload': run_timing.workload(expanded), 'stageGraph': expanded,
-                          'stageMetadata': {'composite.sample': {'sharedOperationId': 'shared-sample'}}}
+    ready = [False]
+    def resolver(*_):
+        if not ready[0]:
+            raise ValueError('bounded selection has not been saved')
+        return {'workload': run_timing.workload(expanded), 'stageGraph': expanded,
+                'stageMetadata': {'composite.sample': {'sharedOperationId': 'shared-sample'}}}
     now = [0.0]
     store = RunTimingStore(str(tmp_path / 'timing.sqlite'), now=lambda: now[0])
     item = (1, 'prompt', {'outer': {'class_type': 'UnknownComposite', 'inputs': {}}}, {}, ['outer'])
     with patch.object(run_timing, 'WORKLOAD_RESOLVERS', [resolver]):
         store.event('accepted', item)
-    store.event('started', item)
-    attach_runtime_metrics(SimpleNamespace(timing=store, mutex=Lock()))
-    try:
+        store.event('started', item)
+        attach_runtime_metrics(SimpleNamespace(timing=store, mutex=Lock(), currently_running={0: item}))
+        ready[0] = True
         with CurrentNodeContext('prompt', 'outer'):
             with execution_metrics.stage_scope('composite.sample', 'KSampler', {'steps': 2}):
                 assert get_executing_context().node_id == 'outer'
                 now[0] = 3
                 execution_metrics.emit('noise_evaluation', branches=1)
+    try:
         record = store.page('0', 100, [], [])['observations'][-1]
         assert [stage['id'] for stage in record['stages']] == ['composite.sample']
         stage = record['stages'][0]
         assert stage['sharedOperationId'] == 'shared-sample'
+        assert stage['workload']['resolved']['steps']['availableAt'] == 'execution_start'
+        assert 'workload_resolution_unavailable' not in record['coverageReasons']
         assert stage['durationSeconds'] == 3 and stage['phase'] == 'succeeded'
         assert stage['workload']['measurements']['noiseEvaluations']['value'] == 1
         with CurrentNodeContext('prompt', 'outer'):
