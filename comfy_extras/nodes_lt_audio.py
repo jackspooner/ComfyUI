@@ -84,12 +84,12 @@ class LTXVAudioVAEDecode(io.ComfyNode):
         comfy.execution_metrics.observe_shape('audio_vae_decode_input', audio_latent, layout='bctf',
                                               tiled=False, normalize=False)
         audio = audio_vae.decode(audio_latent).movedim(-1, 1).to(audio_latent.device)
-        output_audio_sample_rate = audio_vae.first_stage_model.output_sample_rate
-        comfy.execution_metrics.observe_shape('audio_decoded', audio, sample_rate=int(output_audio_sample_rate))
+        output_audio_sample_rate = int(audio_vae.first_stage_model.output_sample_rate)
+        comfy.execution_metrics.observe_shape('audio_decoded', audio, sample_rate=output_audio_sample_rate)
         return io.NodeOutput(
             {
                 "waveform": audio,
-                "sample_rate": int(output_audio_sample_rate),
+                "sample_rate": output_audio_sample_rate,
             }
         )
 
