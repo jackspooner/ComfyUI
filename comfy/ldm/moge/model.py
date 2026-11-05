@@ -17,6 +17,7 @@ import comfy.ops
 import comfy.model_management
 import comfy.model_patcher
 import comfy.storage
+from comfy import execution_metrics
 
 from comfy.image_encoders.dino2 import Dinov2Model
 
@@ -73,6 +74,7 @@ class MoGeModelV1(nn.Module):
         x = F.interpolate(image, (rh, rw), mode="bicubic", align_corners=False, antialias=True)
         x = (x - comfy.ops.cast_to_input(self.image_mean, x, copy=False)) / comfy.ops.cast_to_input(self.image_std, x, copy=False)
         x14 = F.interpolate(x, (rh // 14 * 14, rw // 14 * 14), mode="bilinear", align_corners=False, antialias=True)
+        execution_metrics.observe_shape('moge_processed_input', x14, head_shape=tuple(x.shape))
 
         n_layers = len(self.backbone.encoder.layer)
         indices = list(range(n_layers - self.intermediate_layers, n_layers))
@@ -247,6 +249,8 @@ class MoGeModelV3(MoGeModelV2):
         batch = torch.arange(B, device=device).view(B, 1, 1).expand(B, H, W)
         coords = torch.stack([batch, rows, cols, z_bin], dim=-1).reshape(-1, 4).to(torch.int32)
         spatial = (H, W, int(z_bin.amax()) + 1)
+        execution_metrics.emit('moge_refinement_plan', points=coords.shape[0], spatial=spatial,
+                               conditioning_shape=tuple(conditioning.shape))
 
         residual = self.refiner(coord.reshape(-1, 3), coords, spatial, conditioning)
         return logz + residual.reshape(B, H, W)
@@ -358,7 +362,8 @@ class MoGeModel:
               apply_metric_scale: bool = True, refine_steps: int = 3
               ) -> Dict[str, torch.Tensor]:
         """Run a single MoGe forward + post-process pass. image is (B, 3, H, W) in [0, 1]."""
-        comfy.model_management.load_model_gpu(self.patcher)
+        with execution_metrics.measure('moge_load'):
+            comfy.model_management.load_model_gpu(self.patcher)
 
         # Compute is fp32 or fp16 only: bf16 would cost 4x the error at the same speed
         compute_dtype = self.dtype if self.dtype in (torch.float32, torch.float16) else torch.float16
@@ -373,7 +378,14 @@ class MoGeModel:
 
         # refine_steps only exists on v3; v1/v2 have no refiner to run.
         extra = {"refine_steps": refine_steps} if self.version == "v3" else {}
-        out = self.model.forward(image, num_tokens=num_tokens, **extra)
+        execution_metrics.observe_shape('moge_model_plan', image, version=self.version, num_tokens=num_tokens,
+            refine_steps=refine_steps if self.version == 'v3' else 0, precision=str(compute_dtype),
+            activation_precision=str(activation_dtype), load_device=str(self.load_device),
+            offload_device=str(self.patcher.offload_device), memory_strategy='dynamic' if self.patcher.is_dynamic() else 'standard',
+            force_projection=force_projection,
+            apply_mask=apply_mask, apply_metric_scale=apply_metric_scale, fov_x=fov_x)
+        with execution_metrics.measure('moge_forward'):
+            out = self.model.forward(image, num_tokens=num_tokens, **extra)
         points = out["points"].float()  # recover_focal_shift goes through scipy on CPU; needs fp32.
         mask_binary = out["mask"] > self.mask_threshold
         normal = out.get("normal")

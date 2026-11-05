@@ -1,8 +1,9 @@
 """Explicit, prompt-free workload adapters; no node execution or GPU queries."""
 import math
 from app.run_timing_audio import waveform_features
+from app.run_timing_vision import MOGE_NODES, MOGE_CONTROLS
 
-EXTRACTOR_VERSION = 'comfy-explicit-5'
+EXTRACTOR_VERSION = 'comfy-explicit-6'
 MEASUREMENT_ONLY_REASONS = frozenset((
     'audio_output_unmeasured', 'audio_output_metadata_unavailable', 'stage_completion_unobserved',
 ))
@@ -30,6 +31,7 @@ NODE_STAGES = {
     'VAEDecode': 'decoding', 'VAEDecodeTiled': 'decoding', 'SaveImage': 'publication', 'PreviewImage': 'publication',
     'TextGenerate': 'inference', 'TextGenerateLTX2Prompt': 'inference',
     **AUDIO_NODES,
+    **MOGE_NODES,
 }
 CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_step', 'end_at_step',
             'add_noise', 'return_with_leftover_noise', 'width', 'height', 'length', 'batch_size',
@@ -134,8 +136,14 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if stage_reasons:
             reasons.add('unsupported_workload_adapter')
         node_facts = {}
-        for key in (CONTROLS & inputs.keys()) if stage_kind != 'unknown' else ():
+        controls = MOGE_CONTROLS if kind in MOGE_NODES else CONTROLS
+        for key in (controls & inputs.keys()) if stage_kind != 'unknown' else ():
             value = scalar(inputs[key])
+            if kind in MOGE_NODES:
+                # Native runtime plans supply effective work; v1/v2, for example,
+                # ignore requested refinement passes. Keep those controls audit-only.
+                requested[node_id + '.' + key] = value if type(value) in (bool, int, float) else None
+                continue
             if value is None:
                 stage_reasons.append('linked_control_unresolved')
                 reasons.add('linked_control_unresolved')
@@ -143,11 +151,13 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 node_facts[key] = fact(value, kind + '.' + key)
                 requested[node_id + '.' + key] = value
         model_keys = ('ckpt_name', 'unet_name', 'clip_name', 'clip_name1', 'clip_name2', 'clip_name3', 'vae_name', 'lora_name', 'control_net_name')
+        if kind == 'LoadMoGeModel':
+            model_keys = ('model_name',)
         for key in model_keys if stage_kind != 'unknown' else ():
             value = inputs.get(key)
             if not isinstance(value, str):
                 continue
-            identity = file_identity(key, value)
+            identity = file_identity('moge_model_name' if kind == 'LoadMoGeModel' else key, value)
             component_kind = 'lora' if key == 'lora_name' else 'controlnet' if key == 'control_net_name' else 'model'
             if identity is None:
                 stage_reasons.append('component_identity_unresolved')
@@ -181,6 +191,15 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             components.append({'kind': 'reference', 'identity': None, 'role': 'audio_input', 'order': order,
                                'features': {'sourceStage': fact(node_id, kind)}})
             stage_reasons.append('audio_source_workload_unmeasured')
+        if kind in ('MoGeInference', 'MoGePanoramaInference'):
+            source = inputs.get('image')
+            features = {'sourceStage': fact(source[0], kind)} if isinstance(source, list) and len(source) == 2 and isinstance(source[0], str) and source[0] in graph else {}
+            components.append({'kind': 'reference', 'identity': None, 'role': node_id + ':image', 'order': order, 'features': features})
+            stage_reasons.append('moge_workload_unmeasured')
+            if kind == 'MoGePanoramaInference':
+                stage_reasons.append('moge_panorama_merge_work_unmeasured')
+        if kind == 'SaveMoGeDepthPNG':
+            stage_reasons.append('moge_publication_input_unmeasured')
         if kind == 'EmptyLatentAudio':
             shape = latent_shape(node_id)
             node_facts.update({key: fact(value, kind) for key, value in shape.items()})
@@ -215,7 +234,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         input_reasons = workload_reasons(stage_reasons)
         reasons.update(input_reasons)
         stage_workload = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
-                          'profile': 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
+                          'profile': 'vision' if kind in MOGE_NODES else 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
                                      next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
                           'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                           'modelIdentity': None, 'requested': {}, 'resolved': node_facts, 'measurements': {},
@@ -227,7 +246,8 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
     model_identity = digest(base_models) if base_models and all(identity for _, identity in base_models) else None
     evidence = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
                 'profile': next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else
-                           'audio' if not sampling_profiles and any(node_kind(node) in AUDIO_NODES for node in graph.values()) else 'unknown',
+                           'audio' if not sampling_profiles and any(node_kind(node) in AUDIO_NODES for node in graph.values()) else
+                           'vision' if not sampling_profiles and any(node_kind(node) in MOGE_NODES for node in graph.values()) else 'unknown',
                 'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                 'modelIdentity': model_identity, 'requested': requested, 'resolved': resolved, 'measurements': {},
                 'components': components, 'complete': not reasons, 'reasons': sorted(reasons)}
@@ -243,9 +263,12 @@ def resolved_inputs(kind, inputs, observed_at):
         return {'value': value, 'availableAt': 'execution_start', 'observedAt': observed_at, 'source': kind + '.resolved_inputs'}
     facts = {key: fact(value) for key, value in inputs.items() if key in CONTROLS
              and type(value) in (str, bool, int, float) and (not isinstance(value, float) or math.isfinite(value))}
+    if kind in MOGE_NODES:
+        facts = {}
     references = []
     image_inputs = {'VAEEncode': ('pixels',), 'VAEEncodeTiled': ('pixels',), 'VAEEncodeForInpaint': ('pixels', 'mask'),
-                    'ControlNetApply': ('image',), 'ControlNetApplyAdvanced': ('image',)}
+                    'ControlNetApply': ('image',), 'ControlNetApplyAdvanced': ('image',),
+                    'MoGeInference': ('image',), 'MoGePanoramaInference': ('image',)}
     for key in image_inputs.get(kind, ()):
         shape = getattr(inputs.get(key), 'shape', ())
         if len(shape) not in (3, 4) or not all(type(value) is int and value > 0 for value in shape):
