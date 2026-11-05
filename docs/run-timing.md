@@ -143,6 +143,8 @@ tests-unit/app_test/run_timing_audio_test.py
 tests-unit/comfy_test/audio_execution_metrics_test.py
 tests-unit/app_test/run_timing_av_test.py
 tests-unit/comfy_test/av_preparation_execution_metrics_test.py
+tests-unit/app_test/run_timing_h3_allocation_test.py
+tests-unit/comfy_test/h3_allocation_execution_metrics_test.py
 tests-unit/comfy_test/vision_features_test.py -q`
 using the prepared interpreter. Fixtures use tiny CPU tensors and mocked sampling;
 they do not establish real-model or performance acceptance.
@@ -293,6 +295,21 @@ still prevent stage populations from qualifying. Policy 6 consumes these facts
 through its existing exact dependency comparison. Source/preparation work remains
 exact there, so different completed fitting inputs may still split equal final
 sampling shapes; no broader equivalence or accuracy claim is implied.
+
+`EmptyMiniMaxH3LatentAV` has an explicit native allocation adapter. Requested
+width/height/length stay audit-only; the native temporal plan supplies its computed
+frame count, video tokens, audio time length and rates. The allocation plan records
+the two exact zero-allocation shapes before execution, preserving the original
+device-selection order and default dtype. CPU monotonic allocation timing does
+not synchronize GPU kernels. Actual dtype/device become live execution facts;
+output shapes remain completion-only verification, not a substitute for the plan.
+Repeated/missing/mismatched plans, failed allocations, output probe failures and
+cached allocations without shape proof retain gaps. Shared allocator observations
+inside other H3 nodes cannot complete their unknown conditioning/reference work.
+Requests that round to the same effective grid/canvas can share exact history under
+the existing policy 6; changed effective work remains separate. CPU fixtures check
+native rounding, allocation/call parity, both failure positions and propagation
+to independent stage forecasts. They do not establish model inference or accuracy.
 
 Native audio VAE encode hooks observe actual post-resample B/C/sample dimensions
 as live facts, preserving original-rate input metadata separately. H3's reference
