@@ -212,7 +212,10 @@ can correlate native expansion IDs and optional nested-call telemetry scopes wit
 replacing the executor's context. Joint AV stream shapes stay separate.
 Standard LoRA loaders additionally distinguish file reuse/loading and CPU patch
 preparation, retaining supported parsed ranks as live component evidence. See
-[timing coverage and limitations](docs/run-timing.md).
+[timing coverage and limitations](docs/run-timing.md). Reference observations include
+loaded-image dimensions, post-crop VAE encode shapes, actual standard 2D VAE tile
+forwards, conditioning output positions and native vision-feature reuse. Internal
+tilers and other reference paths retain explicit coverage limitations.
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
 [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
