@@ -19,6 +19,7 @@ from app.run_timing_workload import describe, resolved_inputs
 from app.run_timing_metrics import apply_metrics
 from app.run_timing_references import observe_reference_metrics
 from app.run_timing_controls import observe_control_metrics
+from app.run_timing_text import observe_text_metrics
 
 
 def utc():
@@ -452,6 +453,10 @@ class RunTimingStore:
                 pass
             elif observe_reference_metrics(state, event, facts):
                 pass
+            elif observe_text_metrics(state, event, facts):
+                if event == 'text_generation_plan' or event == 'text_generation_progress' and self.now() - state.get('last_text_snapshot', float('-inf')) >= 5:
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+                    state['last_text_snapshot'] = self.now()
             elif event in ('lora_file_load', 'lora_patch_preparation'):
                 seconds = facts.get('seconds')
                 if type(seconds) in (int, float) and math.isfinite(seconds) and seconds >= 0:
