@@ -5,6 +5,7 @@ from enum import Enum
 from abc import ABC
 from tqdm import tqdm
 from typing import TYPE_CHECKING
+import logging
 if TYPE_CHECKING:
     from comfy_execution.graph import DynamicPrompt
     from comfy_execution.server_protocol import ExecutionServer
@@ -65,6 +66,10 @@ class ProgressHandler(ABC):
 
     def reset(self):
         """Called when the progress registry is reset"""
+        pass
+
+    def inputs_handler(self, node_id: str, inputs: dict, prompt_id: str):
+        """Observe resolved arguments without retaining or modifying their values."""
         pass
 
     def enable(self):
@@ -285,6 +290,15 @@ class ProgressRegistry:
         for handler in self.handlers.values():
             if handler.enabled:
                 handler.start_handler(node_id, entry, self.prompt_id)
+
+    def inputs_ready(self, node_id: str, inputs: dict) -> None:
+        for handler in self.handlers.values():
+            callback = getattr(handler, 'inputs_handler', None)
+            if handler.enabled and callback is not None:
+                try:
+                    callback(node_id, inputs, self.prompt_id)
+                except Exception:
+                    logging.debug('Resolved-input observer unavailable; execution continues')
 
     def update_progress(
         self, node_id: str, value: float, max_value: float, image: PreviewImageTuple | None = None

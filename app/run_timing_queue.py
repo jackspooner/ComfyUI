@@ -58,6 +58,8 @@ def create_timed_queue(server, maintenance_store, filename):
     queue = TimedMaintenanceQueue(server, maintenance_store) if maintenance_store else TimedPromptQueue(server)
     try:
         queue.timing = RunTimingStore(filename, gpu_uuid=physical_gpu_uuid())
+        from app.run_timing_metrics import attach_runtime_metrics
+        attach_runtime_metrics(queue)
     except Exception:
         logging.warning('Run timing store unavailable at startup; queue remains usable', exc_info=False)
         queue.timing = None

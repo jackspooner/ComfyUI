@@ -37,3 +37,67 @@ MediaTools owns duration learning and queue forecasts. These observations do not
 prove queue completeness across other hosts, predict arbitrary future submissions,
 or authorize service maintenance. Validate with the CPU run_timing_test.py suite;
 live behavior requires activation of this commit on the serving instance.
+
+## Expanded workload and stage evidence
+
+Optional `workload.evidence` version 2 separates requested settings, resolved facts
+and completed measurements. Facts carry source, observation time and availability;
+full implementation provenance is separate from explicit performance compatibility.
+This adapter does not declare compatibility across changed implementations.
+
+`app/run_timing_workload.py` uses explicit native node adapters. It resolves scalar
+primitive links and native empty image/LTX/Hunyuan latent shapes, preserving each
+sampling pass instead of adding unrelated widths/steps. Ordered native LoRA entries
+retain strengths, bypass and application mode; ControlNet intervals remain settings,
+not an invented count of active model evaluations. Selection identities are hashed.
+Unknown custom nodes remain visible with `unsupported_workload_adapter`.
+
+Optional `stages` preserve graph dependencies and the physical resource. The existing
+progress registry supplies start/finish offsets and monotonic elapsed durations.
+Cached nodes report reuse and zero executed duration. Overlapping stage durations
+must not be added to replace whole-run elapsed time. Node spans can contain dynamic
+dependencies; completion without a matching observed start is not measured work.
+Progress writes are bounded to one per node per five seconds plus transitions.
+Shared registry percentages can mix loading and sampling, so they remain unreliable
+`node_units` and cannot justify a remaining-time estimate.
+
+Native scalar hooks count noise evaluations, model forward calls/elements and
+conditional/unconditional branch work. The standard KSampler adapter observes the
+actual latent shape after native correction, model dtype, dynamic/standard memory
+strategy and load/offload devices. Explicit Euler plans describe their resolved
+noise-evaluation count; unsupported samplers/CFG hooks retain coverage reasons.
+Repeated sampling within one node remains incomplete. Counts are CPU observations,
+not synchronized GPU kernel timings. GPU worker-thread observations without a
+native executing context remain unattributed. No device synchronization is added.
+
+The native sampling callback provides separate reliable `sampling_steps`, preserving
+the original preview callback and its result. Bounded progress curves retain up to
+128 monotonic stage offsets at the five-second cadence for empirical residuals.
+These are measured steps, not a linear extrapolation. Sampling measurements remain
+separate from submission/start facts; completion-only values must not define an
+in-flight target's workload population. Telemetry construction/observer errors
+must leave inference and callbacks unchanged.
+
+Expanded evidence explicitly reports missing processed references, implicit
+dimensions and unsupported nodes. LoRA ranks/patching durations, control active
+steps and measured GPU transfers/residency are not yet provided by this adapter.
+An expanded envelope is not a claim of complete coverage. The collector/forecast
+consumer must support this additive contract before producer activation; older
+strict readers may reject the extra fields. No source change alone activates it.
+Focused CPU verification: `python -m pytest tests-unit/app_test/run_timing_test.py
+tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py -q`
+using the prepared interpreter. Fixtures use tiny CPU tensors and mocked sampling;
+they do not establish real-model or performance acceptance.
+For fixture runs while the serving GPU is occupied, select CPU before importing
+ComfyUI: invoke pytest through `python -c 'import comfy.cli_args;
+comfy.cli_args.args.cpu=True; import pytest; raise SystemExit(pytest.main([...]))'`,
+using the listed test paths in place of `...`. This avoids ComfyUI's import-time
+GPU probe and does not change the serving process.
+
+Resolved node-input observers attribute processed VAE/control image and mask
+dimensions, batch sizes and encoded conditioning-token shapes without retaining
+tensor contents or source paths. Only explicit adapters observe arguments; unknown
+nodes do not acquire workload coverage from input names. Internal crops/tiles and
+reference encoders still need their own measurements. Optional progress handlers
+remain compatible with older implementations, and observer failures cannot stop
+node execution.
