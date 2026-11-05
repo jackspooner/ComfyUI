@@ -33,6 +33,22 @@ def waveform_features(shape, sample_rate):
             'sampleRate': sample_rate, 'durationSeconds': duration}
 
 
+def joint_av_features(shapes, layout):
+    """Native AV models place video first and audio second; unknown layouts stay unknown."""
+    if not isinstance(shapes, (tuple, list)) or len(shapes) != 2 or layout not in ('bctf', 'bcat'):
+        return None
+    video, audio = shapes
+    if (not isinstance(video, (tuple, list)) or len(video) != 5
+            or not all(type(value) is int and value > 0 for value in video)):
+        return None
+    audio = audio_latent_features(audio, layout)
+    if audio is None or audio['batch'] != video[0]:
+        return None
+    return {'jointAV.layout': 'video_audio', 'batch': video[0], 'latentChannels': video[1],
+            'latentFrames': video[2], 'latentHeight': video[3], 'latentWidth': video[4],
+            **{'jointAV.audio.' + key: value for key, value in audio.items()}}
+
+
 def observe_audio_metrics(state, event, facts):
     events = {'audio_loaded': ('audioSource', 'live'),
               'audio_vae_encode_input': ('audioProcessed', 'live'),

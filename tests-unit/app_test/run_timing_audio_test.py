@@ -100,6 +100,75 @@ def test_audio_reference_loader_does_not_reclassify_text_inference_as_audio():
     assert stages[1]['workload']['profile'] == 'text'
 
 
+@pytest.mark.parametrize('layout,audio_shape', [('bctf', (2, 8, 12, 16)), ('bcat', (2, 32, 2, 12))])
+def test_declared_joint_sampler_keeps_both_streams_and_reclassifies_actual_work(tmp_path, layout, audio_shape):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'sample': {'class_type': 'KSampler', 'inputs': {}}}, {}, ['sample'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'sample', 'started')
+    plan = dict(shapes=[(2, 128, 3, 4, 5), audio_shape], shape=None, audio_layout=layout,
+                stream_layout='video_audio', evaluations=2, branches=1, precision='torch.bfloat16')
+    store.safe_metric('prompt', 'sample', 'sampling_plan', plan)
+    record = latest(store)
+    work = record['stages'][0]['workload']
+    assert work['profile'] == record['workload']['evidence']['profile'] == 'diffusion_video'
+    assert work['complete'] and work['reasons'] == []
+    facts = work['resolved']
+    assert facts['jointAV.layout']['value'] == 'video_audio'
+    assert facts['latentChannels']['value'] == 128 and facts['latentFrames']['value'] == 3
+    assert facts['jointAV.audio.latentChannels']['value'] == audio_shape[1]
+    assert facts['jointAV.audio.audioLatentLayout']['value'] == layout
+    assert facts['jointAV.audio.batch']['value'] == 2
+    assert all(fact['availableAt'] == 'execution_start' for fact in facts.values())
+    assert not any(key.startswith('stream.') for key in facts)
+    for _ in range(2):
+        store.safe_metric('prompt', 'sample', 'noise_evaluation', {'branches': 1})
+    store.safe_stage('prompt', 'sample', 'finished')
+    assert latest(store)['stages'][0]['workload']['complete']
+    # A later invocation is never folded into the first workload/progress claim.
+    store.safe_metric('prompt', 'sample', 'sampling_plan', plan)
+    assert 'multiple_sampling_invocations' in latest(store)['stages'][0]['workload']['reasons']
+
+
+@pytest.mark.parametrize('layout,stream_layout,shapes', [
+    (None, None, [(1, 128, 3, 4, 5), (1, 8, 12, 16)]),
+    ('bctf', None, [(1, 128, 3, 4, 5), (1, 8, 12, 16)]),
+    ('bctf', 'video_audio', [(1, 128, 3, 4, 5), (2, 8, 12, 16)]),
+    ('bctf', 'video_audio', [(1, 8, 12, 16), (1, 128, 3, 4, 5)]),
+    ('bcat', 'video_audio', [(1, 24, 3, 4, 5), (1, 32, 3, 12)]),
+    ('bctf', 'video_audio', [(1, 128, 3, 4, 5), (1, 8, 12, 16), (1, 8, 12, 16)]),
+    ('custom', 'video_audio', [(1, 128, 3, 4, 5), (1, 8, 12, 16)]),
+])
+def test_joint_sampler_unknown_order_format_and_mismatched_shapes_keep_gaps(tmp_path, layout, stream_layout, shapes):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'sample': {'class_type': 'KSampler', 'inputs': {}}}, {}, ['sample'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'sample', 'started')
+    store.safe_metric('prompt', 'sample', 'sampling_plan', dict(shapes=shapes, shape=None,
+        audio_layout=layout, stream_layout=stream_layout, evaluations=2, branches=1, precision='torch.bfloat16'))
+    work = latest(store)['stages'][0]['workload']
+    assert not work['complete'] and 'joint_stream_comparison_unsupported' in work['reasons']
+    assert 'jointAV.layout' not in work['resolved']
+
+
+def test_native_joint_profile_does_not_override_unrelated_sampling_modality(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    graph = {'image': {'class_type': 'KSampler', 'inputs': {}},
+             'joint': {'class_type': 'KSampler', 'inputs': {}}}
+    item = (1, 'prompt', graph, {}, ['image', 'joint'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'joint', 'started')
+    store.safe_metric('prompt', 'joint', 'sampling_plan', dict(shapes=[(1, 128, 3, 4, 5), (1, 8, 12, 16)],
+        audio_layout='bctf', stream_layout='video_audio', evaluations=2, branches=1, precision='torch.bfloat16'))
+    record = latest(store)
+    assert record['stages'][0]['workload']['profile'] == 'diffusion_image'
+    assert record['stages'][1]['workload']['profile'] == 'diffusion_video'
+    assert record['workload']['evidence']['profile'] == 'unknown'
+
+
 def test_prepared_ltx_audio_shapes_are_live_and_repetition_invalidates_once(tmp_path):
     store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
     item = (1, 'prompt', {'latent': {'class_type': 'LTXVEmptyLatentAudio', 'inputs': {}}}, {}, ['latent'])
