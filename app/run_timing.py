@@ -21,6 +21,7 @@ from app.run_timing_references import observe_reference_metrics
 from app.run_timing_controls import observe_control_metrics
 from app.run_timing_text import observe_text_metrics
 from app.run_timing_audio import observe_audio_metrics, audio_latent_features, joint_av_features
+from app.run_timing_av import observe_av_metrics
 from app.run_timing_ltx_audio import observe_ltx_audio_metrics
 from app.run_timing_vision import observe_moge_metrics
 from app.run_timing_stream import TimingStreamHub
@@ -502,6 +503,12 @@ class RunTimingStore:
                     self.control_origins.setdefault(prompt_id, {})[binding] = node_id
             elif observe_control_metrics(state, event, facts, self.control_origins.get(prompt_id, {}).get(facts.get('binding'))):
                 pass
+            elif observe_av_metrics(state, event, facts):
+                reasons = frozenset(state['reasons'])
+                if (event in ('av_concat_plan', 'av_separate_plan') and state.get('av_plan_count') == 1
+                        or reasons != state.get('av_reason_snapshot', frozenset())):
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+                state['av_reason_snapshot'] = reasons
             elif observe_reference_metrics(state, event, facts):
                 snapshots = state.setdefault('image_snapshots', set())
                 repeated = {'image_loaded': 'image_outputs', 'image_mask_selected': 'image_mask_outputs',
