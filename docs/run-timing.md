@@ -124,7 +124,9 @@ temporal truncation, conditioning output positions, vision-forward attempts and
 verified feature-cache hits. Each VAE invocation retains its own axis shapes;
 positions are conditioning output lengths, not tokenizer input counts. Standard
 2D tiled VAE encoding counts actual attempted and completed forwards across its
-existing three passes; OOM fallback is separate. Internal model tilers and 1D/3D
+existing three passes; OOM fallback is separate. An OOM fallback changes the
+observed tiled regime as a live fact, without backdating
+it into the initial execution-start snapshot. Internal model tilers and 1D/3D
 tilers report incomplete tile counting. Counts accumulate in memory until existing
 stage snapshots, without per-tile database writes or device synchronization.
 These observations do not remove broad reference-coverage reasons or establish

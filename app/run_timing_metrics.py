@@ -12,7 +12,7 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     if workload is None or evidence is None:
         return
     for key, value in state.get('resolved', {}).items():
-        workload['resolved'][key] = fact(value, 'execution_start', key)
+        workload['resolved'][key] = fact(value, state.get('availability', {}).get(key, 'execution_start'), key)
         evidence['resolved'][stage['id'] + '.' + key] = workload['resolved'][key]
     for key, value in state.get('measurements', {}).items():
         workload['measurements'][key] = fact(value, 'completion' if completed else 'live', key)
