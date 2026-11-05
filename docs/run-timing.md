@@ -84,13 +84,20 @@ in-flight target's workload population. Telemetry construction/observer errors
 must leave inference and callbacks unchanged.
 
 Expanded evidence explicitly reports missing processed references, implicit
-dimensions and unsupported nodes. LoRA ranks/patching durations, control active
-steps and measured GPU transfers/residency are not yet provided by this adapter.
+dimensions and unsupported nodes. Standard LoRA loaders report actual file-cache
+reuse, file-load time and CPU patch-preparation time separately. Native parsed
+LoRAAdapter tensors provide min/max rank and supported-rank coverage without reading
+tensor values. These live component facts are separate from requested strengths
+and zero-strength bypass; completed durations never become submission/start facts.
+Patch preparation is registration, not later GPU weight materialization or kernel
+time. Other adapter formats may lack ranks. Control active steps and measured GPU
+transfers/residency are not yet provided by this adapter.
 An expanded envelope is not a claim of complete coverage. The collector/forecast
 consumer must support this additive contract before producer activation; older
 strict readers may reject the extra fields. No source change alone activates it.
 Focused CPU verification: `python -m pytest tests-unit/app_test/run_timing_test.py
-tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py -q`
+tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py
+tests-unit/comfy_test/lora_execution_metrics_test.py -q`
 using the prepared interpreter. Fixtures use tiny CPU tensors and mocked sampling;
 they do not establish real-model or performance acceptance.
 For fixture runs while the serving GPU is occupied, select CPU before importing

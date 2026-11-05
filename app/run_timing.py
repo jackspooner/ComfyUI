@@ -431,7 +431,34 @@ class RunTimingStore:
                 return
             state = self.metric_states.setdefault((prompt_id, node_id), {'resolved': {}, 'measurements': {}, 'reasons': []})
             measurements = state['measurements']
-            if event == 'sampling_plan':
+            if event in ('lora_file_load', 'lora_patch_preparation'):
+                seconds = facts.get('seconds')
+                if type(seconds) in (int, float) and math.isfinite(seconds) and seconds >= 0:
+                    name = 'loraFileLoadSeconds' if event == 'lora_file_load' else 'loraPatchPreparationSeconds'
+                    measurements[name] = measurements.get(name, 0) + seconds
+                    state.setdefault('sources', {})[name] = 'native_lora'
+                    state.setdefault('live', {})[name + '.succeeded'] = facts.get('succeeded') is True
+            elif event in ('lora_bypass', 'lora_file_cache', 'lora_patch_metadata', 'lora_patch_registered', 'lora_metadata_unavailable'):
+                live = state.setdefault('live', {})
+                if event == 'lora_bypass':
+                    live['bypassed'] = True
+                elif event == 'lora_file_cache':
+                    live['fileReused'] = facts.get('reused') is True
+                elif event == 'lora_patch_metadata':
+                    for source, target in (('parsed_patches', 'parsedPatchCount'), ('rank_count', 'knownRankCount'),
+                                           ('rank_min', 'minRank'), ('rank_max', 'maxRank')):
+                        value = facts.get(source)
+                        if value is None or type(value) is int and value >= 0:
+                            live[target] = value
+                    live['applicationMode'] = 'native_patcher' if facts.get('application_mode') == 'native_patcher' else None
+                    live['rankCoverageComplete'] = type(facts.get('parsed_patches')) is int and facts['parsed_patches'] > 0 and facts.get('rank_count') == facts['parsed_patches']
+                elif event == 'lora_patch_registered':
+                    for source, target in (('model_patches', 'registeredModelPatches'), ('clip_patches', 'registeredEncoderPatches')):
+                        if type(facts.get(source)) is int and facts[source] >= 0:
+                            live[target] = facts[source]
+                else:
+                    live['rankCoverageComplete'] = False
+            elif event == 'sampling_plan':
                 state['plans'] = state.get('plans', 0) + 1
                 if state['plans'] > 1:
                     state['reasons'].append('multiple_sampling_invocations')
