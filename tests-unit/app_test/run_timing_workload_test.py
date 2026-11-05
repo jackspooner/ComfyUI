@@ -322,3 +322,24 @@ def test_control_attribution_stores_scalar_work_without_runtime_handles(tmp_path
     assert stage['workload']['measurements']['control.0.activeEvaluations']['availableAt'] == 'completion'
     assert not any('activeEvaluations' in key for key in stage['workload']['resolved'])
     assert 'object at' not in json.dumps(record)
+
+
+def test_text_progress_keeps_unknown_final_length_and_modality_coverage(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'text': {'class_type': 'TextGenerate', 'inputs': {'max_length': 0}}}, {}, ['text'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'text', 'started')
+    store.safe_metric('prompt', 'text', 'text_generation_plan', {'input_positions': 3, 'batch': 1, 'output_limit': 5,
+                      'kv_capacity': 8, 'prefix_reused': False, 'do_sample': False, 'precision': 'torch.float32'})
+    store.safe_metric('prompt', 'text', 'text_prefill_forward', {'seconds': .2, 'succeeded': True})
+    store.safe_metric('prompt', 'text', 'text_decode_forward', {'seconds': .1, 'succeeded': True})
+    store.safe_metric('prompt', 'text', 'text_generation_completed', {'generated': 2})
+    store.safe_stage('prompt', 'text', 'finished')
+    stage = store.page('0', 100, [], [])['observations'][-1]['stages'][0]
+    assert stage['workload']['profile'] == 'text'
+    assert stage['workload']['resolved']['outputTokenLimit']['availableAt'] == 'execution_start'
+    assert stage['workload']['measurements']['generatedTokens']['availableAt'] == 'completion'
+    assert stage['progress'] == {'unit': 'generated_tokens', 'completed': 2, 'total': None, 'reliable': True}
+    assert 'text_loop_coverage_unresolved' not in stage['reasons']
+    assert 'text_input_modalities_unmeasured' in stage['reasons']
