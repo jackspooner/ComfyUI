@@ -4,7 +4,7 @@ import math
 
 SHAPE_EVENTS = {'image_loaded', 'vae_processed_input', 'vae_forward_attempt', 'conditioning_encoded',
                 'vision_forward', 'vision_feature_reused'}
-REFERENCE_EVENTS = SHAPE_EVENTS | {'vae_forward_completed', 'vae_tiled_fallback', 'tensor_shape_unavailable'}
+REFERENCE_EVENTS = SHAPE_EVENTS | {'vae_forward_completed', 'vae_tiled_fallback', 'vae_decode_tiled_fallback', 'tensor_shape_unavailable'}
 
 
 def observe_reference_metrics(state, event, facts):
@@ -28,7 +28,14 @@ def observe_reference_metrics(state, event, facts):
     if event == 'tensor_shape_unavailable':
         reason('reference_shape_unavailable')
         return True
-    if event == 'vae_tiled_fallback':
+    if event == 'vae_decode_tiled_fallback':
+        count('vaeDecodeTiledFallbacks')
+        key = 'vaeDecode.tiledFallback'
+        state['resolved'][key] = True
+        sources[key] = 'native_vae'
+        state.setdefault('availability', {})[key] = 'live'
+        reason('vae_decode_tile_work_unmeasured')
+    elif event == 'vae_tiled_fallback':
         count('vaeTiledFallbacks')
         index = state.get('vae_inputs', 0) - 1
         if index >= 0:
