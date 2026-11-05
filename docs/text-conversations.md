@@ -82,6 +82,21 @@ scalar. `use_default_template=false` is rejected because raw templates do not
 have a system message to extend. The specialized Generate LTX2 Prompt node does
 not expose this input.
 
+## Repeated media inputs in TextGenerateV2
+
+The upstream `TextGenerateV2` node is also available as **Generate Text**.
+It flattens connected image batches in socket order and passes separate image,
+video and audio lists to supported tokenizers. Gemma 3 handles repeated images;
+Gemma 4 handles repeated images, videos and audio. Other families retain their
+own tokenizer's modality support; repeated sockets alone do not establish it.
+Video batches default to 24 source frames per second and one sampled frame per
+second. Gemma 4 retains the fork's fractional timestamps and native image sizing.
+
+V2 returns only `generated_text` and `thinking`. It does not expose the fork's
+history, JSON schema, context diagnostics or automatic media-resizing controls.
+Keep existing workflows and integrations on `TextGenerate` when they need those
+features. Its existing inputs and five output positions remain unchanged.
+
 ## History and state
 
 ```json

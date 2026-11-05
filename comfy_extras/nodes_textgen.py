@@ -71,6 +71,105 @@ def _extract_json(text):
     raise ValueError("The model did not return a JSON value for json_schema." + detail)
 
 
+VIDEO_TOOLTIP = "Video frames as image batch. Assumed to be 24 FPS; subsampled to 1 FPS internally."
+
+class TextGenerateV2(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        # Define dynamic combo options for sampling mode
+        sampling_options = [
+            io.DynamicCombo.Option(
+                key="on",
+                inputs=[
+                    io.Float.Input("temperature", default=0.7, min=0.01, max=2.0, step=0.000001),
+                    io.Int.Input("top_k", default=64, min=0, max=1000),
+                    io.Float.Input("top_p", default=0.95, min=0.0, max=1.0, step=0.01),
+                    io.Float.Input("min_p", default=0.05, min=0.0, max=1.0, step=0.01),
+                    io.Float.Input("repetition_penalty", default=1.05, min=0.0, max=5.0, step=0.01),
+                    io.Float.Input("presence_penalty", default=0.0, min=0.0, max=5.0, step=0.01),
+                    io.Int.Input("seed", default=0, min=0, max=0xffffffffffffffff),
+                ]
+            ),
+            io.DynamicCombo.Option(
+                key="off",
+                inputs=[]
+            ),
+        ]
+
+        return io.Schema(
+            node_id="TextGenerateV2",
+            display_name="Generate Text",
+            category="text",
+            search_aliases=["LLM", "gemma"],
+            inputs=[
+                io.Clip.Input("clip"),
+                io.String.Input("prompt", multiline=True, dynamic_prompts=True, default=""),
+                io.Autogrow.Input("images", optional=True, template=io.Autogrow.TemplateNames(io.Image.Input("image"), names=[f"image{i}" for i in range(1, 51)], min=0)),
+                io.Autogrow.Input("videos", optional=True, template=io.Autogrow.TemplateNames(io.Image.Input("video", tooltip=VIDEO_TOOLTIP), names=[f"video{i}" for i in range(1, 101)], min=0)),
+                io.Autogrow.Input("audios", optional=True, template=io.Autogrow.TemplateNames(io.Audio.Input("audio"), names=[f"audio{i}" for i in range(1, 101)], min=0)),
+                io.Int.Input("max_length", default=512, min=1, max=32768),
+                io.DynamicCombo.Input("sampling_mode", options=sampling_options, display_name="Sampling Mode"),
+                io.Boolean.Input("thinking", optional=True, default=False, tooltip="Operate in thinking mode if the model supports it."),
+                io.Boolean.Input("use_default_template", optional=True, default=True, tooltip="Use the built in system prompt/template if the model has one.", advanced=True),
+                io.Combo.Input("mtp", options=["auto", "off", "2", "3", "4", "5", "tree2s1", "tree2s2", "tree3s1", "tree4s1m8"], default="auto", optional=True, tooltip="Speculative decoding with the checkpoint's multi-token-prediction head. No effect without MTP weights. auto adapts the draft depth and breadth to observed token matches and execution cost; 2-5 pins a constant draft depth; tree modes pin both breadth and depth. Sampled output stays correctly distributed but differs from non-MTP output for the same seed."),
+                io.String.Input("system_prompt", force_input=True, optional=True, tooltip="Replaces the system prompt in the model's chat template. Ignored when the default template is not used."),
+            ],
+            outputs=[
+                io.String.Output(display_name="generated_text"),
+                io.String.Output(display_name="thinking"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, clip, prompt, max_length, sampling_mode, image=None, thinking=False, use_default_template=True, video=None, audio=None, mtp="auto", system_prompt="", images: io.Autogrow.Type = None, videos: io.Autogrow.Type = None, audios: io.Autogrow.Type = None) -> io.NodeOutput:
+
+        mtp = {"off": False, "auto": True}.get(mtp, mtp)
+
+        images = [batch[i:i + 1] for batch in (images or {}).values() if batch is not None for i in range(batch.shape[0])]
+        videos = [v for v in (videos or {}).values() if v is not None]
+        audios = [a for a in (audios or {}).values() if a is not None]
+
+        tokens = clip.tokenize(prompt, image=image, images=images, skip_template=not use_default_template, min_length=1, thinking=thinking, video=video, videos=videos, audio=audio, audios=audios, system_prompt=system_prompt if use_default_template else "")
+
+        # Get sampling parameters from dynamic combo
+        do_sample = sampling_mode.get("sampling_mode") == "on"
+        temperature = sampling_mode.get("temperature", 1.0)
+        top_k = sampling_mode.get("top_k", 50)
+        top_p = sampling_mode.get("top_p", 1.0)
+        min_p = sampling_mode.get("min_p", 0.0)
+        seed = sampling_mode.get("seed", None)
+        repetition_penalty = sampling_mode.get("repetition_penalty", 1.0)
+        presence_penalty = sampling_mode.get("presence_penalty", 0.0)
+
+        generated_ids = clip.generate(
+            tokens,
+            do_sample=do_sample,
+            max_length=max_length,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            presence_penalty=presence_penalty,
+            seed=seed,
+            mtp=mtp
+        )
+
+        generated_text = clip.decode(generated_ids)
+
+        # </think> ends reasoning; without one, reasoning opened by the output or prompt was cut off by max_length
+        reasoning, sep, text = generated_text.partition("</think>")
+        if not sep and not reasoning.lstrip().startswith("<think>"):
+            if isinstance(tokens, dict):
+                tokens = next(iter(tokens.values()))
+            prompt_ids = [t[0] for t in tokens[-1] if isinstance(t, tuple) and isinstance(t[0], int)] if tokens else []
+            if not prompt.rstrip().endswith("<think>") and (not prompt_ids or not clip.decode(prompt_ids[-4:]).rstrip().endswith("<think>")):
+                reasoning, text = "", generated_text
+
+        return io.NodeOutput(text.strip(), reasoning.replace("<think>", "", 1).strip())
+
+
+
 class TextGenerate(io.ComfyNode):
     history_output = True
 
@@ -504,6 +603,7 @@ class TextgenExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
         return [
+            TextGenerateV2,
             TextGenerate,
             TextGenerateLTX2Prompt,
             TextImageBudget,
