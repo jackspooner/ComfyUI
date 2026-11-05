@@ -110,6 +110,20 @@ and zero-strength bypass; completed durations never become submission/start fact
 Patch preparation is registration, not later GPU weight materialization or kernel
 time. Other adapter formats may lack ranks. Measured GPU transfers/residency are
 not yet provided by this adapter.
+Standard `CLIPVisionLoader` and `CLIPVisionEncode` have explicit loading/encoding
+adapters. The loader resolves `clip_name` through the native `clip_vision` category,
+not the text encoder directory. The encoder observes source BHWC and actual
+processed BCHW shapes, crop selection, native model type, dtype, memory strategy, load/offload
+devices and the one-forward plan. CLIP/SigLIP/SigLIP2/DINO preprocessing retains its
+ordinary implementation; flexible SigLIP2 resolutions are observed after resizing,
+not guessed from requested size. Source facts are start evidence, processed facts
+are live evidence, and encoded batch/positions/width remain completion evidence.
+Preprocessing and forward-call durations use CPU monotonic boundaries without GPU
+synchronization. These are not GPU kernel time, transfer or residency measurements.
+Repeated calls, mismatched/malformed plans, missing successful forward/output
+evidence and unknown cached input shapes remain explicit gaps. A failed forward
+preserves its error and known input workload; its failed stage is not a successful
+history sample. No feature-cache reuse is invented for this encoder.
 An expanded envelope is not a claim of complete coverage. The collector/forecast
 consumer must support this additive contract before producer activation; older
 strict readers may reject the extra fields. No source change alone activates it.
@@ -117,6 +131,7 @@ Focused CPU verification: `python -m pytest tests-unit/app_test/run_timing_test.
 tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
+tests-unit/comfy_test/clip_vision_execution_metrics_test.py
 tests-unit/comfy_test/control_execution_metrics_test.py
 tests-unit/comfy_test/text_execution_metrics_test.py
 tests-unit/app_test/run_timing_audio_test.py

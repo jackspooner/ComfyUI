@@ -1,6 +1,7 @@
 """Scalar reference-boundary observations; no tensor reads, I/O or prediction."""
 import math
 from app.run_timing_image import observe_image_metrics
+from app.run_timing_clip_vision import observe_clip_vision_metrics
 
 
 SHAPE_EVENTS = {'vae_processed_input', 'vae_forward_attempt', 'conditioning_encoded',
@@ -9,6 +10,8 @@ REFERENCE_EVENTS = SHAPE_EVENTS | {'vae_forward_completed', 'vae_encode_plan', '
 
 
 def observe_reference_metrics(state, event, facts):
+    if observe_clip_vision_metrics(state, event, facts):
+        return True
     if observe_image_metrics(state, event, facts):
         return True
     if event not in REFERENCE_EVENTS:

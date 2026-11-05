@@ -82,7 +82,7 @@ def selected_file_identity(key, value):
     categories = {'ckpt_name': 'checkpoints', 'checkpoint_name': 'checkpoints', 'unet_name': 'diffusion_models',
                   'diffusion_model': 'diffusion_models', 'vae_name': 'vae', 'lora_name': 'loras',
                   'clip_name': 'text_encoders', 'clip_name1': 'text_encoders', 'clip_name2': 'text_encoders', 'clip_name3': 'text_encoders',
-                  'control_net_name': 'controlnet', 'moge_model_name': 'geometry_estimation'}
+                  'control_net_name': 'controlnet', 'moge_model_name': 'geometry_estimation', 'clip_vision_name': 'clip_vision'}
     category = categories.get(key)
     if not category:
         return None
@@ -158,7 +158,8 @@ def workload(graph):
         for key, value in inputs.items():
             if key in MODELS and isinstance(value, str) and value:
                 # Hash the owner-selected artifact identity; never store private paths.
-                identity = selected_file_identity('moge_model_name' if kind == 'LoadMoGeModel' and key == 'model_name' else key, value)
+                selection = 'moge_model_name' if kind == 'LoadMoGeModel' and key == 'model_name' else 'clip_vision_name' if kind == 'CLIPVisionLoader' and key == 'clip_name' else key
+                identity = selected_file_identity(selection, value)
                 selected_files.append(identity is not None)
                 components.append(digest([kind, key, value, identity]))
             elif key in FEATURES and type(value) in (float, int) and math.isfinite(value) and value >= 0:
@@ -503,9 +504,10 @@ class RunTimingStore:
                 snapshots = state.setdefault('image_snapshots', set())
                 repeated = {'image_loaded': 'image_outputs', 'image_mask_selected': 'image_mask_outputs',
                             'video_decode_work': 'image_video_count', 'image_pillow_work': 'image_pillow_count',
-                            'vae_encode_plan': 'image_encode_plans', 'vae_processed_input': 'vae_inputs'}
+                            'vae_encode_plan': 'image_encode_plans', 'vae_processed_input': 'vae_inputs',
+                            'clip_vision_source': 'clip_vision_sources', 'clip_vision_plan': 'clip_vision_plans'}
                 reasons = frozenset(state['reasons'])
-                if (event in ('image_loaded', 'image_mask_selected', 'vae_encode_plan') and event not in snapshots
+                if (event in ('image_loaded', 'image_mask_selected', 'vae_encode_plan', 'clip_vision_source', 'clip_vision_plan') and event not in snapshots
                         or event in repeated and state.get(repeated[event]) == 2
                         or reasons != state.get('reference_reason_snapshot', frozenset())):
                     # A second invocation invalidates previously complete input work.
