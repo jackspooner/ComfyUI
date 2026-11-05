@@ -205,8 +205,10 @@ It preserves upstream queue/model ownership; forecasts are produced by MediaTool
 Optional version-2 workload evidence and resource-qualified stage observations
 describe supported native sampling/latent/loader/LoRA/ControlNet nodes explicitly.
 Existing progress handlers measure node-stage elapsed time and cache reuse;
-unknown adapters and unmeasured reference processing remain incomplete. Native
-sampling reports actual shapes, evaluation/CFG counters and distinct reliable
+unknown adapters and unmeasured reference processing remain incomplete. Unresolved
+loader/LoRA/control identity and LoadImage reference gaps are attached to their
+owning stages as well as the parent workload. Native sampling reports actual
+shapes, evaluation/CFG counters and distinct reliable
 sampling progress; generic node progress remains unreliable. Composite descriptions
 can correlate native expansion IDs and optional nested-call telemetry scopes without
 replacing the executor's context. Joint AV stream shapes stay separate.
