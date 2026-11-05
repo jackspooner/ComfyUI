@@ -220,3 +220,28 @@ def test_processed_reference_shapes_and_encoded_conditioning_tokens_exclude_cont
     assert 'SECRET' not in json.dumps(tokens)
     assert '/PRIVATE' not in json.dumps(references)
     assert resolved_inputs('UnknownLooksLikeVAE', {'pixels': SimpleNamespace(shape=(2, 384, 640, 3))}, 'now') == ({}, [])
+
+
+def test_lora_live_component_facts_and_completed_preparation_times_remain_separate(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', graph(), {}, ['decode'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'lora', 'started')
+    store.safe_metric('prompt', 'lora', 'lora_file_cache', {'reused': False})
+    store.safe_metric('prompt', 'lora', 'lora_patch_metadata', {'parsed_patches': 3, 'rank_count': 2, 'rank_min': 2,
+                       'rank_max': 4, 'application_mode': 'native_patcher'})
+    store.safe_metric('prompt', 'lora', 'lora_file_load', {'seconds': .2, 'succeeded': True})
+    store.safe_metric('prompt', 'lora', 'lora_patch_preparation', {'seconds': .1, 'succeeded': True})
+    store.safe_stage('prompt', 'lora', 'finished')
+    record = store.page('0', 100, [], [])['observations'][-1]
+    stage = next(stage for stage in record['stages'] if stage['id'] == 'lora')
+    component = stage['workload']['components'][0]
+    assert component['features']['rankCoverageComplete']['value'] is False
+    assert component['features']['minRank']['value'] == 2
+    assert component['features']['fileReused']['availableAt'] == 'live'
+    assert component == next(candidate for candidate in record['workload']['evidence']['components']
+                             if candidate['kind'] == 'lora' and candidate['order'] == component['order'])
+    measured = stage['workload']['measurements']['loraFileLoadSeconds']
+    assert measured['value'] == .2 and measured['source'] == 'native_lora'
+    assert measured['availableAt'] == 'completion'

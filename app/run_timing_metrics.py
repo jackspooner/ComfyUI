@@ -4,17 +4,27 @@ from comfy_execution.utils import get_executing_context
 
 
 def apply_metrics(record, stage, state, observed_at, completed=False):
-    def fact(value, available):
-        return {'value': value, 'availableAt': available, 'observedAt': observed_at, 'source': 'native_sampler'}
+    def fact(value, available, key):
+        return {'value': value, 'availableAt': available, 'observedAt': observed_at,
+                'source': state.get('sources', {}).get(key, 'native_sampler')}
     workload = stage.get('workload')
     evidence = record['workload'].get('evidence')
     if workload is None or evidence is None:
         return
     for key, value in state.get('resolved', {}).items():
-        workload['resolved'][key] = fact(value, 'execution_start')
+        workload['resolved'][key] = fact(value, 'execution_start', key)
         evidence['resolved'][stage['id'] + '.' + key] = workload['resolved'][key]
     for key, value in state.get('measurements', {}).items():
-        workload['measurements'][key] = fact(value, 'completion' if completed else 'live')
+        workload['measurements'][key] = fact(value, 'completion' if completed else 'live', key)
+    live = {key: {'value': value, 'availableAt': 'live', 'observedAt': observed_at, 'source': 'native_lora'}
+            for key, value in state.get('live', {}).items()}
+    if live:
+        workload['resolved'].update(live)
+        evidence['resolved'].update({stage['id'] + '.' + key: value for key, value in live.items()})
+        order = next(index for index, item in enumerate(record['stages']) if item['id'] == stage['id'])
+        for component in workload['components'] + [component for component in evidence['components'] if component['order'] == order]:
+            if component['kind'] == 'lora':
+                component['features'].update(live)
     if state.get('precision'):
         record['workload']['precision'] = state['precision']
     reasons = set(stage['reasons'])
