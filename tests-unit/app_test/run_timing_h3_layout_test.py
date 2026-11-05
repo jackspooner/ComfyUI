@@ -77,6 +77,8 @@ def test_native_h3_plan_never_publishes_complete_work_before_packing_and_bounds_
         assert not pending['stages'][0]['workload']['complete']
         assert 'h3_packed_layout_unmeasured' in pending['stages'][0]['reasons']
         assert pending['stages'][0]['workload']['resolved']['h3Layout.required']['availableAt'] == 'execution_start'
+        execution_metrics.emit('managed_load_plan', operation=object(), models=0, force_patch_weights=False,
+                               force_full_load=False, requested_bytes=0, minimum_bytes=0)
         PackedLayout(4, 3, 4, 6, 5, refs=[{'kind': 'image', 'latent_h': 4, 'latent_w': 12}])
         complete = current()
         assert complete['stages'][0]['workload']['complete']

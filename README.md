@@ -230,6 +230,9 @@ callables, specialized inpaint options and other unreviewed paths remain incompl
 Native H3 plans require observed packed text/guide/reference/audio/video token work;
 missing or conflicting layouts retain coverage gaps. These live facts do not
 complete upstream reference preparation or establish RefMod cache reuse.
+Native model-manager observations separate loading/unloading/clone CPU work and
+retain observed entry reuse, memory policy and effective load budgets. Unknown
+physical residency stays unknown; these measurements add no GPU queries or queue work.
 Composite descriptions
 can correlate native expansion IDs and optional nested-call telemetry scopes without
 replacing the executor's context. Joint AV stream shapes stay separate.
