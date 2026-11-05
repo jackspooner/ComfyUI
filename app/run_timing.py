@@ -43,6 +43,12 @@ def runtime_identity():
     return revision, torch_version
 
 
+@lru_cache(maxsize=256)
+def implementation_content_identity(filename, _stat_key):
+    """File metadata invalidates the cache; only source bytes define identity."""
+    return hashlib.sha256(Path(filename).read_bytes()).hexdigest()
+
+
 FEATURES = {'width', 'height', 'steps', 'num_frames', 'frames', 'frame_count', 'length', 'fps',
             'duration', 'duration_seconds', 'batch_size', 'max_new_tokens', 'max_tokens', 'max_length', 'max_output_tokens', 'context_length', 'context_budget', 'megapixels', 'denoise'}
 SETTINGS = {'precision', 'dtype', 'weight_dtype', 'sampler_name', 'scheduler', 'attention', 'sampling_profile', 'decoder'}
@@ -131,7 +137,8 @@ def workload(graph):
         filename = getattr(sys.modules.get(getattr(cls, '__module__', '')), '__file__', None)
         try:
             stat = Path(filename).stat() if filename else None
-            implementations.append([kind, digest([filename, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]) if stat else None])
+            key = (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns) if stat else None
+            implementations.append([kind, implementation_content_identity(filename, key) if stat else None])
         except OSError:
             implementations.append([kind, None])
     for node in graph.values():
@@ -154,7 +161,7 @@ def workload(graph):
     if selected_files and all(selected_files):
         settings['artifactAssurance'] = 'selected_file_identity'
     precision = sorted(str(value) for key, value in settings.items() if any(word in key for word in ('precision', 'dtype')))
-    return {'model': digest(components) if components else None, 'profileRevision': digest([sorted(set(structure)), implementations]),
+    return {'model': digest(components) if components else None, 'profileRevision': digest([revision, torch_version, sorted(set(structure)), implementations]),
             'components': components, 'executionMode': 'comfyui', 'precision': ','.join(precision) or None,
             'residency': 'unknown', 'cache': 'unknown', 'features': features, 'settings': settings}
 

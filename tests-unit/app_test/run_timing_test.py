@@ -103,6 +103,26 @@ def test_profile_separates_changed_node_implementations(tmp_path, monkeypatch):
     assert str(filename) not in json.dumps(second)
 
 
+def test_source_reinstallation_keeps_identity_but_runtime_changes_remain_separate(tmp_path, monkeypatch):
+    import sys
+    from app import run_timing
+    first_path, second_path = tmp_path / 'first.py', tmp_path / 'reinstalled.py'
+    first_path.write_text('same implementation')
+    second_path.write_text('same implementation')
+    cls = type('Loader', (), {'__module__': 'timing_fixture_implementation'})
+    module = SimpleNamespace(__file__=str(first_path))
+    monkeypatch.setitem(sys.modules, 'timing_fixture_implementation', module)
+    monkeypatch.setitem(sys.modules, 'nodes', SimpleNamespace(NODE_CLASS_MAPPINGS={'Loader': cls}))
+    monkeypatch.setattr(run_timing, 'runtime_identity', lambda: ('revision-one', 'torch-one'))
+    first = workload(item()[2])
+    module.__file__ = str(second_path)
+    assert workload(item()[2])['profileRevision'] == first['profileRevision']
+    monkeypatch.setattr(run_timing, 'runtime_identity', lambda: ('revision-two', 'torch-one'))
+    assert workload(item()[2])['profileRevision'] != first['profileRevision']
+    monkeypatch.setattr(run_timing, 'runtime_identity', lambda: ('revision-one', 'torch-two'))
+    assert workload(item()[2])['profileRevision'] != first['profileRevision']
+
+
 def test_duplicate_completion_and_read_only_page(tmp_path):
     store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
     store.event('accepted', item())
