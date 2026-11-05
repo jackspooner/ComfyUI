@@ -149,6 +149,13 @@ the executing node context and scheduler, observes start/finish/failure and veri
 reuse, and routes scalar sampling observations to that described substage.
 Missing descriptions remain unavailable. Receipt presence alone cannot prove reuse.
 Terminal storage failures clear only the attempt's in-memory timing state.
+Composite owners may declare a bounded `implementationRevision`, a supported
+`workloadProfile`, and `stageMetadata.kind` for an opaque native boundary. Owner
+implementation identity enters the strict profile revision, without asserting
+performance compatibility. A declared kind does not remove unsupported-workload
+coverage; native-specific profiles are preserved. Invalid profile/implementation
+declarations remain explicit coverage failures. This internal description contract
+does not change the public timing wire schema or execute an owner graph.
 
 Native ControlNet and T2I adapters report actual interval skips, processed hint
 axis shapes, preparation counts, forward attempts and active calls. A temporary
