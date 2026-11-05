@@ -2,6 +2,7 @@
 from comfy import execution_metrics
 from comfy_execution.utils import get_executing_context
 from app.run_timing_workload import workload_reasons
+from app.run_timing_image import image_pipeline_complete
 
 
 def apply_metrics(record, stage, state, observed_at, completed=False):
@@ -50,10 +51,20 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
                 target['components'] = [item for item in target['components'] if item['role'] != role] + [component]
     if state.get('precision'):
         record['workload']['precision'] = state['precision']
-        precision = fact(state['precision'], 'execution_start', 'executionPrecision')
+        precision = fact(state['precision'], state.get('availability', {}).get('executionPrecision', 'execution_start'), 'executionPrecision')
         workload['resolved']['executionPrecision'] = precision
         evidence['resolved'][stage['id'] + '.executionPrecision'] = precision
     reasons = set(stage['reasons'])
+    image_loader = workload['resolved'].get('imageLoader.maskSelectionRequired')
+    if image_loader is not None:
+        reused = stage['reused'] is True and stage['startedOffsetSeconds'] is None
+        if reused or image_pipeline_complete(state, image_loader['value']):
+            reasons.discard('reference_processing_unmeasured')
+            reuse = {'value': reused, 'availableAt': 'live', 'observedAt': observed_at, 'source': 'native_cache' if reused else 'native_image_loader'}
+            workload['resolved']['imageLoader.sourceReused'] = reuse
+            evidence['resolved'][stage['id'] + '.imageLoader.sourceReused'] = reuse
+        else:
+            reasons.add('reference_processing_unmeasured')
     if 'modelEvaluations' in state.get('resolved', {}) and 'cfgBranches' in state['resolved']:
         reasons.discard('model_evaluations_unmeasured')
     if all(key in state.get('resolved', {}) for key in ('latentWidth', 'latentHeight', 'latentFrames')):
@@ -71,6 +82,22 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         reasons.discard('audio_input_unmeasured')
     if state.get('moge_workload_complete'):
         reasons.discard('moge_workload_unmeasured')
+    if 'imageEncode.nativePlanRequired' in workload['resolved']:
+        values, measured = state['resolved'], state['measurements']
+        reused = stage['reused'] is True and stage['startedOffsetSeconds'] is None
+        known = state.get('vae_inputs') == 1 and state.get('image_encode_plan_complete') and not measured.get('vaeTiledFallbacks')
+        known = known and measured.get('vaeTileCountingComplete') is True and values.get('vaeEncode.0.tiled') == values.get('vaeEncode.plan.tiled')
+        known = known and all(values.get('vaeEncode.0.axis.' + str(axis)) == values.get('vaeEncode.plan.axis.' + str(axis)) for axis in range(4))
+        if reused or known:
+            reasons.discard('image_encode_workload_unmeasured')
+            reuse = {'value': reused, 'availableAt': 'live', 'observedAt': observed_at, 'source': 'native_cache' if reused else 'native_vae'}
+            workload['resolved']['imageEncode.sourceReused'] = reuse
+            evidence['resolved'][stage['id'] + '.imageEncode.sourceReused'] = reuse
+            if completed and not reused and (measured.get('vaeForwardAttempts') != values['vaeEncode.plan.forwards']
+                                            or measured.get('vaeForwardCompleted') != values['vaeEncode.plan.forwards']):
+                reasons.add('image_encode_forwards_unresolved')
+        else:
+            reasons.add('image_encode_workload_unmeasured')
     if state.get('moge_exports') == 1 and state.get('moge_export_input_known'):
         reasons.discard('moge_publication_input_unmeasured')
     if workload['profile'] == 'audio' and state.get('measurements', {}).get('vaeTileCountingComplete') is False:
@@ -98,7 +125,8 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     workload.update(complete=not input_reasons, reasons=input_reasons)
     remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved',
                 'text_loop_coverage_unresolved', 'text_input_modalities_unmeasured', 'audio_input_unmeasured',
-                'moge_workload_unmeasured', 'moge_publication_input_unmeasured', *audio_requirements}
+                'moge_workload_unmeasured', 'moge_publication_input_unmeasured', 'reference_processing_unmeasured',
+                'image_encode_workload_unmeasured', *audio_requirements}
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)
     evidence.update(complete=not input_reasons, reasons=input_reasons)

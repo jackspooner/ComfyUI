@@ -15,6 +15,8 @@ import os
 import torch
 from .._util import VideoContainer, VideoCodec, VideoComponents, normalize_crop_rect
 import comfy.utils
+from comfy import execution_metrics
+from .video_metrics import VideoDecodeMetrics
 import logging
 import torch.nn.functional as F
 
@@ -602,6 +604,14 @@ class VideoFromFile(VideoInput):
             resampler = av.audio.resampler.AudioResampler(format='fltp')
             audio_done = False
 
+        metrics = VideoDecodeMetrics(
+            include_images and include_audio and frame_stride == 1 and max_size == 0 and not compact
+            and self.__start_time == 0 and self.__duration == 0 and self.__crop is None,
+            audio_stream is not None,
+        ) if execution_metrics.enabled() else None
+        if metrics is not None:
+            metrics.streams(video_stream, audio_stream, av.__version__)
+
         packets = container.demux(*streams) if streams else ()
         for packet in packets:
             if video_done and audio_done:
@@ -611,7 +621,10 @@ class VideoFromFile(VideoInput):
                 if video_done:
                     continue
                 try:
-                    for frame in packet.decode():
+                    decoded_video = packet.decode()
+                    if metrics is not None:
+                        metrics.video(decoded_video)
+                    for frame in decoded_video:
                         if frame.pts < start_pts:
                             continue
                         if duration and frame.pts >= end_pts:
@@ -645,6 +658,7 @@ class VideoFromFile(VideoInput):
 
                             checked_alpha = True
 
+                        aligned = resized = False
                         if frame.format.name in (
                             'gbrpf16le', 'gbrpf16be', 'gbrapf16le', 'gbrapf16be', 'grayf16le', 'grayf16be',
                             'gbrpf32le', 'gbrpf32be', 'gbrapf32le', 'gbrapf32be', 'grayf32le', 'grayf32be',
@@ -661,6 +675,7 @@ class VideoFromFile(VideoInput):
                                 ))
                             img = np.stack(planes * 3 if len(planes) == 1 else planes, axis=-1, dtype=np.float32)
                         elif image_format in ('gbrpf32le', 'gbrapf32le') and frame.width % 32 != 0:
+                            aligned = True
                             # Fix non-deterministic video decode when the video width is not a multiple of 32
                             # For non-yuvj pixel formats: most H.264/H.265 video and static images (e.g. lossy WebP via LoadImage)
                             # Pad both axes to a multiple of 32 and smear the border so the alignment padding never bleeds into the cropped edges
@@ -693,6 +708,7 @@ class VideoFromFile(VideoInput):
                                 cx, cy, cw, ch = crop_rect
                                 img = np.ascontiguousarray(img[cy:cy + ch, cx:cx + cw])
                         if max_size and max(img.shape[:2]) > max_size:
+                            resized = True
                             height, width = img.shape[:2]
                             size = (max(1, round(height * max_size / max(height, width))),
                                     max(1, round(width * max_size / max(height, width))))
@@ -700,22 +716,29 @@ class VideoFromFile(VideoInput):
                             if img.dtype == np.uint8:
                                 pixels = pixels.float().div_(255)
                             img = F.interpolate(pixels, size=size, mode="bilinear", align_corners=False, antialias=True)[0].movedim(0, -1).numpy()
+                        if metrics is not None:
+                            metrics.processed(frame, img.shape, image_format, aligned, rotation_quadrant, crop_rect is not None, resized)
                         if alphas is None:
                             frames.append(img)
                         else:
                             frames.append(img[..., :-1])
                             alphas.append(img[..., -1:])
                 except av.error.InvalidDataError:
+                    if metrics is not None:
+                        metrics.failed_packet()
                     logging.info("pyav decode error")
 
             elif packet.stream.type == "audio":
                 if audio_done:
                     continue
 
-                aframes = itertools.chain.from_iterable(
-                    map(resampler.resample, packet.decode())
-                )
+                decoded_audio = packet.decode()
+                if metrics is not None:
+                    metrics.audio(decoded_audio)
+                aframes = itertools.chain.from_iterable(map(resampler.resample, decoded_audio))
                 for frame in aframes:
+                    if metrics is not None:
+                        metrics.resampled(frame)
                     if duration and frame.time > start_time + duration:
                         audio_done = True
                         break
@@ -750,6 +773,8 @@ class VideoFromFile(VideoInput):
             })
 
         metadata = container.metadata
+        if metrics is not None:
+            metrics.finish(images, alphas, audio)
         return VideoComponents(images=images, alpha=alphas, audio=audio, frame_rate=frame_rate, metadata=metadata)
 
     def get_components(self) -> VideoComponents:
