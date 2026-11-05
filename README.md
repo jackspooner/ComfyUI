@@ -223,7 +223,11 @@ an unrelated earlier image/video branch cannot change a later stage's profile.
 Reachable node implementations, core/runtime revisions and declared composite-owner revisions
 remain boundaries, with no inferred performance compatibility. Native sampling
 reports actual shapes, evaluation/CFG counters and distinct reliable
-sampling progress; generic node progress remains unreliable. Composite descriptions
+sampling progress; generic node progress remains unreliable. Reviewed native Euler,
+Euler ancestral, non-CFG++ res-multistep and ER-SDE plans retain effective scalar
+options and fixed evaluation counts without reading sigma values. Custom noise
+callables, specialized inpaint options and other unreviewed paths remain incomplete.
+Composite descriptions
 can correlate native expansion IDs and optional nested-call telemetry scopes without
 replacing the executor's context. Joint AV stream shapes stay separate.
 Composite owners can declare phase profiles, opaque boundary kinds and bounded
