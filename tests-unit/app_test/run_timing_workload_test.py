@@ -379,3 +379,24 @@ def test_supported_text_embedding_work_is_available_before_outcomes(tmp_path):
     assert 'generatedTokens' not in stage['workload']['measurements']
     assert 'text_input_modalities_unmeasured' not in stage['reasons']
     assert 'text_loop_coverage_unresolved' not in stage['reasons']
+
+
+def test_owner_phase_profile_and_source_identity_do_not_claim_opaque_workload_support(tmp_path):
+    from app import run_timing
+    expanded = {'publish': {'class_type': 'OwnerPublication', 'inputs': {}}}
+    revision = ['owner-one']
+    def resolver(*_):
+        return {'workload': run_timing.workload(expanded), 'stageGraph': expanded,
+                'workloadProfile': 'diffusion_video', 'implementationRevision': revision[0],
+                'stageMetadata': {'publish': {'kind': 'publication'}}}
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    with patch.object(run_timing, 'WORKLOAD_RESOLVERS', [resolver]):
+        store.event('accepted', (1, 'first', {}, {}, []))
+        revision[0] = 'owner-two'
+        store.event('accepted', (1, 'second', {}, {}, []))
+    values = store.page('0', 100, [], [])['observations']
+    assert values[-1]['workload']['profileRevision'] != values[-2]['workload']['profileRevision']
+    stage = values[-1]['stages'][0]
+    assert stage['kind'] == 'publication' and stage['workload']['profile'] == 'diffusion_video'
+    assert not stage['workload']['complete']
+    assert 'unsupported_workload_adapter' in stage['reasons']
