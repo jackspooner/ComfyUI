@@ -144,6 +144,7 @@ strict readers may reject the extra fields. No source change alone activates it.
 Focused CPU verification: `python -m pytest tests-unit/app_test/run_timing_test.py
 tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py
 tests-unit/app_test/run_timing_sampler_test.py tests-unit/comfy_test/sampling_execution_metrics_test.py
+tests-unit/app_test/run_timing_h3_layout_test.py tests-unit/comfy_test/h3_layout_execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/clip_vision_execution_metrics_test.py
@@ -289,6 +290,23 @@ video profile; unrelated image/text stages still make whole-run modality unknown
 MediaTools policy 6 permits only exact joint matches, without broadened diffusion
 bounds or stream scaling. Unknown format/order, reversed/extra streams, malformed
 axes, unequal batches, custom guider behavior and repeated calls keep gaps.
+
+Native H3 sampling additionally requires the actual `PackedLayout` plan. Until
+packing is observed, `h3_packed_layout_unmeasured` keeps the stage incomplete.
+Live `h3Layout.*` facts retain the padded target signature, total token count and
+ordered per-segment role/token counts: text, visual/audio guides, visual/audio
+references and target audio/video. This includes the native reference blocks used
+by RefMods, without inspecting tensor values or filenames. Only the exact native
+layout class qualifies; truncated metadata, inconsistent totals/target shapes,
+custom subclasses and differing layouts within one stage remain incomplete.
+Identical rebuilds count as live measurements with no per-rebuild persistence;
+the first plan and later invalidation are committed at transition boundaries.
+Saved pre-layout forecasts remain unknown. Packed rows do not establish upstream
+reference decoding/encoding, RefMod extraction, file identity or cache reuse, and
+cannot clear unrelated dependency reasons. No model execution or GPU synchronization
+is added. Run the H3 layout CPU suites with the launcher above; real inference and
+deployment acceptance remain separate.
+
 `LTXVConcatAVLatent` and `LTXVSeparateAVLatent` have explicit preparation adapters.
 Graph components retain video/audio roles, source stage and output slot, including
 the separate node's audio output. Native plans observe raw video/audio/mask shapes,

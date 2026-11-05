@@ -20,6 +20,7 @@ import torch
 import torch.nn as nn
 
 import comfy.ldm.common_dit
+import comfy.execution_metrics
 import comfy.model_management
 import comfy.model_prefetch
 import comfy.ops
@@ -461,6 +462,9 @@ class PackedLayout:
         self.audio_pos = torch.cat(audio_pos)
         self.audio_update = torch.cat(audio_update)
         self.signature = (text_len, latent_t, latent_h, latent_w, audio_t)
+        if comfy.execution_metrics.enabled():
+            comfy.execution_metrics.emit('h3_packed_layout', signature=self.signature, tokens=row,
+                                         segments=tuple(segments[:128]), segment_count=len(segments), native=type(self) is PackedLayout)
         # contiguous segment table (start, stop, kind)
         # kinds: text / cond / cond_audio / ref_img / ref_audio / audio / video
         # the packed sequence is uniform per segment in (modality tag, timestep class),
