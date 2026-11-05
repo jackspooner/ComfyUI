@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from app.run_timing_text import observe_text_metrics
-from comfy import execution_metrics
+from comfy import execution_metrics, sd1_clip
 from comfy.text_encoders.llama import BaseGenerate
 
 
@@ -73,3 +73,37 @@ def test_repeated_text_invocations_do_not_claim_reliable_single_loop_progress():
         TinyGenerator().generate(torch.zeros(1, 3, 2), do_sample=False, max_length=0)
     assert state['progress']['reliable'] is False
     assert 'multiple_text_generation_invocations' in state['reasons']
+
+
+def test_native_expanded_modality_counts_match_actual_input_and_preserve_embeddings():
+    state = {'resolved': {}, 'measurements': {}, 'reasons': []}
+    events = []
+    def observe(event, facts):
+        events.append((event, facts))
+        observe_text_metrics(state, event, facts)
+    execution_metrics.set_observer(observe)
+    transformer = SimpleNamespace(get_input_embeddings=lambda: lambda ids, out_dtype: torch.ones(*ids.shape, 2),
+                                   preprocess_embed=lambda value, device: (torch.zeros(1, 3 if value['type'] == 'image' else 2, 2), None))
+    owner = SimpleNamespace(special_tokens={'pad': 0}, transformer=transformer)
+    embeddings, mask, active, info = sd1_clip.SDClipModel.process_tokens(owner, [[1, {'type': 'image'}, {'type': 'audio'}, 2, 0]], 'cpu')
+    assert embeddings.shape == (1, 8, 2)
+    torch.testing.assert_close(embeddings[0, 1:6], torch.zeros(5, 2))
+    torch.testing.assert_close(mask, torch.tensor([[1, 1, 1, 1, 1, 1, 1, 0]]))
+    assert active == [7]
+    assert [entry['size'] for entry in info] == [3, 2]
+    assert TinyGenerator().generate(embeddings, do_sample=False, max_length=1) == [1]
+    assert state['resolved']['modalityCoverageComplete'] is True
+    assert {key: state['resolved'][key] for key in ('inputTextPositions', 'inputImagePositions', 'inputAudioPositions', 'inputPaddingPositions')} == {
+        'inputTextPositions': 2, 'inputImagePositions': 3, 'inputAudioPositions': 2, 'inputPaddingPositions': 1}
+    assert not any('extra' in facts or 'token_ids' in facts for _, facts in events)
+
+
+def test_unknown_embedding_types_do_not_gain_modality_coverage():
+    state = {'resolved': {}, 'measurements': {}, 'reasons': []}
+    execution_metrics.set_observer(lambda event, facts: observe_text_metrics(state, event, facts))
+    execution_metrics.emit('text_embedding_started')
+    execution_metrics.observe_embedding_row(3, 3, [{'type': 'PRIVATE/custom', 'size': 2}])
+    TinyGenerator().generate(torch.zeros(1, 3, 2), do_sample=False, max_length=1)
+    assert state['resolved']['modalityCoverageComplete'] is False
+    assert state['resolved']['inputUnknownPositions'] == 2
+    assert 'PRIVATE' not in str(state)
