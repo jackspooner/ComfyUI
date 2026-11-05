@@ -20,7 +20,8 @@ from app.run_timing_metrics import apply_metrics
 from app.run_timing_references import observe_reference_metrics
 from app.run_timing_controls import observe_control_metrics
 from app.run_timing_text import observe_text_metrics
-from app.run_timing_audio import observe_audio_metrics
+from app.run_timing_audio import observe_audio_metrics, audio_latent_features
+from app.run_timing_ltx_audio import observe_ltx_audio_metrics
 from app.run_timing_vision import observe_moge_metrics
 from app.run_timing_stream import TimingStreamHub
 
@@ -82,7 +83,8 @@ def selected_file_identity(key, value):
     categories = {'ckpt_name': 'checkpoints', 'checkpoint_name': 'checkpoints', 'unet_name': 'diffusion_models',
                   'diffusion_model': 'diffusion_models', 'vae_name': 'vae', 'lora_name': 'loras',
                   'clip_name': 'text_encoders', 'clip_name1': 'text_encoders', 'clip_name2': 'text_encoders', 'clip_name3': 'text_encoders',
-                  'control_net_name': 'controlnet', 'moge_model_name': 'geometry_estimation', 'clip_vision_name': 'clip_vision'}
+                  'control_net_name': 'controlnet', 'moge_model_name': 'geometry_estimation', 'clip_vision_name': 'clip_vision',
+                  'text_encoder': 'text_encoders'}
     category = categories.get(key)
     if not category:
         return None
@@ -518,11 +520,15 @@ class RunTimingStore:
                 fallback = {'vae_tiled_fallback': 'vaeTiledFallbacks', 'vae_decode_tiled_fallback': 'vaeDecodeTiledFallbacks'}
                 if event in fallback and measurements.get(fallback[event]) == 1:
                     self.safe_stage(prompt_id, node_id, 'metrics')
-            elif observe_audio_metrics(state, event, facts):
+            elif observe_audio_metrics(state, event, facts) or observe_ltx_audio_metrics(state, event, facts):
                 snapshots = state.setdefault('audio_snapshots', set())
-                if event in ('audio_loaded', 'audio_vae_encode_input', 'audio_vae_decode_input') and event not in snapshots:
+                reasons = frozenset(state['reasons'])
+                if (event in ('audio_loaded', 'audio_vae_encode_input', 'audio_vae_decode_input', 'audio_latent_prepared',
+                              'ltx_audio_resampled', 'ltx_audio_mel', 'ltx_audio_decode_plan') and event not in snapshots
+                        or reasons != state.get('audio_reason_snapshot', frozenset())):
                     self.safe_stage(prompt_id, node_id, 'metrics')
                     snapshots.add(event)
+                state['audio_reason_snapshot'] = reasons
             elif observe_moge_metrics(state, event, facts):
                 snapshots = state.setdefault('moge_snapshots', set())
                 ready = state.get('moge_workload_complete', False)
@@ -575,9 +581,9 @@ class RunTimingStore:
                                 state['resolved']['stream.' + str(index) + '.axis.' + str(axis)] = size
                     state['reasons'].append('joint_stream_comparison_unsupported')
                 if state.get('profile') == 'audio':
-                    if isinstance(shape, tuple) and len(shape) == 3 and all(type(value) is int and value > 0 for value in shape):
-                        state['resolved'].update(batch=shape[0], latentChannels=shape[1], audioLatentLength=shape[-1],
-                                                 audioLatentChannels=1)
+                    audio_features = audio_latent_features(shape, facts.get('audio_layout'))
+                    if audio_features is not None:
+                        state['resolved'].update(audio_features)
                     else:
                         # Four-dimensional audio VAEs can use time/frequency or
                         # channel/time axes. Keep the actual axes without choosing

@@ -75,6 +75,24 @@ def test_native_basic_guider_positive_only_branch_plan():
     assert dict(observations)['sampling_plan']['branches'] == 1
 
 
+def test_audio_layout_provenance_uses_exact_native_latent_format_types():
+    from comfy import latent_formats
+    class UnknownLTX(latent_formats.LTXAV):
+        pass
+    for format_type, expected in [(latent_formats.LTXAV, 'bctf'), (latent_formats.MiniMaxH3AV, 'bcat'),
+                                  (latent_formats.SD15, None), (UnknownLTX, None)]:
+        guider = samplers.CFGGuider.__new__(samplers.CFGGuider)
+        guider.model_patcher = SimpleNamespace(model=SimpleNamespace(latent_format=format_type.__new__(format_type)),
+            model_dtype=lambda: torch.bfloat16, is_dynamic=lambda: False, offload_device='cpu', load_device='cpu')
+        guider.cfg, guider.model_options, guider.original_conds = 1, {}, {'positive': [{}]}
+        events = []
+        execution_metrics.set_observer(lambda event, facts: events.append((event, facts)))
+        samplers.sampling_metrics_callback(guider, [(1, 8, 12, 16)],
+            samplers.KSAMPLER(samplers.k_diffusion_sampling.sample_euler), torch.zeros(3), None)
+        assert dict(events)['sampling_plan']['audio_layout'] == expected
+        assert dict(events)['sampling_plan']['evaluations'] == 2
+
+
 def test_nested_stage_scope_restores_context_and_preserves_exceptions():
     observations = []
     execution_metrics.set_observer(lambda event, facts: observations.append((event, execution_metrics.current_stage())))

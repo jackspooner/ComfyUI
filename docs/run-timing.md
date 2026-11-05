@@ -236,11 +236,34 @@ values are excluded. `EmptyLatentAudio` uses native even rounding at the 44.1 kH
 2048 latent ratio; that describes latent allocation, not a promised decoded length.
 Linked seconds are resolved through supported primitive nodes. Audio sampling
 identified from native audio-latent ancestry records ordinary 3D temporal latent
-length; 4D audio tensors retain raw axes and an unresolved-layout reason because
-native audio VAEs can use different time/frequency/channel layouts. It never
+length. Exact native `LTXAV`/`MiniMaxH3AV` latent-format types declare supported 4D
+layouts: LTX `[batch, features, time, frequency]` (`bctf`) and H3
+`[batch, features, stereo, time]` (`bcat`). Frequency bins never become audio
+channels. Unknown formats/custom subclasses retain raw axes and an unresolved
+layout reason. The sampler never
 fabricates spatial/video axes from an audio tensor. Unsupported shapes and joint
 AV streams remain incomplete. An audio
 reference loader does not change a text-generation operation's main profile.
+
+`LTXVAudioVAELoader`, `LTXAVTextEncoderLoader`, `LTXVAudioVAEEncode`,
+`LTXVAudioVAEDecode` and `LTXVEmptyLatentAudio` have explicit adapters. The
+empty-latent node observes the VAE's actual configured allocation; it does not
+guess latent rate/frequency from frame requests. Requested frames/rate/batch remain
+audit intent, so equal effective allocations need not split sampling history.
+Audio input roles preserve graph source-stage relationships and processed work.
+LTX encoding also requires internal resampled waveform, FFT/hop/mel settings,
+expanded channels and actual mel-input dimensions. Observing only the generic
+outer VAE wrapper cannot establish that coverage. LTX decoding requires its native
+latent/target-shape plan and verifies the resulting vocoder input before a
+successful span qualifies. Encoder/decoder/vocoder CPU monotonic boundaries do not
+synchronize GPU kernels. Latent and vocoder output shapes stay completion evidence,
+including when an intermediate snapshot is written before node completion.
+Missing/mismatched plans and repeated invocations retain gaps; newly detected
+audio coverage changes are saved once without per-forward journal writes.
+Run `tests-unit/comfy_test/ltx_audio_execution_metrics_test.py` with the audio
+collector, native audio and sampling metrics suites. CPU fixtures use real tiny
+mel processing with stub model forwards; they do not establish model accuracy,
+native joint-AV matching, tiled internals or live deployment acceptance.
 
 Native audio VAE encode hooks observe actual post-resample B/C/sample dimensions
 as live facts, preserving original-rate input metadata separately. H3's reference
