@@ -47,7 +47,8 @@ def test_sampling_metrics_preserve_result_callback_and_inference_count(monkeypat
 
 def test_nested_sampling_streams_and_custom_guiders_do_not_invent_cfg_work():
     class CustomGuider(samplers.CFGGuider):
-        pass
+        def predict_noise(self, *args, **kwargs):
+            return super().predict_noise(*args, **kwargs)
     guider = CustomGuider.__new__(CustomGuider)
     guider.model_patcher = SimpleNamespace(model_dtype=lambda: torch.bfloat16, is_dynamic=lambda: False,
                                            offload_device='cpu', load_device='cpu')
@@ -60,6 +61,18 @@ def test_nested_sampling_streams_and_custom_guiders_do_not_invent_cfg_work():
     facts = dict(observations)['sampling_plan']
     assert facts['shape'] is None and facts['shapes'] == shapes
     assert facts['evaluations'] is None and facts['branches'] is None
+
+
+def test_native_basic_guider_positive_only_branch_plan():
+    from comfy_extras.nodes_custom_sampler import Guider_Basic
+    guider = Guider_Basic.__new__(Guider_Basic)
+    guider.model_patcher = SimpleNamespace(model_dtype=lambda: torch.bfloat16, is_dynamic=lambda: False,
+                                           offload_device='cpu', load_device='cpu')
+    guider.cfg, guider.model_options, guider.original_conds = 1, {}, {'positive': [{}]}
+    observations = []
+    execution_metrics.set_observer(lambda event, facts: observations.append((event, facts)))
+    samplers.sampling_metrics_callback(guider, [(1, 4, 8, 8)], samplers.KSAMPLER(samplers.k_diffusion_sampling.sample_euler), torch.zeros(3), None)
+    assert dict(observations)['sampling_plan']['branches'] == 1
 
 
 def test_nested_stage_scope_restores_context_and_preserves_exceptions():

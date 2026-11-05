@@ -67,7 +67,9 @@ including standard and custom samplers, observes the
 actual latent shape after native correction, model dtype, dynamic/standard memory
 strategy and load/offload devices. Explicit Euler plans describe their resolved
 noise-evaluation count by native sampler-function identity; unsupported samplers,
-custom guiders and CFG hooks retain coverage reasons. Joint AV streams retain
+guiders that override native prediction and CFG hooks retain coverage reasons.
+Positive-only BasicGuider inherits the verified native CFG path and reports one
+planned branch. Joint AV streams retain
 separate axis shapes and remain incomplete for broadened workload comparison.
 Repeated sampling within one node remains incomplete. Counts are CPU observations,
 not synchronized GPU kernel timings. GPU worker-thread observations without a
