@@ -30,6 +30,13 @@ def observe_reference_metrics(state, event, facts):
         return True
     if event == 'vae_tiled_fallback':
         count('vaeTiledFallbacks')
+        index = state.get('vae_inputs', 0) - 1
+        if index >= 0:
+            key = 'vaeEncode.' + str(index) + '.tiled'
+            state['resolved'][key] = True
+            sources[key] = 'native_vae'
+            state.setdefault('availability', {})[key] = 'live'
+            reference('pixels', {key: True}, 'native_vae', 'live')
     elif event == 'vae_forward_completed':
         count('vaeForwardCompleted')
         if facts.get('tiled') is True:
