@@ -230,7 +230,7 @@ durations remain per invocation rather than being summed across unrelated audio.
 There is no broader audio matching, linear scaling, added model execution or GPU
 synchronization. CPU fixture parity is separate from deployed real-model acceptance.
 
-Extractor `comfy-explicit-4` keeps input-workload completeness distinct from known
+Extractor `comfy-explicit-5` keeps input-workload completeness distinct from known
 measurement gaps. `audio_output_unmeasured`, `audio_output_metadata_unavailable`
 and `stage_completion_unobserved` remain in `stage.reasons`, while being excluded
 from `stage.workload.reasons` and whole-workload completeness. A missing end span
@@ -242,3 +242,9 @@ multiple invocations are not reclassified. This change does not make future
 decode/publication input work known or provide a whole-run ETA for that missing
 work. Sampling and shared text-loop plans also expose their actually observed
 `executionPrecision` on the stage; precision is not inferred for other operations.
+
+Unresolved selected model/LoRA/control identities and unmeasured LoadImage reference
+processing also mark their owning stage's workload incomplete. These gaps cannot
+be dropped by a consumer selecting a stage dependency subgraph. Loaded-image shape
+observations alone do not clear reference-processing coverage or establish crop,
+tile and role attribution. Older extractor records retain their original evidence.
