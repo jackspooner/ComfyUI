@@ -254,6 +254,17 @@ class RunTimingStore:
                 observed = {key: value for key, value in record['workload']['features'].items() if key.startswith('observed.')}
                 record['workload'] = resolved['workload']
                 record['workload']['features'].update(observed)
+                if isinstance(resolved.get('stageGraph'), dict):
+                    available_at = 'submission' if record['phase'] == 'queued' else 'execution_start' if phase == 'started' else 'completion' if phase not in ('accepted', 'observation') else 'live'
+                    evidence, stages = describe(resolved['stageGraph'], record['workload'], self.resource,
+                                                utc(), selected_file_identity, digest, available_at)
+                    metadata = resolved.get('stageMetadata', {})
+                    for stage in stages:
+                        # Only declared correlations are accepted; raw graphs and
+                        # owner-private manifests never enter persisted telemetry.
+                        if isinstance(metadata.get(stage['id'], {}).get('sharedOperationId'), str):
+                            stage['sharedOperationId'] = metadata[stage['id']]['sharedOperationId']
+                    record['workload']['evidence'], record['stages'] = evidence, stages
                 record['relatedOperationIds'] = sorted(set(record.get('relatedOperationIds', [])) | set(resolved.get('relatedOperationIds', [])))
                 for key in ('batchId', 'stageId', 'sharedOperationId', 'dependsOn'):
                     if key in resolved:
@@ -284,8 +295,9 @@ class RunTimingStore:
                     candidates.extend(value for key, value in meta.items() if key in ('runId', 'requestId', 'operationId', 'jobId', 'batchId', 'promptId') and isinstance(value, str))
             record['relatedOperationIds'] = sorted({value for value in candidates if len(value) <= 128 and identity_pattern.fullmatch(value)})
             self.resolve_workload(record, item[2], action)
-            record['workload']['evidence'], record['stages'] = describe(item[2], record['workload'], self.resource,
-                                                                     record['observedAt'], selected_file_identity, digest)
+            if 'evidence' not in record['workload']:
+                record['workload']['evidence'], record['stages'] = describe(item[2], record['workload'], self.resource,
+                                                                         record['observedAt'], selected_file_identity, digest)
             self.clocks[prompt_id] = [self.now(), None, len(item[2])]
         elif record is None:
             self.issue = 'timing_acceptance_missing'
@@ -348,6 +360,14 @@ class RunTimingStore:
             if self.issue != 'timing_store_unavailable':
                 logging.warning('Run timing observation unavailable; execution continues', exc_info=False)
             self.issue = 'timing_store_unavailable'
+        finally:
+            if args and args[0] not in ('accepted', 'started'):
+                prompt_id = args[1][1]
+                self.clocks.pop(prompt_id, None)
+                self.gpu_waits.pop(prompt_id, None)
+                self.stage_snapshots.pop(prompt_id, None)
+                for key in [key for key in self.metric_states if key[0] == prompt_id]:
+                    del self.metric_states[key]
 
     def safe_cache(self, prompt_id, cached_nodes):
         try:
@@ -402,6 +422,12 @@ class RunTimingStore:
                 if state['plans'] > 1:
                     state['reasons'].append('multiple_sampling_invocations')
                 shape = facts.get('shape')
+                for index, stream_shape in enumerate(facts.get('shapes') or []):
+                    if isinstance(stream_shape, tuple) and all(type(value) is int and value > 0 for value in stream_shape):
+                        for axis, size in enumerate(stream_shape):
+                            state['resolved']['stream.' + str(index) + '.axis.' + str(axis)] = size
+                if len(facts.get('shapes') or []) > 1:
+                    state['reasons'].append('joint_stream_comparison_unsupported')
                 if isinstance(shape, tuple) and len(shape) in (4, 5) and all(type(value) is int and value > 0 for value in shape):
                     state['resolved'].update(batch=shape[0], latentChannels=shape[1], latentWidth=shape[-1],
                                              latentHeight=shape[-2], latentFrames=shape[2] if len(shape) == 5 else 1)
@@ -453,7 +479,7 @@ class RunTimingStore:
                 return
             record = json.loads(row[0])
             stage = next((stage for stage in record.get('stages', []) if stage['id'] == node_id), None)
-            if stage is None or stage['reused']:
+            if stage is None or stage['reused'] and action not in ('started', 'reused'):
                 return
             metrics = self.metric_states.get((prompt_id, node_id))
             if metrics:
@@ -462,14 +488,33 @@ class RunTimingStore:
             elapsed = self.elapsed_phases(prompt_id, clock)[0]
             if action == 'started':
                 if stage['phase'] != 'running':
-                    stage.update(phase='running', startedOffsetSeconds=elapsed)
-            elif action == 'finished':
-                # A cache finish without start is reuse, not a measured execution.
+                    state = self.metric_states.setdefault((prompt_id, node_id), {'resolved': {}, 'measurements': {}, 'reasons': []})
+                    if stage['phase'] == 'succeeded':
+                        stage['reasons'] = sorted(set(stage['reasons']) | {'multiple_stage_invocations'})
+                        stage['workload'].update(complete=False, reasons=stage['reasons'])
+                    state.update(span_start=elapsed, prior_duration=stage['durationSeconds'] or 0)
+                    stage.update(phase='running', reused=False)
+                    if stage['startedOffsetSeconds'] is None:
+                        stage['startedOffsetSeconds'] = elapsed
+            elif action == 'reused':
                 if stage['startedOffsetSeconds'] is None:
                     stage.update(phase='succeeded', reused=True, durationSeconds=0)
                 else:
-                    stage.update(phase='succeeded', completedOffsetSeconds=elapsed,
-                                 durationSeconds=max(0, elapsed - stage['startedOffsetSeconds']))
+                    # A later hit cannot erase loading/execution already measured
+                    # under this stage identity (for example H3 context export).
+                    measurements = stage['workload']['measurements']
+                    previous = measurements.get('verifiedReuseHits', {}).get('value', 0)
+                    measurements['verifiedReuseHits'] = {'value': previous + 1, 'availableAt': 'live',
+                                                         'observedAt': utc(), 'source': 'native_cache'}
+            elif action in ('finished', 'failed'):
+                # A cache finish without start is reuse, not a measured execution.
+                if stage['startedOffsetSeconds'] is None:
+                    stage.update(phase='failed' if action == 'failed' else 'succeeded',
+                                 reused=None if action == 'failed' else True, durationSeconds=None if action == 'failed' else 0)
+                else:
+                    state = self.metric_states.get((prompt_id, node_id), {})
+                    stage.update(phase='failed' if action == 'failed' else 'succeeded', completedOffsetSeconds=elapsed,
+                                 durationSeconds=state.get('prior_duration', 0) + max(0, elapsed - state.get('span_start', stage['startedOffsetSeconds'])))
             elif action == 'progress':
                 if type(completed) not in (int, float) or type(total) not in (int, float) or not all(math.isfinite(v) for v in (completed, total)) or not 0 <= completed <= total or total <= 0:
                     return

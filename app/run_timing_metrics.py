@@ -25,6 +25,10 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     reasons.update(state.get('reasons', []))
     if completed and state.get('measurements', {}).get('noiseEvaluations') != state.get('resolved', {}).get('modelEvaluations'):
         reasons.add('sampling_evaluation_count_unresolved')
+    if completed and state.get('resolved', {}).get('cfgBranches') is not None:
+        expected = state['resolved'].get('modelEvaluations')
+        if expected is not None and state.get('measurements', {}).get('cfgBranchEvaluations') != expected * state['resolved']['cfgBranches']:
+            reasons.add('cfg_behavior_unmeasured')
     stage['reasons'] = sorted(reasons)
     workload.update(complete=not reasons, reasons=stage['reasons'])
     remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved'}
@@ -38,6 +42,15 @@ def attach_runtime_metrics(queue):
     def observe(event, facts):
         context = get_executing_context()
         if context is not None:
+            node_id = execution_metrics.current_stage() or context.node_id
             with queue.mutex:
-                queue.timing.safe_metric(context.prompt_id, context.node_id, event, facts)
+                if event == 'stage_inputs':
+                    queue.timing.safe_inputs(context.prompt_id, node_id, facts['class_type'], facts['inputs'])
+                elif event.startswith('stage_'):
+                    action = {'stage_started': 'started', 'stage_finished': 'finished',
+                              'stage_failed': 'failed', 'stage_reused': 'reused'}.get(event)
+                    if action:
+                        queue.timing.safe_stage(context.prompt_id, node_id, action)
+                else:
+                    queue.timing.safe_metric(context.prompt_id, node_id, event, facts)
     execution_metrics.set_observer(observe)

@@ -207,7 +207,9 @@ describe supported native sampling/latent/loader/LoRA/ControlNet nodes explicitl
 Existing progress handlers measure node-stage elapsed time and cache reuse;
 unknown adapters and unmeasured reference processing remain incomplete. Native
 sampling reports actual shapes, evaluation/CFG counters and distinct reliable
-sampling progress; generic node progress remains unreliable. See
+sampling progress; generic node progress remains unreliable. Composite descriptions
+can correlate native expansion IDs and optional nested-call telemetry scopes without
+replacing the executor's context. Joint AV stream shapes stay separate. See
 [timing coverage and limitations](docs/run-timing.md).
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
