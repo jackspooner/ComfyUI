@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime, timezone
 from app.run_timing_workload import describe, resolved_inputs
 from app.run_timing_metrics import apply_metrics
+from app.run_timing_references import observe_reference_metrics
 
 
 def utc():
@@ -432,7 +433,9 @@ class RunTimingStore:
                 return
             state = self.metric_states.setdefault((prompt_id, node_id), {'resolved': {}, 'measurements': {}, 'reasons': []})
             measurements = state['measurements']
-            if event in ('lora_file_load', 'lora_patch_preparation'):
+            if observe_reference_metrics(state, event, facts):
+                pass
+            elif event in ('lora_file_load', 'lora_patch_preparation'):
                 seconds = facts.get('seconds')
                 if type(seconds) in (int, float) and math.isfinite(seconds) and seconds >= 0:
                     name = 'loraFileLoadSeconds' if event == 'lora_file_load' else 'loraPatchPreparationSeconds'

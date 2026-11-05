@@ -1775,6 +1775,7 @@ class LoadImage:
 
         components = InputImpl.VideoFromFile(image_path).get_components()
         if components.images.shape[0] > 0:
+            comfy.execution_metrics.observe_shape('image_loaded', components.images)
             return (components.images.to(device=device, dtype=dtype), (1.0 - components.alpha[..., -1]).to(device=device, dtype=dtype) if components.alpha is not None else torch.zeros((components.images.shape[0], 64, 64), dtype=dtype, device=device))
 
         # This code is left here to handle animated webp which pyav does not support loading
@@ -1809,6 +1810,7 @@ class LoadImage:
         output_image = torch.cat(output_images, dim=0)
         output_mask = torch.cat(output_masks, dim=0)
 
+        comfy.execution_metrics.observe_shape('image_loaded', output_image)
         return (output_image.to(device=device, dtype=dtype), output_mask.to(device=device, dtype=dtype))
 
     @classmethod

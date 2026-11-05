@@ -25,6 +25,15 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         for component in workload['components'] + [component for component in evidence['components'] if component['order'] == order]:
             if component['kind'] == 'lora':
                 component['features'].update(live)
+    if state.get('reference_features'):
+        order = next(index for index, item in enumerate(record['stages']) if item['id'] == stage['id'])
+        components = workload['components'] + [item for item in evidence['components'] if item['order'] == order]
+        for component in components:
+            if component['kind'] != 'reference':
+                continue
+            role = component['role'] if component['role'] == 'image_input' else component['role'].removeprefix(stage['id'] + ':')
+            for key, value in state['reference_features'].get(role, {}).items():
+                component['features'][key] = {**value, 'observedAt': observed_at}
     if state.get('precision'):
         record['workload']['precision'] = state['precision']
     reasons = set(stage['reasons'])
