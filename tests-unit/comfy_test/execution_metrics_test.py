@@ -91,6 +91,11 @@ def test_audio_layout_provenance_uses_exact_native_latent_format_types():
             samplers.KSAMPLER(samplers.k_diffusion_sampling.sample_euler), torch.zeros(3), None)
         assert dict(events)['sampling_plan']['audio_layout'] == expected
         assert dict(events)['sampling_plan']['evaluations'] == 2
+        assert dict(events)['sampling_plan']['stream_layout'] is None
+        events.clear()
+        samplers.sampling_metrics_callback(guider, [(1, 128, 3, 4, 5), (1, 8, 12, 16)],
+            samplers.KSAMPLER(samplers.k_diffusion_sampling.sample_euler), torch.zeros(3), None)
+        assert dict(events)['sampling_plan']['stream_layout'] == ('video_audio' if expected else None)
 
 
 def test_nested_stage_scope_restores_context_and_preserves_exceptions():
