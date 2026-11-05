@@ -60,7 +60,8 @@ def links(graph, node):
             if isinstance(value, list) and len(value) == 2 and isinstance(value[0], str) and value[0] in graph]
 
 
-def describe(graph, base, resource, observed_at, file_identity, digest, available_at='submission', loader_aliases=None):
+def describe(graph, base, resource, observed_at, file_identity, digest, available_at='submission', loader_aliases=None,
+             implementation_identity=None):
     reasons, ordered, visiting = set(), [], set()
 
     def node_kind(node):
@@ -132,6 +133,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 and audio_latent(value[0], (*seen, node_id)))
 
     components, resolved, requested, stages, base_models = [], {}, {}, [], []
+    model_sources, stage_revisions, implementations = {}, {}, {}
     sampling_profiles = set()
     for order, node_id in enumerate(ordered):
         component_start = len(components)
@@ -244,15 +246,40 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 reasons.add('control_active_steps_unmeasured')
         for key, value in node_facts.items():
             resolved[node_id + '.' + key] = value
+        parents = sorted(set(links(graph, node)))
+        # Scope identities to reachable work once in dependency order. Keep the
+        # whole-run identities below for audit and whole-run comparisons.
+        models = {source: values for parent in parents for source, values in model_sources.get(parent, {}).items()}
+        own_models = [[component['role'], component['identity']] for component in components[component_start:]
+                      if component['kind'] == 'model']
+        if own_models:
+            models[node_id] = own_models
+        model_sources[node_id] = models
+        selected_models = sorted((value for values in models.values() for value in values),
+                                 key=lambda value: (value[0], value[1] or ''))
+        stage_model = digest(selected_models) if selected_models and all(identity for _, identity in selected_models) else None
+        stage_revision = base['profileRevision']
+        if implementation_identity is not None:
+            declared = node.get('class_type', '')
+            if declared not in implementations:
+                implementations[declared] = implementation_identity(declared)
+            if any(parent not in stage_revisions for parent in parents):
+                stage_reasons.append('stage_dependency_identity_unresolved')
+            dependency_revisions = sorted([key, stage_revisions.get(value[0]), value[1]]
+                                          for key, value in inputs.items()
+                                          if isinstance(value, list) and len(value) == 2
+                                          and isinstance(value[0], str) and value[0] in graph)
+            stage_revision = digest(['dependency-stage-1', implementations[declared], sorted(inputs), dependency_revisions])
+        stage_revisions[node_id] = stage_revision
         input_reasons = workload_reasons(stage_reasons)
         reasons.update(input_reasons)
         stage_workload = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
                           'profile': 'vision' if kind in MOGE_NODES or kind in IMAGE_LOADERS or kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint') else 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
                                      next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
-                          'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
-                          'modelIdentity': None, 'requested': {}, 'resolved': node_facts, 'measurements': {},
+                          'implementation': {'revision': stage_revision, 'compatibilityId': None},
+                          'modelIdentity': stage_model, 'requested': {}, 'resolved': node_facts, 'measurements': {},
                           'components': components[component_start:], 'complete': not input_reasons, 'reasons': input_reasons}
-        stages.append({'id': node_id, 'kind': stage_kind, 'dependsOn': sorted(set(links(graph, node))),
+        stages.append({'id': node_id, 'kind': stage_kind, 'dependsOn': parents,
                        'resource': resource, 'workload': stage_workload, 'phase': 'queued',
                        'startedOffsetSeconds': None, 'completedOffsetSeconds': None, 'durationSeconds': None,
                        'reused': None, 'reasons': list(stage_reasons)})
@@ -264,8 +291,6 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                 'modelIdentity': model_identity, 'requested': requested, 'resolved': resolved, 'measurements': {},
                 'components': components, 'complete': not reasons, 'reasons': sorted(reasons)}
-    for stage in stages:
-        stage['workload']['modelIdentity'] = model_identity
     return evidence, stages
 
 

@@ -53,6 +53,22 @@ def implementation_content_identity(filename, _stat_key):
     return hashlib.sha256(Path(filename).read_bytes()).hexdigest()
 
 
+def node_implementation_identity(kind):
+    registry = getattr(sys.modules.get('nodes'), 'NODE_CLASS_MAPPINGS', {})
+    cls = registry.get(kind)
+    filename = getattr(sys.modules.get(getattr(cls, '__module__', '')), '__file__', None)
+    try:
+        stat = Path(filename).stat() if filename else None
+        key = (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns) if stat else None
+        return implementation_content_identity(filename, key) if stat else None
+    except OSError:
+        return None
+
+
+def stage_implementation_identity(kind):
+    return digest([runtime_identity(), kind, node_implementation_identity(kind)])
+
+
 FEATURES = {'width', 'height', 'steps', 'num_frames', 'frames', 'frame_count', 'length', 'fps',
             'duration', 'duration_seconds', 'batch_size', 'max_new_tokens', 'max_tokens', 'max_length', 'max_output_tokens', 'context_length', 'context_budget', 'megapixels', 'denoise'}
 SETTINGS = {'precision', 'dtype', 'weight_dtype', 'sampler_name', 'scheduler', 'attention', 'sampling_profile', 'decoder'}
@@ -134,17 +150,8 @@ def workload(graph):
         signatures[node_id] = digest([node.get('class_type'), sorted(node.get('inputs', {})), sorted(links)])
         return signatures[node_id]
     structure = sorted(signature(node_id, set()) for node_id in graph)
-    implementations = []
-    registry = getattr(sys.modules.get('nodes'), 'NODE_CLASS_MAPPINGS', {})
-    for kind in sorted({node.get('class_type', '') for node in graph.values()}):
-        cls = registry.get(kind)
-        filename = getattr(sys.modules.get(getattr(cls, '__module__', '')), '__file__', None)
-        try:
-            stat = Path(filename).stat() if filename else None
-            key = (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns) if stat else None
-            implementations.append([kind, implementation_content_identity(filename, key) if stat else None])
-        except OSError:
-            implementations.append([kind, None])
+    implementations = [[kind, node_implementation_identity(kind)]
+                       for kind in sorted({node.get('class_type', '') for node in graph.values()})]
     for node in graph.values():
         kind, inputs = node.get('class_type', ''), node.get('inputs', {})
         features[kind + '.nodeInstances'] = features.get(kind + '.nodeInstances', 0) + 1
@@ -288,7 +295,8 @@ class RunTimingStore:
                     available_at = 'submission' if record['phase'] == 'queued' else 'execution_start' if phase == 'started' else 'completion' if phase not in ('accepted', 'observation') else 'live'
                     evidence, stages = describe(resolved['stageGraph'], record['workload'], self.resource,
                                                 utc(), selected_file_identity, digest, available_at,
-                                                resolved.get('loaderAliases'))
+                                                resolved.get('loaderAliases'),
+                                                lambda kind: digest([stage_implementation_identity(kind), owner_revision]))
                     metadata = resolved.get('stageMetadata', {})
                     profile = resolved.get('workloadProfile')
                     if profile in ('diffusion_image', 'diffusion_video', 'text', 'audio', 'vision', '3d'):
@@ -342,7 +350,8 @@ class RunTimingStore:
             self.resolve_workload(record, item[2], action)
             if 'evidence' not in record['workload']:
                 record['workload']['evidence'], record['stages'] = describe(item[2], record['workload'], self.resource,
-                                                                         record['observedAt'], selected_file_identity, digest)
+                                                                         record['observedAt'], selected_file_identity, digest,
+                                                                         implementation_identity=stage_implementation_identity)
             self.clocks[prompt_id] = [self.now(), None, len(item[2])]
         elif record is None:
             self.issue = 'timing_acceptance_missing'
