@@ -14,14 +14,18 @@ MEASUREMENT_ONLY_REASONS = frozenset((
     'image_preparation_measurement_unavailable',
 ))
 AUDIO_NODES = {'LoadAudio': 'preparation', 'EmptyLatentAudio': 'preparation',
+               'LTXVAudioVAELoader': 'loading',
+               'LTXVEmptyLatentAudio': 'preparation', 'LTXVAudioVAEEncode': 'encoding', 'LTXVAudioVAEDecode': 'decoding',
                'VAEEncodeAudio': 'encoding', 'VAEDecodeAudio': 'decoding', 'VAEDecodeAudioTiled': 'decoding',
                'SaveAudio': 'publication', 'SaveAudioMP3': 'publication', 'SaveAudioOpus': 'publication',
                'PreviewAudio': 'publication'}
+AUDIO_INPUTS = {'VAEEncodeAudio': ('audio',), 'LTXVAudioVAEEncode': ('audio',)}
 
 
 NODE_STAGES = {
     'CheckpointLoaderSimple': 'loading', 'CheckpointLoader': 'loading', 'UNETLoader': 'loading',
     'CLIPLoader': 'loading', 'DualCLIPLoader': 'loading', 'TripleCLIPLoader': 'loading',
+    'LTXAVTextEncoderLoader': 'loading',
     'VAELoader': 'loading', 'ControlNetLoader': 'loading', 'DiffControlNetLoader': 'loading', 'CLIPVisionLoader': 'loading',
     'LoraLoader': 'preparation', 'LoraLoaderModelOnly': 'preparation',
     'EmptyLatentImage': 'preparation', 'EmptySD3LatentImage': 'preparation',
@@ -45,7 +49,8 @@ CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_st
             'tile_size', 'overlap', 'temporal_size', 'temporal_overlap', 'grow_mask_by',
             'strength_model', 'strength_clip', 'strength', 'start_percent', 'end_percent',
             'weight_dtype', 'type', 'device', 'max_length', 'mtp', 'thinking', 'response_format',
-            'context_budget', 'fps', 'source_fps', 'auto_resize', 'min_short_edge', 'seconds', 'normalize', 'quality', 'crop'}
+            'context_budget', 'fps', 'source_fps', 'auto_resize', 'min_short_edge', 'seconds', 'normalize', 'quality', 'crop',
+            'frames_number', 'frame_rate'}
 LATENTS = {'EmptyLatentImage': (8, 1, 4), 'EmptySD3LatentImage': (8, 1, 16),
            'EmptyHunyuanLatentVideo': (8, 4, 16), 'EmptyHunyuanVideo15Latent': (16, 4, 32),
            'EmptyLTXVLatentVideo': (32, 8, 128)}
@@ -126,7 +131,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             return False
         node = graph[node_id]
         kind = node_kind(node)
-        if kind in ('EmptyLatentAudio', 'VAEEncodeAudio'):
+        if kind in ('EmptyLatentAudio', 'VAEEncodeAudio', 'LTXVEmptyLatentAudio', 'LTXVAudioVAEEncode'):
             return True
         value = node.get('inputs', {}).get('latent_image')
         return (kind in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced')
@@ -145,10 +150,15 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         stage_reasons = [] if stage_kind != 'unknown' else ['unsupported_workload_adapter']
         if stage_reasons:
             reasons.add('unsupported_workload_adapter')
-        node_facts = {}
+        node_facts, node_requested = {}, {}
         controls = MOGE_CONTROLS if kind in MOGE_NODES else CONTROLS
         for key in (controls & inputs.keys()) if stage_kind != 'unknown' else ():
             value = scalar(inputs[key])
+            if kind == 'LTXVEmptyLatentAudio':
+                # The VAE owns frame/rate rounding and frequency configuration.
+                # Compare the observed allocation, retaining these as intent.
+                requested[node_id + '.' + key] = node_requested[key] = value
+                continue
             if kind in MOGE_NODES:
                 # Native runtime plans supply effective work; v1/v2, for example,
                 # ignore requested refinement passes. Keep those controls audit-only.
@@ -163,6 +173,8 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         model_keys = ('ckpt_name', 'unet_name', 'clip_name', 'clip_name1', 'clip_name2', 'clip_name3', 'vae_name', 'lora_name', 'control_net_name')
         if kind == 'LoadMoGeModel':
             model_keys = ('model_name',)
+        elif kind == 'LTXAVTextEncoderLoader':
+            model_keys = ('text_encoder', 'ckpt_name')
         for key in model_keys if stage_kind != 'unknown' else ():
             value = inputs.get(key)
             if not isinstance(value, str):
@@ -203,7 +215,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             components.append({'kind': 'reference', 'identity': None, 'role': 'audio_input', 'order': order,
                                'features': {'sourceStage': fact(node_id, kind)}})
             stage_reasons.append('audio_source_workload_unmeasured')
-        for role in IMAGE_INPUTS.get(kind, ()):
+        for role in IMAGE_INPUTS.get(kind, ()) + AUDIO_INPUTS.get(kind, ()):
             source = inputs.get(role)
             features = {'sourceStage': fact(source[0], kind)} if isinstance(source, list) and len(source) == 2 and isinstance(source[0], str) and source[0] in graph else {}
             components.append({'kind': 'reference', 'identity': None, 'role': node_id + ':' + role, 'order': order, 'features': features})
@@ -226,9 +238,17 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             node_facts.update({key: fact(value, kind) for key, value in shape.items()})
             if not shape:
                 stage_reasons.append('latent_shape_unresolved')
-        if kind == 'VAEEncodeAudio':
+        if kind == 'LTXVEmptyLatentAudio':
+            stage_reasons.append('audio_latent_workload_unmeasured')
+        if kind in ('VAEEncodeAudio', 'LTXVAudioVAEEncode'):
             stage_reasons.append('audio_processed_workload_unmeasured')
-        if kind in ('VAEDecodeAudio', 'VAEDecodeAudioTiled'):
+        if kind == 'LTXVAudioVAEEncode':
+            node_facts['ltxAudio.encodePlanRequired'] = fact(True, kind)
+            stage_reasons.append('ltx_audio_encode_workload_unmeasured')
+        if kind == 'LTXVAudioVAEDecode':
+            node_facts['ltxAudio.decodePlanRequired'] = fact(True, kind)
+            stage_reasons.append('ltx_audio_decode_workload_unmeasured')
+        if kind in ('VAEDecodeAudio', 'VAEDecodeAudioTiled', 'LTXVAudioVAEDecode'):
             stage_reasons.extend(('audio_decode_workload_unmeasured', 'audio_output_unmeasured'))
         if kind in AUDIO_NODES and stage_kind == 'publication':
             stage_reasons.append('audio_input_unmeasured')
@@ -284,7 +304,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             stage_profile = 'vision'
         elif kind in AUDIO_NODES or audio_latent(node_id):
             stage_profile = 'audio'
-        elif kind == 'CLIPTextEncode':
+        elif kind in ('CLIPTextEncode', 'LTXAVTextEncoderLoader'):
             stage_profile = 'text'
         else:
             stage_profile = node_profile or (next(iter(inherited_profiles)) if len(inherited_profiles) == 1 else 'unknown')
@@ -294,7 +314,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         stage_workload = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
                           'profile': stage_profile,
                           'implementation': {'revision': stage_revision, 'compatibilityId': None},
-                          'modelIdentity': stage_model, 'requested': {}, 'resolved': node_facts, 'measurements': {},
+                          'modelIdentity': stage_model, 'requested': node_requested, 'resolved': node_facts, 'measurements': {},
                           'components': components[component_start:], 'complete': not input_reasons, 'reasons': input_reasons}
         stages.append({'id': node_id, 'kind': stage_kind, 'dependsOn': parents,
                        'resource': resource, 'workload': stage_workload, 'phase': 'queued',

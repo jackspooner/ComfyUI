@@ -21,6 +21,7 @@ import comfy.context_windows
 import comfy.multigpu
 import comfy.utils
 import comfy.execution_metrics
+import comfy.latent_formats
 from comfy.internal_logging import detail
 import scipy.stats
 import numpy
@@ -1208,11 +1209,15 @@ def sampling_metrics_callback(guider, shapes, sampler, sigmas, callback):
                                   'sampler_pre_cfg_function', 'sampler_post_cfg_function', 'model_function_wrapper')))
         branches = 1 if 'negative' not in guider.original_conds or math.isclose(guider.cfg, 1.0) and not options.get('disable_cfg1_optimization', False) else 2
         model = guider.model_patcher
+        try:
+            audio_layout = {comfy.latent_formats.LTXAV: 'bctf', comfy.latent_formats.MiniMaxH3AV: 'bcat'}.get(type(model.model.latent_format))
+        except AttributeError:
+            audio_layout = None
         comfy.execution_metrics.emit('sampling_plan', shapes=shapes, shape=shapes[0] if len(shapes) == 1 else None,
                                      evaluations=max(0, len(sigmas) - 1) if type(sampler) is KSAMPLER and sampler.sampler_function is k_diffusion_sampling.sample_euler else None,
                                      branches=branches if simple_cfg else None, precision=str(model.model_dtype()),
                                      memory_strategy='dynamic' if model.is_dynamic() else 'standard',
-                                     offload_device=str(model.offload_device), load_device=str(model.load_device))
+                                     offload_device=str(model.offload_device), load_device=str(model.load_device), audio_layout=audio_layout)
     except Exception:
         comfy.execution_metrics.emit('sampling_plan_unavailable')
 
