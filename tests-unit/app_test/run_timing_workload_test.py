@@ -70,11 +70,15 @@ def test_terminal_storage_failure_cleans_only_attempt_memory(tmp_path):
     store.event('started', item)
     store.metric_states[('prompt', 'sample')] = {}
     store.metric_states[('other', 'sample')] = {}
+    store.control_origins['prompt'] = {object(): 'apply'}
+    store.control_origins['other'] = {object(): 'apply'}
     store.db.close()
     store.safe_event('finished', item, SimpleNamespace(completed=True, messages=[]))
     assert 'prompt' not in store.clocks
     assert ('prompt', 'sample') not in store.metric_states
     assert ('other', 'sample') in store.metric_states
+    assert 'prompt' not in store.control_origins
+    assert 'other' in store.control_origins
 
 
 def graph():
@@ -287,3 +291,34 @@ def test_processed_reference_boundaries_and_tile_coverage_do_not_use_contents(tm
     assert stage['workload']['measurements']['vaeTileForwardCompleted']['value'] == 12
     assert stage['workload']['measurements']['vaeTileCountingComplete']['value'] is True
     assert '/PRIVATE' not in json.dumps(record)
+
+
+def test_control_attribution_stores_scalar_work_without_runtime_handles(tmp_path):
+    value = {'loader': {'class_type': 'ControlNetLoader', 'inputs': {'control_net_name': 'weight'}},
+             'apply': {'class_type': 'ControlNetApplyAdvanced', 'inputs': {'control_net': ['loader', 0], 'strength': .7, 'start_percent': .2, 'end_percent': .8}},
+             'sample': {'class_type': 'KSampler', 'inputs': {'positive': ['apply', 0]}}}
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', value, {}, ['sample'])
+    with patch('app.run_timing.selected_file_identity', return_value='selected-control'):
+        store.event('accepted', item)
+        store.event('started', item)
+    binding, evaluation = object(), object()
+    store.safe_metric('prompt', 'apply', 'control_bound', {'binding': binding})
+    store.safe_stage('prompt', 'sample', 'started')
+    changes = store.db.total_changes
+    for _ in range(2):
+        store.safe_metric('prompt', 'sample', 'control_applied', {'binding': binding, 'evaluation': evaluation,
+                          'shape': (1, 3, 32, 64), 'adapter': 'controlnet'})
+    assert store.db.total_changes == changes
+    store.safe_stage('prompt', 'sample', 'finished')
+    record = store.page('0', 100, [], [])['observations'][-1]
+    stage = next(item for item in record['stages'] if item['id'] == 'sample')
+    component = stage['workload']['components'][0]
+    assert component['identity'] == 'selected-control'
+    assert component['features']['sourceStage']['value'] == 'apply'
+    assert component['features']['hint.axis.3']['value'] == 64
+    assert stage['workload']['measurements']['control.0.activeEvaluations']['value'] == 1
+    assert stage['workload']['measurements']['control.0.activeCalls']['value'] == 2
+    assert stage['workload']['measurements']['control.0.activeEvaluations']['availableAt'] == 'completion'
+    assert not any('activeEvaluations' in key for key in stage['workload']['resolved'])
+    assert 'object at' not in json.dumps(record)

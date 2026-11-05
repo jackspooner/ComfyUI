@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from app.run_timing_workload import describe, resolved_inputs
 from app.run_timing_metrics import apply_metrics
 from app.run_timing_references import observe_reference_metrics
+from app.run_timing_controls import observe_control_metrics
 
 
 def utc():
@@ -177,6 +178,7 @@ class RunTimingStore:
         self.gpu_waits = {}
         self.stage_snapshots = {}
         self.metric_states = {}
+        self.control_origins = {}
         self.pruned_at = 0
         self.db.commit()
         # Surviving observations are evidence of interruption, never a replay list.
@@ -341,6 +343,7 @@ class RunTimingStore:
                 reasons = set(evidence['reasons']) | {reason for stage in record.get('stages', []) for reason in stage['reasons']}
                 evidence.update(complete=not reasons, reasons=sorted(reasons))
             self.stage_snapshots.pop(prompt_id, None)
+            self.control_origins.pop(prompt_id, None)
             for key in [key for key in self.metric_states if key[0] == prompt_id]:
                 del self.metric_states[key]
             messages = status.messages if status else []
@@ -368,6 +371,7 @@ class RunTimingStore:
                 self.clocks.pop(prompt_id, None)
                 self.gpu_waits.pop(prompt_id, None)
                 self.stage_snapshots.pop(prompt_id, None)
+                self.control_origins.pop(prompt_id, None)
                 for key in [key for key in self.metric_states if key[0] == prompt_id]:
                     del self.metric_states[key]
 
@@ -433,7 +437,13 @@ class RunTimingStore:
                 return
             state = self.metric_states.setdefault((prompt_id, node_id), {'resolved': {}, 'measurements': {}, 'reasons': []})
             measurements = state['measurements']
-            if observe_reference_metrics(state, event, facts):
+            if event == 'control_bound':
+                binding = facts.get('binding')
+                if type(binding) is object:
+                    self.control_origins.setdefault(prompt_id, {})[binding] = node_id
+            elif observe_control_metrics(state, event, facts, self.control_origins.get(prompt_id, {}).get(facts.get('binding'))):
+                pass
+            elif observe_reference_metrics(state, event, facts):
                 pass
             elif event in ('lora_file_load', 'lora_patch_preparation'):
                 seconds = facts.get('seconds')

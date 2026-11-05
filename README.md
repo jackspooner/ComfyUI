@@ -216,6 +216,9 @@ preparation, retaining supported parsed ranks as live component evidence. See
 loaded-image dimensions, post-crop VAE encode shapes, actual standard 2D VAE tile
 forwards, conditioning output positions and native vision-feature reuse. Internal
 tilers and other reference paths retain explicit coverage limitations.
+Native ControlNet/T2I observations additionally distinguish interval skips, active
+noise evaluations, forward calls and T2I feature reuse, with application-stage
+correlation where available. Uncorrelated controls remain incomplete.
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
 [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
