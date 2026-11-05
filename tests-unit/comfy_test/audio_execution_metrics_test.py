@@ -72,6 +72,25 @@ def test_ltx_decode_keeps_stream_selection_native_rate_and_unnormalized_output()
                       ('audio_decoded', dict(shape=(1, 2, 2), sample_rate=48000))]
 
 
+@pytest.mark.parametrize('observer_raises', [False, True])
+def test_ltx_rate_conversion_happens_once_with_optional_observation(observer_raises):
+    class Rate:
+        calls = 0
+        def __int__(self):
+            self.calls += 1
+            if self.calls > 1:
+                raise RuntimeError('rate converted more than once')
+            return 48000
+    rate = Rate()
+    def observe(*_):
+        if observer_raises:
+            raise OSError('observer offline')
+    execution_metrics.set_observer(observe)
+    vae = SimpleNamespace(decode=lambda _: torch.zeros(1, 12, 2), first_stage_model=SimpleNamespace(output_sample_rate=rate))
+    output = nodes_lt_audio.LTXVAudioVAEDecode.execute({'samples': torch.zeros(1, 8, 3, 16)}, vae).result[0]
+    assert output['sample_rate'] == 48000 and rate.calls == 1
+
+
 def test_ltx_encode_inherits_the_existing_single_resample_and_encode_boundary(monkeypatch):
     events, calls = [], []
     def resample(value, source_rate, target_rate):
