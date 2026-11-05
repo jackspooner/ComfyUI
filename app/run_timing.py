@@ -15,6 +15,8 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from app.run_timing_workload import describe, resolved_inputs
+from app.run_timing_metrics import apply_metrics
 
 
 def utc():
@@ -51,7 +53,8 @@ def selected_file_identity(key, value):
     """Use the native path registry; keep file identity facts hashed and prompt-free."""
     categories = {'ckpt_name': 'checkpoints', 'checkpoint_name': 'checkpoints', 'unet_name': 'diffusion_models',
                   'diffusion_model': 'diffusion_models', 'vae_name': 'vae', 'lora_name': 'loras',
-                  'clip_name': 'text_encoders', 'clip_name1': 'text_encoders', 'clip_name2': 'text_encoders', 'clip_name3': 'text_encoders'}
+                  'clip_name': 'text_encoders', 'clip_name1': 'text_encoders', 'clip_name2': 'text_encoders', 'clip_name3': 'text_encoders',
+                  'control_net_name': 'controlnet'}
     category = categories.get(key)
     if not category:
         return None
@@ -171,6 +174,8 @@ class RunTimingStore:
                          'instanceId': self.instance_id, 'laneId': 'comfyui'}
         self.now, self.clocks, self.issue = now, {}, None
         self.gpu_waits = {}
+        self.stage_snapshots = {}
+        self.metric_states = {}
         self.pruned_at = 0
         self.db.commit()
         # Surviving observations are evidence of interruption, never a replay list.
@@ -178,6 +183,10 @@ class RunTimingStore:
             record = json.loads(raw)
             record['phase'] = 'unknown'
             record['coverageReasons'] = ['native_instance_restarted']
+            for stage in record.get('stages', []):
+                if stage['phase'] in ('queued', 'running'):
+                    stage['phase'] = 'unknown'
+                    stage['reasons'].append('native_instance_restarted')
             self._save(record, terminal=True)
 
     def _save(self, record, terminal=False):
@@ -275,6 +284,8 @@ class RunTimingStore:
                     candidates.extend(value for key, value in meta.items() if key in ('runId', 'requestId', 'operationId', 'jobId', 'batchId', 'promptId') and isinstance(value, str))
             record['relatedOperationIds'] = sorted({value for value in candidates if len(value) <= 128 and identity_pattern.fullmatch(value)})
             self.resolve_workload(record, item[2], action)
+            record['workload']['evidence'], record['stages'] = describe(item[2], record['workload'], self.resource,
+                                                                     record['observedAt'], selected_file_identity, digest)
             self.clocks[prompt_id] = [self.now(), None, len(item[2])]
         elif record is None:
             self.issue = 'timing_acceptance_missing'
@@ -299,6 +310,25 @@ class RunTimingStore:
             self.gpu_waits.pop(prompt_id, None)
             if record['phase'] == 'succeeded':
                 record['readyAt'] = record['finishedAt']
+            for stage in record.get('stages', []):
+                metrics = self.metric_states.pop((prompt_id, stage['id']), None)
+                if metrics:
+                    apply_metrics(record, stage, metrics, utc(), completed=True)
+                if stage['phase'] == 'running':
+                    stage['phase'] = 'unknown' if record['phase'] == 'succeeded' else record['phase']
+                    stage['reasons'].append('stage_completion_unobserved')
+                elif stage['phase'] == 'queued':
+                    stage['phase'] = 'unknown' if record['phase'] == 'succeeded' else record['phase']
+                    stage['reasons'].append('stage_execution_unobserved')
+                if stage['reasons'] and stage.get('workload'):
+                    stage['workload'].update(complete=False, reasons=stage['reasons'])
+            evidence = record['workload'].get('evidence')
+            if evidence:
+                reasons = set(evidence['reasons']) | {reason for stage in record.get('stages', []) for reason in stage['reasons']}
+                evidence.update(complete=not reasons, reasons=sorted(reasons))
+            self.stage_snapshots.pop(prompt_id, None)
+            for key in [key for key in self.metric_states if key[0] == prompt_id]:
+                del self.metric_states[key]
             messages = status.messages if status else []
             cached = [data.get('nodes', []) for event, data in messages if event == 'execution_cached']
             if record['workload']['cache'] != 'unknown':
@@ -327,9 +357,136 @@ class RunTimingStore:
                 record = json.loads(row[0])
                 if record['workload']['cache'] == 'unknown':
                     record['workload']['cache'] = 'hit' if len(cached_nodes) == clock[2] else 'partial' if cached_nodes else 'none'
-                    self._save(record)
+                for stage in record.get('stages', []):
+                    stage['reused'] = stage['id'] in cached_nodes
+                    if stage['reused']:
+                        stage.update(phase='succeeded', durationSeconds=0)
+                self._save(record)
         except Exception:
             self.issue = 'timing_cache_observation_unavailable'
+
+    def safe_inputs(self, prompt_id, node_id, kind, inputs):
+        try:
+            row = self.db.execute('SELECT record FROM timing_records WHERE id=?', (prompt_id,)).fetchone()
+            if not row or prompt_id not in self.clocks:
+                return
+            record = json.loads(row[0])
+            stage = next((item for item in record.get('stages', []) if item['id'] == node_id), None)
+            if stage is None or stage.get('workload') is None:
+                return
+            facts, references = resolved_inputs(kind, inputs, utc())
+            if not facts and not references:
+                return
+            evidence = record['workload']['evidence']
+            stage['workload']['resolved'].update(facts)
+            evidence['resolved'].update({node_id + '.' + key: value for key, value in facts.items()})
+            for role, features in references:
+                component = {'kind': 'reference', 'identity': None, 'role': node_id + ':' + role,
+                             'order': next(index for index, item in enumerate(record['stages']) if item['id'] == node_id), 'features': features}
+                stage['workload']['components'] = [item for item in stage['workload']['components'] if item['role'] != component['role']] + [component]
+                evidence['components'] = [item for item in evidence['components'] if item['role'] != component['role']] + [component]
+            # Internal reference crops/tiles and control intervals still require their
+            # own native measurements; input tensor shape alone cannot establish them.
+            self._save(record)
+        except Exception:
+            self.issue = 'timing_input_observation_unavailable'
+
+    def safe_metric(self, prompt_id, node_id, event, facts):
+        try:
+            if prompt_id not in self.clocks:
+                return
+            state = self.metric_states.setdefault((prompt_id, node_id), {'resolved': {}, 'measurements': {}, 'reasons': []})
+            measurements = state['measurements']
+            if event == 'sampling_plan':
+                state['plans'] = state.get('plans', 0) + 1
+                if state['plans'] > 1:
+                    state['reasons'].append('multiple_sampling_invocations')
+                shape = facts.get('shape')
+                if isinstance(shape, tuple) and len(shape) in (4, 5) and all(type(value) is int and value > 0 for value in shape):
+                    state['resolved'].update(batch=shape[0], latentChannels=shape[1], latentWidth=shape[-1],
+                                             latentHeight=shape[-2], latentFrames=shape[2] if len(shape) == 5 else 1)
+                for source, target in (('evaluations', 'modelEvaluations'), ('branches', 'cfgBranches')):
+                    if type(facts.get(source)) is int and facts[source] > 0:
+                        state['resolved'][target] = facts[source]
+                if facts.get('branches') is None:
+                    state['reasons'].append('cfg_behavior_unmeasured')
+                for source, target in (('memory_strategy', 'memoryStrategy'), ('offload_device', 'offloadDevice'), ('load_device', 'loadDevice')):
+                    if isinstance(facts.get(source), str):
+                        state['resolved'][target] = facts[source][:128]
+                state['precision'] = facts.get('precision')
+                self.safe_stage(prompt_id, node_id, 'metrics')
+            elif event == 'model_forward':
+                for source, target, default in (('elements', 'modelForwardElements', 0), ('conditional', 'conditionalForwardCalls', 0), ('unconditional', 'unconditionalForwardCalls', 0)):
+                    value = facts.get(source, default)
+                    if type(value) is int and value >= 0:
+                        measurements[target] = measurements.get(target, 0) + value
+                measurements['modelForwardCalls'] = measurements.get('modelForwardCalls', 0) + 1
+            elif event == 'noise_evaluation':
+                measurements['noiseEvaluations'] = measurements.get('noiseEvaluations', 0) + 1
+                measurements['cfgBranchEvaluations'] = measurements.get('cfgBranchEvaluations', 0) + facts.get('branches', 0)
+            elif event == 'sampling_progress':
+                completed, total = facts.get('completed'), facts.get('total')
+                if type(completed) is not int or type(total) is not int or not 0 <= completed <= total or total <= 0:
+                    return
+                state['progress'] = {'unit': 'sampling_steps', 'completed': completed, 'total': total,
+                                     'reliable': state.get('plans') == 1}
+                measurements['executedSteps'] = completed
+                if self.now() - state.get('last_snapshot', float('-inf')) >= 5:
+                    clock = self.clocks.get(prompt_id)
+                    if clock and clock[1] is not None and state.get('started_offset') is not None:
+                        keys = sum(key.startswith('progress.') for key in measurements)
+                        if keys < 128:
+                            measurements['progress.' + str(completed) + '.elapsedSeconds'] = max(0, self.elapsed_phases(prompt_id, clock)[0] - state['started_offset'])
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+                    state['last_snapshot'] = self.now()
+            elif event == 'sampling_plan_unavailable':
+                state['reasons'].append('sampling_plan_unavailable')
+        except Exception:
+            self.issue = 'timing_metric_observation_unavailable'
+
+    def safe_stage(self, prompt_id, node_id, action, completed=None, total=None):
+        """Observe existing progress events; throttle durable progress writes to five seconds."""
+        try:
+            row = self.db.execute('SELECT record FROM timing_records WHERE id=?', (prompt_id,)).fetchone()
+            clock = self.clocks.get(prompt_id)
+            if not row or not clock or clock[1] is None:
+                return
+            record = json.loads(row[0])
+            stage = next((stage for stage in record.get('stages', []) if stage['id'] == node_id), None)
+            if stage is None or stage['reused']:
+                return
+            metrics = self.metric_states.get((prompt_id, node_id))
+            if metrics:
+                metrics['started_offset'] = stage['startedOffsetSeconds']
+                apply_metrics(record, stage, metrics, utc(), completed=action == 'finished')
+            elapsed = self.elapsed_phases(prompt_id, clock)[0]
+            if action == 'started':
+                if stage['phase'] != 'running':
+                    stage.update(phase='running', startedOffsetSeconds=elapsed)
+            elif action == 'finished':
+                # A cache finish without start is reuse, not a measured execution.
+                if stage['startedOffsetSeconds'] is None:
+                    stage.update(phase='succeeded', reused=True, durationSeconds=0)
+                else:
+                    stage.update(phase='succeeded', completedOffsetSeconds=elapsed,
+                                 durationSeconds=max(0, elapsed - stage['startedOffsetSeconds']))
+            elif action == 'progress':
+                if type(completed) not in (int, float) or type(total) not in (int, float) or not all(math.isfinite(v) for v in (completed, total)) or not 0 <= completed <= total or total <= 0:
+                    return
+                # The shared registry can mix model transfers and sampling callbacks.
+                # A node-level percentage alone cannot establish remaining inference work.
+                if not stage.get('progress', {}).get('reliable'):
+                    stage['progress'] = {'unit': 'node_units', 'completed': completed, 'total': total, 'reliable': False}
+                last = self.stage_snapshots.get(prompt_id, {}).get(node_id, float('-inf'))
+                if self.now() - last < 5:
+                    return
+            elif action != 'metrics':
+                return
+            if action == 'progress':
+                self.stage_snapshots.setdefault(prompt_id, {})[node_id] = self.now()
+            self._save(record)
+        except Exception:
+            self.issue = 'timing_stage_observation_unavailable'
 
     def page(self, cursor, limit, running, pending):
         after = int(cursor or '0')

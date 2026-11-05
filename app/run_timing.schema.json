@@ -283,6 +283,281 @@
                         "null"
                       ]
                     }
+                  },
+                  "evidence": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "version": {
+                        "const": 2
+                      },
+                      "extractorVersion": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      "observedAt": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      },
+                      "profile": {
+                        "enum": [
+                          "diffusion_image",
+                          "diffusion_video",
+                          "text",
+                          "audio",
+                          "vision",
+                          "3d",
+                          "unknown"
+                        ]
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "revision": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "compatibilityId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "revision",
+                          "compatibilityId"
+                        ]
+                      },
+                      "modelIdentity": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "requested": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "null"
+                          ]
+                        }
+                      },
+                      "resolved": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "value": {
+                              "type": [
+                                "string",
+                                "number",
+                                "boolean",
+                                "null"
+                              ]
+                            },
+                            "availableAt": {
+                              "enum": [
+                                "submission",
+                                "execution_start",
+                                "live",
+                                "completion"
+                              ]
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "source": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": [
+                            "value",
+                            "availableAt",
+                            "observedAt",
+                            "source"
+                          ]
+                        }
+                      },
+                      "measurements": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "value": {
+                              "type": [
+                                "string",
+                                "number",
+                                "boolean",
+                                "null"
+                              ]
+                            },
+                            "availableAt": {
+                              "enum": [
+                                "submission",
+                                "execution_start",
+                                "live",
+                                "completion"
+                              ]
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "source": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": [
+                            "value",
+                            "availableAt",
+                            "observedAt",
+                            "source"
+                          ]
+                        }
+                      },
+                      "components": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "model",
+                                "reference",
+                                "lora",
+                                "controlnet",
+                                "adapter",
+                                "cache"
+                              ]
+                            },
+                            "identity": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "role": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "order": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "features": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "value": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "null"
+                                    ]
+                                  },
+                                  "availableAt": {
+                                    "enum": [
+                                      "submission",
+                                      "execution_start",
+                                      "live",
+                                      "completion"
+                                    ]
+                                  },
+                                  "observedAt": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "source": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  }
+                                },
+                                "required": [
+                                  "value",
+                                  "availableAt",
+                                  "observedAt",
+                                  "source"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "identity",
+                            "role",
+                            "order",
+                            "features"
+                          ]
+                        }
+                      },
+                      "complete": {
+                        "type": "boolean"
+                      },
+                      "reasons": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        }
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "extractorVersion",
+                      "observedAt",
+                      "profile",
+                      "implementation",
+                      "modelIdentity",
+                      "requested",
+                      "resolved",
+                      "measurements",
+                      "components",
+                      "complete",
+                      "reasons"
+                    ]
                   }
                 },
                 "required": [
@@ -296,6 +571,463 @@
                   "features",
                   "settings"
                 ]
+              },
+              "stages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    },
+                    "kind": {
+                      "enum": [
+                        "loading",
+                        "preparation",
+                        "encoding",
+                        "inference",
+                        "sampling",
+                        "decoding",
+                        "publication",
+                        "unknown"
+                      ]
+                    },
+                    "dependsOn": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    },
+                    "sharedOperationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512
+                    },
+                    "resource": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "hostId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "gpuUuid": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "instanceId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "laneId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        }
+                      },
+                      "required": [
+                        "hostId",
+                        "gpuUuid",
+                        "instanceId",
+                        "laneId"
+                      ]
+                    },
+                    "workload": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "version": {
+                          "const": 2
+                        },
+                        "extractorVersion": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "observedAt": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "profile": {
+                          "enum": [
+                            "diffusion_image",
+                            "diffusion_video",
+                            "text",
+                            "audio",
+                            "vision",
+                            "3d",
+                            "unknown"
+                          ]
+                        },
+                        "implementation": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "revision": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "compatibilityId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "revision",
+                            "compatibilityId"
+                          ]
+                        },
+                        "modelIdentity": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "requested": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": [
+                              "string",
+                              "number",
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        },
+                        "resolved": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "value": {
+                                "type": [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "availableAt": {
+                                "enum": [
+                                  "submission",
+                                  "execution_start",
+                                  "live",
+                                  "completion"
+                                ]
+                              },
+                              "observedAt": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "source": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              }
+                            },
+                            "required": [
+                              "value",
+                              "availableAt",
+                              "observedAt",
+                              "source"
+                            ]
+                          }
+                        },
+                        "measurements": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "value": {
+                                "type": [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "availableAt": {
+                                "enum": [
+                                  "submission",
+                                  "execution_start",
+                                  "live",
+                                  "completion"
+                                ]
+                              },
+                              "observedAt": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "source": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              }
+                            },
+                            "required": [
+                              "value",
+                              "availableAt",
+                              "observedAt",
+                              "source"
+                            ]
+                          }
+                        },
+                        "components": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "model",
+                                  "reference",
+                                  "lora",
+                                  "controlnet",
+                                  "adapter",
+                                  "cache"
+                                ]
+                              },
+                              "identity": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "role": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "order": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "features": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "value": {
+                                      "type": [
+                                        "string",
+                                        "number",
+                                        "boolean",
+                                        "null"
+                                      ]
+                                    },
+                                    "availableAt": {
+                                      "enum": [
+                                        "submission",
+                                        "execution_start",
+                                        "live",
+                                        "completion"
+                                      ]
+                                    },
+                                    "observedAt": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    },
+                                    "source": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    }
+                                  },
+                                  "required": [
+                                    "value",
+                                    "availableAt",
+                                    "observedAt",
+                                    "source"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "identity",
+                              "role",
+                              "order",
+                              "features"
+                            ]
+                          }
+                        },
+                        "complete": {
+                          "type": "boolean"
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "extractorVersion",
+                        "observedAt",
+                        "profile",
+                        "implementation",
+                        "modelIdentity",
+                        "requested",
+                        "resolved",
+                        "measurements",
+                        "components",
+                        "complete",
+                        "reasons"
+                      ]
+                    },
+                    "phase": {
+                      "enum": [
+                        "queued",
+                        "running",
+                        "succeeded",
+                        "failed",
+                        "cancelled",
+                        "unknown"
+                      ]
+                    },
+                    "startedOffsetSeconds": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "completedOffsetSeconds": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "durationSeconds": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reused": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "progress": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "unit": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "completed": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "total": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "reliable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "unit",
+                        "completed",
+                        "total",
+                        "reliable"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "dependsOn",
+                    "resource",
+                    "phase",
+                    "startedOffsetSeconds",
+                    "completedOffsetSeconds",
+                    "durationSeconds",
+                    "reused",
+                    "reasons"
+                  ]
+                }
               },
               "phase": {
                 "enum": [
@@ -642,6 +1374,281 @@
                             "null"
                           ]
                         }
+                      },
+                      "evidence": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "version": {
+                            "const": 2
+                          },
+                          "extractorVersion": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "profile": {
+                            "enum": [
+                              "diffusion_image",
+                              "diffusion_video",
+                              "text",
+                              "audio",
+                              "vision",
+                              "3d",
+                              "unknown"
+                            ]
+                          },
+                          "implementation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "revision": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              "compatibilityId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "revision",
+                              "compatibilityId"
+                            ]
+                          },
+                          "modelIdentity": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "requested": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": [
+                                "string",
+                                "number",
+                                "boolean",
+                                "null"
+                              ]
+                            }
+                          },
+                          "resolved": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "value": {
+                                  "type": [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                    "null"
+                                  ]
+                                },
+                                "availableAt": {
+                                  "enum": [
+                                    "submission",
+                                    "execution_start",
+                                    "live",
+                                    "completion"
+                                  ]
+                                },
+                                "observedAt": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "availableAt",
+                                "observedAt",
+                                "source"
+                              ]
+                            }
+                          },
+                          "measurements": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "value": {
+                                  "type": [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                    "null"
+                                  ]
+                                },
+                                "availableAt": {
+                                  "enum": [
+                                    "submission",
+                                    "execution_start",
+                                    "live",
+                                    "completion"
+                                  ]
+                                },
+                                "observedAt": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                }
+                              },
+                              "required": [
+                                "value",
+                                "availableAt",
+                                "observedAt",
+                                "source"
+                              ]
+                            }
+                          },
+                          "components": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "model",
+                                    "reference",
+                                    "lora",
+                                    "controlnet",
+                                    "adapter",
+                                    "cache"
+                                  ]
+                                },
+                                "identity": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "order": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "features": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "value": {
+                                        "type": [
+                                          "string",
+                                          "number",
+                                          "boolean",
+                                          "null"
+                                        ]
+                                      },
+                                      "availableAt": {
+                                        "enum": [
+                                          "submission",
+                                          "execution_start",
+                                          "live",
+                                          "completion"
+                                        ]
+                                      },
+                                      "observedAt": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 512
+                                      },
+                                      "source": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 512
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "availableAt",
+                                      "observedAt",
+                                      "source"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "identity",
+                                "role",
+                                "order",
+                                "features"
+                              ]
+                            }
+                          },
+                          "complete": {
+                            "type": "boolean"
+                          },
+                          "reasons": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "extractorVersion",
+                          "observedAt",
+                          "profile",
+                          "implementation",
+                          "modelIdentity",
+                          "requested",
+                          "resolved",
+                          "measurements",
+                          "components",
+                          "complete",
+                          "reasons"
+                        ]
                       }
                     },
                     "required": [
@@ -655,6 +1662,463 @@
                       "features",
                       "settings"
                     ]
+                  },
+                  "stages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "kind": {
+                          "enum": [
+                            "loading",
+                            "preparation",
+                            "encoding",
+                            "inference",
+                            "sampling",
+                            "decoding",
+                            "publication",
+                            "unknown"
+                          ]
+                        },
+                        "dependsOn": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          }
+                        },
+                        "sharedOperationId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "resource": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "hostId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "gpuUuid": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "instanceId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "laneId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            }
+                          },
+                          "required": [
+                            "hostId",
+                            "gpuUuid",
+                            "instanceId",
+                            "laneId"
+                          ]
+                        },
+                        "workload": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "version": {
+                              "const": 2
+                            },
+                            "extractorVersion": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "observedAt": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "profile": {
+                              "enum": [
+                                "diffusion_image",
+                                "diffusion_video",
+                                "text",
+                                "audio",
+                                "vision",
+                                "3d",
+                                "unknown"
+                              ]
+                            },
+                            "implementation": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "revision": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "compatibilityId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 512
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "revision",
+                                "compatibilityId"
+                              ]
+                            },
+                            "modelIdentity": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "requested": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "resolved": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "value": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "null"
+                                    ]
+                                  },
+                                  "availableAt": {
+                                    "enum": [
+                                      "submission",
+                                      "execution_start",
+                                      "live",
+                                      "completion"
+                                    ]
+                                  },
+                                  "observedAt": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "source": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  }
+                                },
+                                "required": [
+                                  "value",
+                                  "availableAt",
+                                  "observedAt",
+                                  "source"
+                                ]
+                              }
+                            },
+                            "measurements": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "value": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "null"
+                                    ]
+                                  },
+                                  "availableAt": {
+                                    "enum": [
+                                      "submission",
+                                      "execution_start",
+                                      "live",
+                                      "completion"
+                                    ]
+                                  },
+                                  "observedAt": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "source": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  }
+                                },
+                                "required": [
+                                  "value",
+                                  "availableAt",
+                                  "observedAt",
+                                  "source"
+                                ]
+                              }
+                            },
+                            "components": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "model",
+                                      "reference",
+                                      "lora",
+                                      "controlnet",
+                                      "adapter",
+                                      "cache"
+                                    ]
+                                  },
+                                  "identity": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 512
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "role": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "order": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "features": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "value": {
+                                          "type": [
+                                            "string",
+                                            "number",
+                                            "boolean",
+                                            "null"
+                                          ]
+                                        },
+                                        "availableAt": {
+                                          "enum": [
+                                            "submission",
+                                            "execution_start",
+                                            "live",
+                                            "completion"
+                                          ]
+                                        },
+                                        "observedAt": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        },
+                                        "source": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        }
+                                      },
+                                      "required": [
+                                        "value",
+                                        "availableAt",
+                                        "observedAt",
+                                        "source"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "identity",
+                                  "role",
+                                  "order",
+                                  "features"
+                                ]
+                              }
+                            },
+                            "complete": {
+                              "type": "boolean"
+                            },
+                            "reasons": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              }
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "extractorVersion",
+                            "observedAt",
+                            "profile",
+                            "implementation",
+                            "modelIdentity",
+                            "requested",
+                            "resolved",
+                            "measurements",
+                            "components",
+                            "complete",
+                            "reasons"
+                          ]
+                        },
+                        "phase": {
+                          "enum": [
+                            "queued",
+                            "running",
+                            "succeeded",
+                            "failed",
+                            "cancelled",
+                            "unknown"
+                          ]
+                        },
+                        "startedOffsetSeconds": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "completedOffsetSeconds": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "durationSeconds": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "reused": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ]
+                        },
+                        "progress": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512
+                            },
+                            "completed": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "total": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "reliable": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "completed",
+                            "total",
+                            "reliable"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "dependsOn",
+                        "resource",
+                        "phase",
+                        "startedOffsetSeconds",
+                        "completedOffsetSeconds",
+                        "durationSeconds",
+                        "reused",
+                        "reasons"
+                      ]
+                    }
                   },
                   "phase": {
                     "enum": [
@@ -1108,6 +2572,6 @@
   },
   "x-source": {
     "repository": "https://github.com/jackspooner/router-contracts",
-    "commit": "af98823d71f8024287bf8cef883d7c9f4689337e"
+    "commit": "cf0f102c4b6c3cfe0855be183f112347a8974f37"
   }
 }

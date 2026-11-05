@@ -202,6 +202,13 @@ This fork adds local, durable [run timing observations](docs/run-timing.md) for
 MediaTools duration and queue forecasts. The server adapter records prompt-free
 native queue/execution measurements and exposes a machine-local read-only API.
 It preserves upstream queue/model ownership; forecasts are produced by MediaTools.
+Optional version-2 workload evidence and resource-qualified stage observations
+describe supported native sampling/latent/loader/LoRA/ControlNet nodes explicitly.
+Existing progress handlers measure node-stage elapsed time and cache reuse;
+unknown adapters and unmeasured reference processing remain incomplete. Native
+sampling reports actual shapes, evaluation/CFG counters and distinct reliable
+sampling progress; generic node progress remains unreliable. See
+[timing coverage and limitations](docs/run-timing.md).
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
 [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
