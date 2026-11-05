@@ -36,13 +36,20 @@ def test_monotonic_phases_and_durable_cursor(tmp_path):
 
 def test_restart_does_not_invent_completion(tmp_path):
     filename = str(tmp_path / 'timing.sqlite')
-    first = RunTimingStore(filename)
+    clock = [0.0]
+    first = RunTimingStore(filename, now=lambda: clock[0])
     first.event('accepted', item())
+    clock[0] = 5
     first.event('started', item())
+    clock[0] = 7
+    first.numeric_evidence('p1', {'inputTokens': 1})
     second = RunTimingStore(filename)
     records = second.page('0', 100, [], [])['observations']
     assert records[-1]['phase'] == 'unknown'
-    assert records[-1]['durations']['executionSeconds'] is None
+    # Retain the last observed elapsed span, without fabricating an end duration.
+    assert records[-1]['durations']['executionSeconds'] == 2
+    assert 'finishedAt' not in records[-1]
+    assert records[-1]['coverageReasons'] == ['native_instance_restarted']
     assert second.source_id == first.source_id
     assert second.instance_id != first.instance_id
 

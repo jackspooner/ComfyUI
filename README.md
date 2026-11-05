@@ -202,6 +202,12 @@ This fork adds local, durable [run timing observations](docs/run-timing.md) for
 MediaTools duration and queue forecasts. The server adapter records prompt-free
 native queue/execution measurements and exposes a machine-local read-only API.
 It preserves upstream queue/model ownership; forecasts are produced by MediaTools.
+Optional loopback `GET /timing/observations/stream` delivers bounded live-only SSE
+snapshots at existing committed timing boundaries. It starts with a cursor baseline
+and reports overflow/oversize gaps; durable cursor reads remain the recovery path.
+Intermediate snapshots retain current owner-monotonic elapsed time. Interrupted
+records retain last observed elapsed evidence with an unknown outcome, without an
+invented end duration. Matching readers and separate activation are required.
 Optional version-2 workload evidence and resource-qualified stage observations
 describe supported native sampling/latent/loader/LoRA/ControlNet nodes explicitly.
 Existing progress handlers measure node-stage elapsed time and cache reuse;
