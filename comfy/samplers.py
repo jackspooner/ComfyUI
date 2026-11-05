@@ -1198,13 +1198,14 @@ def sampling_metrics_callback(guider, shapes, sampler, sigmas, callback):
         return callback
     try:
         options = guider.model_options
-        # Subclass guiders may implement different branch semantics. The standard
-        # CFG path alone supplies an advance branch count; actual calls are observed.
-        simple_cfg = (type(guider) is CFGGuider and all(len(value) == 1 for value in guider.original_conds.values())
-                      and set(guider.original_conds) == {'positive', 'negative'}
+        # BasicGuider inherits this same native prediction path with positive-only
+        # conditioning. Overrides retain unknown advance branch semantics.
+        simple_cfg = (type(guider).predict_noise is CFGGuider.predict_noise
+                      and all(len(value) == 1 for value in guider.original_conds.values())
+                      and set(guider.original_conds) in ({'positive'}, {'positive', 'negative'})
                       and not any(key in options for key in ('sampler_calc_cond_batch_function', 'sampler_cfg_function',
                                   'sampler_pre_cfg_function', 'sampler_post_cfg_function', 'model_function_wrapper')))
-        branches = 1 if math.isclose(guider.cfg, 1.0) and not options.get('disable_cfg1_optimization', False) else 2
+        branches = 1 if 'negative' not in guider.original_conds or math.isclose(guider.cfg, 1.0) and not options.get('disable_cfg1_optimization', False) else 2
         model = guider.model_patcher
         comfy.execution_metrics.emit('sampling_plan', shapes=shapes, shape=shapes[0] if len(shapes) == 1 else None,
                                      evaluations=max(0, len(sigmas) - 1) if type(sampler) is KSAMPLER and sampler.sampler_function is k_diffusion_sampling.sample_euler else None,
