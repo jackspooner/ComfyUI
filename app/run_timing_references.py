@@ -26,7 +26,7 @@ def observe_reference_metrics(state, event, facts):
         target.update({key: {'value': value, 'source': source, 'availableAt': available} for key, value in values.items()})
 
     if event == 'tensor_shape_unavailable':
-        reason('reference_shape_unavailable')
+        reason('audio_output_metadata_unavailable' if facts.get('operation') == 'audio_decoded' else 'reference_shape_unavailable')
         return True
     if event == 'vae_decode_tiled_fallback':
         count('vaeDecodeTiledFallbacks')

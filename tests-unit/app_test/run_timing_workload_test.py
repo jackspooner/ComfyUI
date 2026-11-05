@@ -415,3 +415,18 @@ def test_invalid_owner_declarations_remain_explicit_coverage_failures(tmp_path):
     assert not evidence['complete']
     assert 'declared_timing_profile_invalid' in evidence['reasons']
     assert 'declared_timing_implementation_invalid' in evidence['reasons']
+
+
+def test_text_precision_is_stage_scoped_without_implying_complete_text_work(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'text': {'class_type': 'TextGenerate', 'inputs': {'max_length': 5}}}, {}, ['text'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'text', 'started')
+    store.safe_metric('prompt', 'text', 'text_generation_plan', {'input_positions': 3, 'batch': 1,
+                      'output_limit': 5, 'kv_capacity': 8, 'precision': 'torch.float32'})
+    stage = store.page('0', 100, [], [])['observations'][-1]['stages'][0]
+    precision = stage['workload']['resolved']['executionPrecision']
+    assert precision['value'] == 'torch.float32'
+    assert precision['source'] == 'native_text_loop' and precision['availableAt'] == 'execution_start'
+    assert 'text_input_modalities_unmeasured' in stage['workload']['reasons']

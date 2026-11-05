@@ -95,6 +95,9 @@ def test_processed_audio_is_live_and_decoded_output_never_becomes_input_evidence
     before_output = latest(store)
     assert 'audio_decode_workload_unmeasured' not in before_output['stages'][1]['reasons']
     assert 'audio_output_unmeasured' in before_output['stages'][1]['reasons']
+    assert before_output['stages'][1]['workload']['complete']
+    assert 'audio_output_unmeasured' not in before_output['stages'][1]['workload']['reasons']
+    assert before_output['workload']['evidence']['complete']
     store.safe_metric('prompt', 'decode', 'audio_decoded', {'shape': (1, 2, 24000), 'sample_rate': 24000})
     store.safe_stage('prompt', 'decode', 'metrics')
     measured = latest(store)
@@ -109,6 +112,51 @@ def test_processed_audio_is_live_and_decoded_output_never_becomes_input_evidence
     jsonschema.validate(store.page('0', 100, [], []), schema['$defs']['TimingObservationPage'])
 
 
+def test_output_metadata_failures_preserve_input_completeness_and_explicit_stage_gap(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'decode': {'class_type': 'VAEDecodeAudio', 'inputs': {}}}, {}, ['decode'])
+    store.event('accepted', item)
+    accepted = latest(store)
+    assert 'audio_decode_workload_unmeasured' in accepted['workload']['evidence']['reasons']
+    assert 'audio_output_unmeasured' not in accepted['workload']['evidence']['reasons']
+    store.event('started', item)
+    store.safe_stage('prompt', 'decode', 'started')
+    store.safe_metric('prompt', 'decode', 'audio_vae_decode_input', {'shape': (1, 64, 12), 'tiled': False, 'normalize': False})
+    store.safe_metric('prompt', 'decode', 'audio_decoded', {'shape': (1, 0), 'sample_rate': 0})
+    store.safe_metric('prompt', 'decode', 'tensor_shape_unavailable', {'operation': 'audio_decoded'})
+    store.safe_stage('prompt', 'decode', 'finished')
+    stage = latest(store)['stages'][0]
+    assert stage['workload']['complete'] and stage['workload']['reasons'] == []
+    assert 'audio_output_metadata_unavailable' in stage['reasons']
+    assert not stage['workload']['measurements']
+    store.event('finished', item, SimpleNamespace(completed=True, messages=[]))
+    final = latest(store)
+    assert final['workload']['evidence']['complete']
+    assert 'audio_output_metadata_unavailable' in final['stages'][0]['reasons']
+
+
+def test_missing_stage_end_is_measurement_only_but_unobserved_execution_stays_incomplete(tmp_path):
+    store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
+    item = (1, 'prompt', {'decode': {'class_type': 'VAEDecodeAudio', 'inputs': {}}}, {}, ['decode'])
+    store.event('accepted', item)
+    store.event('started', item)
+    store.safe_stage('prompt', 'decode', 'started')
+    store.safe_metric('prompt', 'decode', 'audio_vae_decode_input', {'shape': (1, 64, 12), 'tiled': False, 'normalize': False})
+    store.event('finished', item, SimpleNamespace(completed=True, messages=[]))
+    final = latest(store)
+    assert final['stages'][0]['phase'] == 'unknown'
+    assert final['stages'][0]['durationSeconds'] is None
+    assert 'stage_completion_unobserved' in final['stages'][0]['reasons']
+    assert final['workload']['evidence']['complete']
+    other = (2, 'unobserved', {'prepare': {'class_type': 'EmptyLatentAudio', 'inputs': {'seconds': 1.1, 'batch_size': 1}}}, {}, ['prepare'])
+    store.event('accepted', other)
+    store.event('started', other)
+    store.event('finished', other, SimpleNamespace(completed=True, messages=[]))
+    final = latest(store)
+    assert 'stage_execution_unobserved' in final['workload']['evidence']['reasons']
+    assert not final['workload']['evidence']['complete']
+
+
 @pytest.mark.parametrize('shape', [(2, 64, 12), (2, 32, 2, 12)])
 def test_runtime_audio_sampling_shape_keeps_reliable_counts_without_spatial_inference(tmp_path, shape):
     store = RunTimingStore(str(tmp_path / 'timing.sqlite'))
@@ -118,8 +166,11 @@ def test_runtime_audio_sampling_shape_keeps_reliable_counts_without_spatial_infe
     store.event('accepted', item)
     store.event('started', item)
     store.safe_stage('prompt', 'sample', 'started')
-    store.safe_metric('prompt', 'sample', 'sampling_plan', {'shape': shape, 'evaluations': 2, 'branches': 1})
+    store.safe_metric('prompt', 'sample', 'sampling_plan', {'shape': shape, 'evaluations': 2, 'branches': 1, 'precision': 'torch.bfloat16'})
     stage = latest(store)['stages'][1]
+    precision = stage['workload']['resolved']['executionPrecision']
+    assert precision['value'] == 'torch.bfloat16'
+    assert precision['availableAt'] == 'execution_start' and precision['source'] == 'native_sampler'
     assert not any(key in stage['workload']['resolved'] for key in ('latentWidth', 'latentHeight', 'latentFrames'))
     if len(shape) == 3:
         assert stage['workload']['resolved']['audioLatentLength']['value'] == 12

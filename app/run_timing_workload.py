@@ -2,7 +2,10 @@
 import math
 from app.run_timing_audio import waveform_features
 
-EXTRACTOR_VERSION = 'comfy-explicit-3'
+EXTRACTOR_VERSION = 'comfy-explicit-4'
+MEASUREMENT_ONLY_REASONS = frozenset((
+    'audio_output_unmeasured', 'audio_output_metadata_unavailable', 'stage_completion_unobserved',
+))
 AUDIO_NODES = {'LoadAudio': 'preparation', 'EmptyLatentAudio': 'preparation',
                'VAEEncodeAudio': 'encoding', 'VAEDecodeAudio': 'decoding', 'VAEDecodeAudioTiled': 'decoding',
                'SaveAudio': 'publication', 'SaveAudioMP3': 'publication', 'SaveAudioOpus': 'publication',
@@ -37,6 +40,11 @@ CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_st
 LATENTS = {'EmptyLatentImage': (8, 1, 4), 'EmptySD3LatentImage': (8, 1, 16),
            'EmptyHunyuanLatentVideo': (8, 4, 16), 'EmptyHunyuanVideo15Latent': (16, 4, 32),
            'EmptyLTXVLatentVideo': (32, 8, 128)}
+
+
+def workload_reasons(reasons):
+    """Missing outcomes/spans do not change otherwise resolved input work."""
+    return sorted(set(reasons) - MEASUREMENT_ONLY_REASONS)
 
 
 def links(graph, node):
@@ -200,13 +208,14 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 reasons.add('control_active_steps_unmeasured')
         for key, value in node_facts.items():
             resolved[node_id + '.' + key] = value
-        reasons.update(stage_reasons)
+        input_reasons = workload_reasons(stage_reasons)
+        reasons.update(input_reasons)
         stage_workload = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
                           'profile': 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
                                      next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
                           'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                           'modelIdentity': None, 'requested': {}, 'resolved': node_facts, 'measurements': {},
-                          'components': components[component_start:], 'complete': not stage_reasons, 'reasons': stage_reasons}
+                          'components': components[component_start:], 'complete': not input_reasons, 'reasons': input_reasons}
         stages.append({'id': node_id, 'kind': stage_kind, 'dependsOn': sorted(set(links(graph, node))),
                        'resource': resource, 'workload': stage_workload, 'phase': 'queued',
                        'startedOffsetSeconds': None, 'completedOffsetSeconds': None, 'durationSeconds': None,

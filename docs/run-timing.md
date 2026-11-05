@@ -229,3 +229,16 @@ durable audio-boundary snapshots occur once per event type and stage. Output
 durations remain per invocation rather than being summed across unrelated audio.
 There is no broader audio matching, linear scaling, added model execution or GPU
 synchronization. CPU fixture parity is separate from deployed real-model acceptance.
+
+Extractor `comfy-explicit-4` keeps input-workload completeness distinct from known
+measurement gaps. `audio_output_unmeasured`, `audio_output_metadata_unavailable`
+and `stage_completion_unobserved` remain in `stage.reasons`, while being excluded
+from `stage.workload.reasons` and whole-workload completeness. A missing end span
+keeps that stage's phase/duration unknown; it does not invalidate separately known
+input work or the owner's successful end-to-end duration. Stage residuals still
+need actual successful spans, so a missing span may require whole-run fallback.
+Unobserved execution, unsupported paths, missing inputs, tile/layout gaps and
+multiple invocations are not reclassified. This change does not make future
+decode/publication input work known or provide a whole-run ETA for that missing
+work. Sampling and shared text-loop plans also expose their actually observed
+`executionPrecision` on the stage; precision is not inferred for other operations.
