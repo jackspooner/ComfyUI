@@ -230,10 +230,14 @@ acceptance remains unrun while unrelated generation occupies the queue.
 
 ## Stable release maintenance in this fork
 
-This fork merges upstream stable [v0.43.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.43.0)
+This fork merges upstream stable [v0.44.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.44.0)
 while retaining its native model, conversation and memory-recovery changes.
-Upstream adds adaptive Qwen MTP trees, writable KV storage, fused Flux2 VAE
-operations and Fibo/MOSS-Image fixes. Cloud-deployment uploads and their persistent
+This release adds H3 latent upscaling, Sol-H3 and p-h3-image VAE support,
+VAE compute-dtype selection, ProRes/chroma controls and an additional
+`TextGenerateV2` node with repeated media inputs. The existing `TextGenerate`
+keeps its five outputs, history, JSON and memory-budget controls; V2 has upstream's
+two-output single-turn contract. See [text conversations](docs/text-conversations.md).
+Cloud-deployment uploads and their persistent
 headless-use marker are excluded under this fork's no-internet policy;
 source support does not establish local checkpoint or quality acceptance.
 Use the release's pinned frontend, templates and Comfy Kitchen alongside a
