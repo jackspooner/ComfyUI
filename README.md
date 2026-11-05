@@ -227,6 +227,10 @@ allowance, fresh KV allocation, prefill/decode forward boundaries and generated
 token counts. The standard encoder's expansion metadata attributes text/image/audio
 and padding positions before generation. Final token length remains unknown while
 running; other loops and unrecognized embeddings retain coverage limitations.
+Native audio adapters observe waveform duration/rate/channels, post-resample VAE
+inputs and completed decode outputs. Ordinary audio sampling keeps temporal latent
+length/channel groups separate from image/video axes. Tiled audio internals and
+unsupported synthesis paths retain explicit limitations; audio matching stays exact.
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
 [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).

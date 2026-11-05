@@ -1594,6 +1594,7 @@ class VAE:
                 do_tile = True
 
             if do_tile:
+                comfy.execution_metrics.emit('vae_decode_tiled_fallback')
                 pixel_samples = None
                 comfy.model_management.soft_empty_cache()
                 dims = samples_in.ndim - 2

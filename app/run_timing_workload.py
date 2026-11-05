@@ -1,5 +1,12 @@
 """Explicit, prompt-free workload adapters; no node execution or GPU queries."""
 import math
+from app.run_timing_audio import waveform_features
+
+EXTRACTOR_VERSION = 'comfy-explicit-3'
+AUDIO_NODES = {'LoadAudio': 'preparation', 'EmptyLatentAudio': 'preparation',
+               'VAEEncodeAudio': 'encoding', 'VAEDecodeAudio': 'decoding', 'VAEDecodeAudioTiled': 'decoding',
+               'SaveAudio': 'publication', 'SaveAudioMP3': 'publication', 'SaveAudioOpus': 'publication',
+               'PreviewAudio': 'publication'}
 
 
 NODE_STAGES = {
@@ -19,13 +26,14 @@ NODE_STAGES = {
     'BasicScheduler': 'preparation', 'RandomNoise': 'preparation', 'DisableNoise': 'preparation',
     'VAEDecode': 'decoding', 'VAEDecodeTiled': 'decoding', 'SaveImage': 'publication', 'PreviewImage': 'publication',
     'TextGenerate': 'inference', 'TextGenerateLTX2Prompt': 'inference',
+    **AUDIO_NODES,
 }
 CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_step', 'end_at_step',
             'add_noise', 'return_with_leftover_noise', 'width', 'height', 'length', 'batch_size',
             'tile_size', 'overlap', 'temporal_size', 'temporal_overlap', 'grow_mask_by',
             'strength_model', 'strength_clip', 'strength', 'start_percent', 'end_percent',
             'weight_dtype', 'type', 'device', 'max_length', 'mtp', 'thinking', 'response_format',
-            'context_budget', 'fps', 'source_fps', 'auto_resize', 'min_short_edge'}
+            'context_budget', 'fps', 'source_fps', 'auto_resize', 'min_short_edge', 'seconds', 'normalize', 'quality'}
 LATENTS = {'EmptyLatentImage': (8, 1, 4), 'EmptySD3LatentImage': (8, 1, 16),
            'EmptyHunyuanLatentVideo': (8, 4, 16), 'EmptyHunyuanVideo15Latent': (16, 4, 32),
            'EmptyLTXVLatentVideo': (32, 8, 128)}
@@ -73,6 +81,13 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             return {}
         node = graph[node_id]
         kind, inputs = node_kind(node), node.get('inputs', {})
+        if kind == 'EmptyLatentAudio':
+            seconds, batch = scalar(inputs.get('seconds')), scalar(inputs.get('batch_size', 1))
+            if (type(seconds) not in (int, float) or seconds <= 0 or not math.isfinite(seconds * 44100)
+                    or type(batch) is not int or batch <= 0):
+                return {}
+            length = round((seconds * 44100 / 2048) / 2) * 2
+            return {'audioLatentLength': length, 'latentChannels': 64, 'batch': batch} if length > 0 else {}
         if kind in LATENTS:
             spatial, temporal, channels = LATENTS[kind]
             values = {key: scalar(inputs.get(key, default)) for key, default in
@@ -84,9 +99,21 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                     'batch': values['batch_size']}
         if kind in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced'):
             value = inputs.get('latent_image')
-            if isinstance(value, list) and len(value) == 2:
+            if isinstance(value, list) and len(value) == 2 and value[1] == 0:
                 return latent_shape(value[0], (*seen, node_id))
         return {}
+
+    def audio_latent(node_id, seen=()):
+        if node_id in seen or node_id not in graph:
+            return False
+        node = graph[node_id]
+        kind = node_kind(node)
+        if kind in ('EmptyLatentAudio', 'VAEEncodeAudio'):
+            return True
+        value = node.get('inputs', {}).get('latent_image')
+        return (kind in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced')
+                and isinstance(value, list) and len(value) == 2 and value[1] == 0
+                and audio_latent(value[0], (*seen, node_id)))
 
     components, resolved, requested, stages, base_models = [], {}, {}, [], []
     sampling_profiles = set()
@@ -131,7 +158,8 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 reasons.add('latent_shape_unresolved')
                 stage_reasons.append('latent_shape_unresolved')
             node_facts.update({key: fact(value, kind + '.latent_image') for key, value in shape.items()})
-            sampling_profiles.add('diffusion_video' if shape.get('latentFrames', 1) > 1 else 'diffusion_image')
+            sampling_profiles.add('audio' if audio_latent(node_id) else
+                                  'diffusion_video' if shape.get('latentFrames', 1) > 1 else 'diffusion_image')
             # Step callbacks are measured later; configured steps do not assert NFE or CFG branch execution.
             stage_reasons.append('model_evaluations_unmeasured')
             reasons.add('model_evaluations_unmeasured')
@@ -139,6 +167,21 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             # Source paths are deliberately excluded. Processed reference shapes require runtime evidence.
             components.append({'kind': 'reference', 'identity': None, 'role': 'image_input', 'order': order, 'features': {'sourceStage': fact(node_id, kind)}})
             reasons.add('reference_processing_unmeasured')
+        if kind == 'LoadAudio':
+            components.append({'kind': 'reference', 'identity': None, 'role': 'audio_input', 'order': order,
+                               'features': {'sourceStage': fact(node_id, kind)}})
+            stage_reasons.append('audio_source_workload_unmeasured')
+        if kind == 'EmptyLatentAudio':
+            shape = latent_shape(node_id)
+            node_facts.update({key: fact(value, kind) for key, value in shape.items()})
+            if not shape:
+                stage_reasons.append('latent_shape_unresolved')
+        if kind == 'VAEEncodeAudio':
+            stage_reasons.append('audio_processed_workload_unmeasured')
+        if kind in ('VAEDecodeAudio', 'VAEDecodeAudioTiled'):
+            stage_reasons.extend(('audio_decode_workload_unmeasured', 'audio_output_unmeasured'))
+        if kind in AUDIO_NODES and stage_kind == 'publication':
+            stage_reasons.append('audio_input_unmeasured')
         if kind in ('TextGenerate', 'TextGenerateLTX2Prompt'):
             sampling_profiles.add('text')
             stage_reasons.extend(('text_loop_coverage_unresolved', 'text_input_modalities_unmeasured'))
@@ -157,8 +200,10 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 reasons.add('control_active_steps_unmeasured')
         for key, value in node_facts.items():
             resolved[node_id + '.' + key] = value
-        stage_workload = {'version': 2, 'extractorVersion': 'comfy-explicit-2', 'observedAt': observed_at,
-                          'profile': next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
+        reasons.update(stage_reasons)
+        stage_workload = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
+                          'profile': 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
+                                     next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
                           'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                           'modelIdentity': None, 'requested': {}, 'resolved': node_facts, 'measurements': {},
                           'components': components[component_start:], 'complete': not stage_reasons, 'reasons': stage_reasons}
@@ -167,8 +212,9 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                        'startedOffsetSeconds': None, 'completedOffsetSeconds': None, 'durationSeconds': None,
                        'reused': None, 'reasons': list(stage_reasons)})
     model_identity = digest(base_models) if base_models and all(identity for _, identity in base_models) else None
-    evidence = {'version': 2, 'extractorVersion': 'comfy-explicit-2', 'observedAt': observed_at,
-                'profile': next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
+    evidence = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
+                'profile': next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else
+                           'audio' if not sampling_profiles and any(node_kind(node) in AUDIO_NODES for node in graph.values()) else 'unknown',
                 'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                 'modelIdentity': model_identity, 'requested': requested, 'resolved': resolved, 'measurements': {},
                 'components': components, 'complete': not reasons, 'reasons': sorted(reasons)}
@@ -208,4 +254,10 @@ def resolved_inputs(kind, inputs, observed_at):
                     facts[role + '.' + str(index) + '.encodedTokens'] = fact(shape[-2])
     if kind == 'CLIPTextEncode' and isinstance(inputs.get('text'), str):
         facts['inputCharacters'] = fact(len(inputs['text']))
+    if kind in AUDIO_NODES and isinstance(inputs.get('audio'), dict):
+        audio = inputs['audio']
+        values = waveform_features(getattr(audio.get('waveform'), 'shape', ()), audio.get('sample_rate'))
+        if values is not None:
+            facts.update({'audioInput.' + key: fact(value) for key, value in values.items()})
+            references.append(('audio', {key: fact(value) for key, value in values.items()}))
     return facts, references

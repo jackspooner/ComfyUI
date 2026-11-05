@@ -106,6 +106,8 @@ tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/control_execution_metrics_test.py
 tests-unit/comfy_test/text_execution_metrics_test.py
+tests-unit/app_test/run_timing_audio_test.py
+tests-unit/comfy_test/audio_execution_metrics_test.py
 tests-unit/comfy_test/vision_features_test.py -q`
 using the prepared interpreter. Fixtures use tiny CPU tensors and mocked sampling;
 they do not establish real-model or performance acceptance.
@@ -192,3 +194,38 @@ observable but does not yet refine MediaTools empirical residuals. No sampler,
 stopping rule, output token, constraint or failure/retry behavior is changed.
 Run `text_generation_length_test.py` and `text_json_native_test.py` alongside the
 focused text timing checks to validate EOS, automatic budgets and constraints.
+
+Extractor `comfy-explicit-3` adds explicit native `LoadAudio`, `EmptyLatentAudio`,
+`VAEEncodeAudio`, `VAEDecodeAudio[Tiled]` and ordinary audio save/preview adapters.
+Only existing tensor shapes and integer rates are observed: batch, waveform
+channels, per-item sample count and seconds stay separate. Filenames and waveform
+values are excluded. `EmptyLatentAudio` uses native even rounding at the 44.1 kHz /
+2048 latent ratio; that describes latent allocation, not a promised decoded length.
+Linked seconds are resolved through supported primitive nodes. Audio sampling
+identified from native audio-latent ancestry records ordinary 3D temporal latent
+length; 4D audio tensors retain raw axes and an unresolved-layout reason because
+native audio VAEs can use different time/frequency/channel layouts. It never
+fabricates spatial/video axes from an audio tensor. Unsupported shapes and joint
+AV streams remain incomplete. An audio
+reference loader does not change a text-generation operation's main profile.
+
+Native audio VAE encode hooks observe actual post-resample B/C/sample dimensions
+as live facts, preserving original-rate input metadata separately. H3's reference
+encoder observes its actual first batch item, not all supplied waveform items.
+Decode records the selected latent stream and existing normalization/tile options;
+returned waveform dimensions/rate/duration are completion measurements and never
+resolved input features. The existing sample-rate override and normalization
+behavior is unchanged. Loading source dimensions are live facts available only
+after that existing file decode; no header preflight or extra file read is added.
+Ordinary save/preview stages observe their already resolved waveform input.
+
+The collector clears only the corresponding measured audio-coverage reasons.
+Native VAE decode memory fallback records a separate live tiling-regime change
+without backdating it into the initial decode options or asserting tile counts.
+Unknown/malformed waveform metadata, actual tile forward work, repeated audio
+invocations, unsupported synthesis/transcription and custom suffix-decode paths
+retain explicit gaps. Audio facts are bounded to 16 invocations per operation;
+durable audio-boundary snapshots occur once per event type and stage. Output
+durations remain per invocation rather than being summed across unrelated audio.
+There is no broader audio matching, linear scaling, added model execution or GPU
+synchronization. CPU fixture parity is separate from deployed real-model acceptance.
