@@ -21,6 +21,7 @@ AUDIO_NODES = {'LoadAudio': 'preparation', 'EmptyLatentAudio': 'preparation',
                'PreviewAudio': 'publication'}
 AUDIO_INPUTS = {'VAEEncodeAudio': ('audio',), 'LTXVAudioVAEEncode': ('audio',)}
 AV_INPUTS = {'LTXVConcatAVLatent': ('video_latent', 'audio_latent'), 'LTXVSeparateAVLatent': ('av_latent',)}
+AV_ALLOCATORS = {'EmptyMiniMaxH3LatentAV'}
 
 
 NODE_STAGES = {
@@ -44,6 +45,7 @@ NODE_STAGES = {
     'TextGenerate': 'inference', 'TextGenerateLTX2Prompt': 'inference',
     **AUDIO_NODES,
     **{name: 'preparation' for name in AV_INPUTS},
+    **{name: 'preparation' for name in AV_ALLOCATORS},
     **MOGE_NODES,
 }
 CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_step', 'end_at_step',
@@ -152,7 +154,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if node_id in seen or node_id not in graph:
             return False
         node = graph[node_id]
-        if node_kind(node) == 'LTXVConcatAVLatent':
+        if node_kind(node) in AV_ALLOCATORS or node_kind(node) == 'LTXVConcatAVLatent':
             return True
         value = node.get('inputs', {}).get('latent_image')
         return (node_kind(node) in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced')
@@ -175,9 +177,9 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         controls = MOGE_CONTROLS if kind in MOGE_NODES else CONTROLS
         for key in (controls & inputs.keys()) if stage_kind != 'unknown' else ():
             value = scalar(inputs[key])
-            if kind == 'LTXVEmptyLatentAudio':
-                # The VAE owns frame/rate rounding and frequency configuration.
-                # Compare the observed allocation, retaining these as intent.
+            if kind == 'LTXVEmptyLatentAudio' or kind in AV_ALLOCATORS:
+                # Native allocators own effective rounding and shape. Compare
+                # their observed allocation, retaining these as audit intent.
                 requested[node_id + '.' + key] = node_requested[key] = value
                 continue
             if kind in MOGE_NODES:
@@ -251,6 +253,9 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             node_facts['jointPreparation.nativePlanRequired'] = fact(True, kind)
             node_facts['jointPreparation.operation'] = fact('concat' if kind == 'LTXVConcatAVLatent' else 'separate', kind)
             stage_reasons.append('joint_preparation_workload_unmeasured')
+        if kind in AV_ALLOCATORS:
+            node_facts['jointAllocation.nativePlanRequired'] = fact(True, kind)
+            stage_reasons.append('h3_allocation_workload_unmeasured')
         if kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint'):
             node_facts['imageEncode.nativePlanRequired'] = fact(True, kind)
             stage_reasons.append('image_encode_workload_unmeasured')
@@ -332,7 +337,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                               if parent in stage_profiles and stage_profiles[parent] != 'unknown'}
         if kind in MOGE_NODES or kind in IMAGE_LOADERS or kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint', 'CLIPVisionLoader', 'CLIPVisionEncode'):
             stage_profile = 'vision'
-        elif kind in AV_INPUTS:
+        elif kind in AV_INPUTS or kind in AV_ALLOCATORS:
             stage_profile = 'diffusion_video'
         elif kind in AUDIO_NODES or audio_latent(node_id):
             stage_profile = 'audio'
@@ -355,7 +360,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
     model_identity = digest(base_models) if base_models and all(identity for _, identity in base_models) else None
     evidence = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
                 'profile': next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else
-                           'diffusion_video' if not sampling_profiles and any(node_kind(node) in AV_INPUTS for node in graph.values()) else
+                           'diffusion_video' if not sampling_profiles and any(node_kind(node) in AV_INPUTS or node_kind(node) in AV_ALLOCATORS for node in graph.values()) else
                            'audio' if not sampling_profiles and any(node_kind(node) in AUDIO_NODES for node in graph.values()) else
                            'vision' if not sampling_profiles and any(node_kind(node) in MOGE_NODES or node_kind(node) in ('CLIPVisionLoader', 'CLIPVisionEncode') for node in graph.values()) else 'unknown',
                 'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},

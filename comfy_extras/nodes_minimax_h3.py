@@ -93,15 +93,20 @@ def _encode_ref_audio(audio_vae, audio):
 
 
 def _av_latent(width, height, latent_t, audio_t, batch_size=1):
-    video = torch.zeros([batch_size, 24, latent_t, height // 16, width // 16],
-                        device=comfy.model_management.intermediate_device())
-    audio = torch.zeros([batch_size, 32, 2, audio_t],
-                        device=comfy.model_management.intermediate_device())
+    video_shape = [batch_size, 24, latent_t, height // 16, width // 16]
+    audio_shape = [batch_size, 32, 2, audio_t]
+    comfy.execution_metrics.emit('h3_av_allocation_plan', video_shape=tuple(video_shape), audio_shape=tuple(audio_shape))
+    with comfy.execution_metrics.measure('h3_av_allocate'):
+        video = torch.zeros(video_shape, device=comfy.model_management.intermediate_device())
+        audio = torch.zeros(audio_shape, device=comfy.model_management.intermediate_device())
+    comfy.execution_metrics.observe_shapes('h3_av_allocation_output', {'video': video, 'audio': audio})
     return {"samples": comfy.nested_tensor.NestedTensor((video, audio))}
 
 
 def _empty_av_latent(width, height, length, batch_size=1):
     frame_count, latent_t, audio_t = temporal_shape(length)
+    comfy.execution_metrics.emit('h3_av_temporal_plan', frames=frame_count, video_latents=latent_t,
+                                 audio_latents=audio_t, frame_rate=FPS, audio_latent_rate=AUDIO_LATENT_FPS)
     return _av_latent(width, height, latent_t, audio_t, batch_size), frame_count
 
 
