@@ -22,6 +22,7 @@ from app.run_timing_controls import observe_control_metrics
 from app.run_timing_text import observe_text_metrics
 from app.run_timing_audio import observe_audio_metrics
 from app.run_timing_vision import observe_moge_metrics
+from app.run_timing_stream import TimingStreamHub
 
 
 def utc():
@@ -184,6 +185,7 @@ class RunTimingStore:
         self.instance_id = str(uuid.uuid4())
         self.resource = {'hostId': host_id or socket.gethostname(), 'gpuUuid': gpu_uuid,
                          'instanceId': self.instance_id, 'laneId': 'comfyui'}
+        self.streams = TimingStreamHub(self.source_id, self.resource)
         self.now, self.clocks, self.issue = now, {}, None
         self.gpu_waits = {}
         self.stage_snapshots = {}
@@ -205,16 +207,28 @@ class RunTimingStore:
     def _save(self, record, terminal=False):
         record['revision'] += 1
         record['observedAt'] = utc()
+        clock = self.clocks.get(record['id'])
+        if clock and record['phase'] in ('queued', 'running'):
+            if clock[1] is None:
+                record['durations']['queueSeconds'] = max(0, self.now() - clock[0])
+            else:
+                execution, queued, held = self.elapsed_phases(record['id'], clock)
+                record['durations'].update(executionSeconds=execution, queueSeconds=queued)
+                record['workload']['features']['observed.gpuHoldWaitSeconds'] = held
         value, now = json.dumps(record, allow_nan=False), time.time()
         with self.db:
             self.db.execute('INSERT INTO timing_records VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET record=excluded.record,terminal_at=excluded.terminal_at',
                             (record['id'], value, now if terminal else None))
-            self.db.execute('INSERT INTO timing_events(record,at) VALUES(?,?)', (value, now))
+            cursor = self.db.execute('INSERT INTO timing_events(record,at) VALUES(?,?)', (value, now)).lastrowid
             if now - self.pruned_at > 60:
                 self.db.execute('DELETE FROM timing_events WHERE at<?', (now - 90 * 86400,))
                 self.db.execute('DELETE FROM timing_records WHERE terminal_at<?', (now - 90 * 86400,))
                 self.pruned_at = now
         self.issue = None
+        try:
+            self.streams.publish(cursor, value)
+        except Exception:
+            self.issue = 'timing_stream_unavailable'
 
     def numeric_evidence(self, prompt_id, features):
         row = self.db.execute('SELECT record FROM timing_records WHERE id=?', (prompt_id,)).fetchone()
