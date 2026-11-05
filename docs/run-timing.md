@@ -88,8 +88,17 @@ Native scalar hooks count noise evaluations, model forward calls/elements and
 conditional/unconditional branch work. The generic native CFGGuider boundary,
 including standard and custom samplers, observes the
 actual latent shape after native correction, model dtype, dynamic/standard memory
-strategy and load/offload devices. Explicit Euler plans describe their resolved
-noise-evaluation count by native sampler-function identity; unsupported samplers,
+strategy and load/offload devices. Reviewed native Euler, Euler ancestral (including
+its native flow-matching dispatch), non-CFG++ res-multistep and ER-SDE paths plan
+one noise evaluation per schedule interval. Their identities and effective scalar
+options are execution-start facts; defaults come from the native function signature.
+Euler's unbounded churn cutoff is represented as `positive_infinity`, keeping JSON
+finite. `SamplerEulerAncestral` preparation retains `eta` and `s_noise`; actual
+sampling options still come from the resolved native sampler. Explicit custom noise
+samplers/scalers, nonempty specialized inpaint options, unsupported options,
+custom sampler subclasses/wrappers and unreviewed multi-evaluation/adaptive/CFG++
+paths retain unknown advance evaluations. No schedule values are read or transferred
+to plan the count. Unsupported samplers,
 guiders that override native prediction and CFG hooks retain coverage reasons.
 Positive-only BasicGuider inherits the verified native CFG path and reports one
 planned branch. Joint AV streams retain
@@ -134,6 +143,7 @@ consumer must support this additive contract before producer activation; older
 strict readers may reject the extra fields. No source change alone activates it.
 Focused CPU verification: `python -m pytest tests-unit/app_test/run_timing_test.py
 tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_metrics_test.py
+tests-unit/app_test/run_timing_sampler_test.py tests-unit/comfy_test/sampling_execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/clip_vision_execution_metrics_test.py

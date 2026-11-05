@@ -620,6 +620,12 @@ class RunTimingStore:
                 for source, target in (('evaluations', 'modelEvaluations'), ('branches', 'cfgBranches')):
                     if type(facts.get(source)) is int and facts[source] > 0:
                         state['resolved'][target] = facts[source]
+                if facts.get('sampler') in ('euler', 'euler_ancestral', 'res_multistep', 'er_sde'):
+                    state['resolved']['nativeSampler'] = facts['sampler']
+                    for key, value in facts.get('sampler_options', {}).items():
+                        if isinstance(key, str) and len(key) <= 64 and (type(value) is str and len(value) <= 64
+                                or type(value) in (int, float) and math.isfinite(value)):
+                            state['resolved']['samplerOption.' + key] = value
                 if facts.get('branches') is None:
                     state['reasons'].append('cfg_behavior_unmeasured')
                 for source, target in (('memory_strategy', 'memoryStrategy'), ('offload_device', 'offloadDevice'), ('load_device', 'loadDevice')):
