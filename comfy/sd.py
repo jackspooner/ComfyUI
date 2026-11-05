@@ -5,6 +5,8 @@ import logging
 from contextlib import contextmanager
 from functools import wraps
 import threading
+import comfy.execution_metrics
+import comfy.weight_adapter
 
 from comfy import model_management
 from comfy.component_leases import active_pool
@@ -132,6 +134,15 @@ def load_lora_for_models(model, clip, lora, strength_model, strength_clip, lora_
 
     lora = comfy.lora_convert.convert_lora(lora)
     loaded = comfy.lora.load_lora(lora, key_map)
+    if comfy.execution_metrics.enabled():
+        try:
+            ranks = [int(adapter.weights[1].shape[0]) for adapter in loaded.values()
+                     if type(adapter) is comfy.weight_adapter.LoRAAdapter]
+            comfy.execution_metrics.emit('lora_patch_metadata', parsed_patches=len(loaded), rank_count=len(ranks),
+                                         rank_min=min(ranks) if ranks else None, rank_max=max(ranks) if ranks else None,
+                                         application_mode='native_patcher')
+        except Exception:
+            comfy.execution_metrics.emit('lora_metadata_unavailable')
     if model is not None:
         new_modelpatcher = model.clone()
         k = new_modelpatcher.add_patches(loaded, strength_model)
@@ -154,6 +165,7 @@ def load_lora_for_models(model, clip, lora, strength_model, strength_clip, lora_
     for x in loaded:
         if (x not in k) and (x not in k1):
             logging.warning("NOT LOADED {}".format(x))
+    comfy.execution_metrics.emit('lora_patch_registered', model_patches=len(k), clip_patches=len(k1))
 
     return (new_modelpatcher, new_clip)
 

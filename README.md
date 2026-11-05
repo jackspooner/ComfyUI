@@ -209,7 +209,9 @@ unknown adapters and unmeasured reference processing remain incomplete. Native
 sampling reports actual shapes, evaluation/CFG counters and distinct reliable
 sampling progress; generic node progress remains unreliable. Composite descriptions
 can correlate native expansion IDs and optional nested-call telemetry scopes without
-replacing the executor's context. Joint AV stream shapes stay separate. See
+replacing the executor's context. Joint AV stream shapes stay separate.
+Standard LoRA loaders additionally distinguish file reuse/loading and CPU patch
+preparation, retaining supported parsed ranks as live component evidence. See
 [timing coverage and limitations](docs/run-timing.md).
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
