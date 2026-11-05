@@ -230,7 +230,7 @@ durations remain per invocation rather than being summed across unrelated audio.
 There is no broader audio matching, linear scaling, added model execution or GPU
 synchronization. CPU fixture parity is separate from deployed real-model acceptance.
 
-Extractor `comfy-explicit-5` keeps input-workload completeness distinct from known
+Extractor `comfy-explicit-6` keeps input-workload completeness distinct from known
 measurement gaps. `audio_output_unmeasured`, `audio_output_metadata_unavailable`
 and `stage_completion_unobserved` remain in `stage.reasons`, while being excluded
 from `stage.workload.reasons` and whole-workload completeness. A missing end span
@@ -248,3 +248,39 @@ processing also mark their owning stage's workload incomplete. These gaps cannot
 be dropped by a consumer selecting a stage dependency subgraph. Loaded-image shape
 observations alone do not clear reference-processing coverage or establish crop,
 tile and role attribution. Older extractor records retain their original evidence.
+
+## Native MoGe workload boundaries
+
+Extractor 6 explicitly describes `LoadMoGeModel`, `MoGeInference`,
+`MoGePanoramaInference` and `SaveMoGeDepthPNG`. The loader uses hashed selected-file
+identity from `geometry_estimation`; unknown lookalike/custom classes gain no
+coverage. Runtime observations preserve image-reference source-stage relationships.
+Requested controls are audit data. Effective image/view counts, chunk layout,
+resolved token budgets, processed encoder/head shapes, model version, compute and
+activation precision, native memory strategy, load/offload devices and projection
+options come from the actual node/model boundaries. Oversized batch limits are
+normalized to actual views; ignored v1/v2 refinement requests do not split effective
+work. v3 refinement input point counts, spatial bounds and conditioning shapes are
+live facts, observed before each real refiner call; unknown future passes remain
+incomplete. No tensor contents or new device synchronization are used.
+
+Model loading and forward durations are CPU-monotonic boundary measurements, not
+GPU kernel timings or input matching features. The depth-PNG publisher observes
+actual depth/mask dimensions before conversion. At most 16 model invocations and
+16 refinement entries per model are retained; excess, malformed, duplicate or
+unattributed work stays incomplete. Durable snapshots cover first input/model/
+encoder/publication boundaries and readiness changes, plus existing progress and
+stage transitions; forwards/refinements do not write once per call.
+
+Panorama view/chunk and effective merge-canvas facts are observed, but merge work
+retains `moge_panorama_merge_work_unmeasured`. LoadImage's reference-processing gap
+and unsupported rendering/meshing/export paths remain visible. These observations
+alone do not make the complete pipeline comparable or provide parent completion.
+No matching/scaling policy, model selection, bridge routing or execution owner
+changes. Source and CPU fixtures do not establish deployment, real-model quality
+or forecast accuracy.
+
+In addition to the timing suite above, run `tests-unit/app_test/run_timing_vision_test.py`,
+`tests-unit/comfy_test/moge_execution_metrics_test.py`,
+`tests-unit/comfy_extras_test/nodes_moge_test.py` and
+`tests-unit/comfy_extras_test/moge_geometry_io_test.py` using the same CPU fixture launcher.
