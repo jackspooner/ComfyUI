@@ -44,6 +44,11 @@ Optional `workload.evidence` version 2 separates requested settings, resolved fa
 and completed measurements. Facts carry source, observation time and availability;
 full implementation provenance is separate from explicit performance compatibility.
 This adapter does not declare compatibility across changed implementations.
+Native implementation identity includes the core revision, Torch version and
+selected node-module content hashes. File paths, timestamps and inodes only
+invalidate the bounded hash cache; reinstalling identical source at a new path
+does not split history. Unreviewed core/runtime changes remain separate even
+when the selected node module is unchanged.
 
 `app/run_timing_workload.py` uses explicit native node adapters. It resolves scalar
 primitive links and native empty image/LTX/Hunyuan latent shapes, preserving each
