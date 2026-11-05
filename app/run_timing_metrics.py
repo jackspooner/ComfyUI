@@ -15,7 +15,8 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         workload['resolved'][key] = fact(value, state.get('availability', {}).get(key, 'execution_start'), key)
         evidence['resolved'][stage['id'] + '.' + key] = workload['resolved'][key]
     for key, value in state.get('measurements', {}).items():
-        workload['measurements'][key] = fact(value, 'completion' if completed else 'live', key)
+        available = state.get('measurement_availability', {}).get(key, 'completion' if completed else 'live')
+        workload['measurements'][key] = fact(value, available, key)
     live = {key: {'value': value, 'availableAt': 'live', 'observedAt': observed_at, 'source': 'native_lora'}
             for key, value in state.get('live', {}).items()}
     if live:
@@ -53,6 +54,19 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         reasons.discard('model_evaluations_unmeasured')
     if all(key in state.get('resolved', {}) for key in ('latentWidth', 'latentHeight', 'latentFrames')):
         reasons.discard('latent_shape_unresolved')
+    if workload['profile'] == 'audio' and 'audioLatentLength' in state.get('resolved', {}):
+        reasons.discard('latent_shape_unresolved')
+    audio_requirements = {'audio_source_workload_unmeasured': 'audioSource_count',
+                          'audio_processed_workload_unmeasured': 'audioProcessed_count',
+                          'audio_decode_workload_unmeasured': 'audioDecode_count',
+                          'audio_output_unmeasured': 'audioOutput_count'}
+    for reason, count in audio_requirements.items():
+        if state.get(count) == 1:
+            reasons.discard(reason)
+    if 'audioInput.durationSeconds' in workload['resolved']:
+        reasons.discard('audio_input_unmeasured')
+    if workload['profile'] == 'audio' and state.get('measurements', {}).get('vaeTileCountingComplete') is False:
+        reasons.add('audio_tile_work_unmeasured')
     if state.get('text_plans') == 1 and all(key in state.get('resolved', {}) for key in ('inputPositions', 'textBatch', 'outputTokenLimit', 'kvCapacity')):
         reasons.discard('text_loop_coverage_unresolved')
         if completed:
@@ -73,7 +87,8 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
             reasons.add('cfg_behavior_unmeasured')
     stage['reasons'] = sorted(reasons)
     workload.update(complete=not reasons, reasons=stage['reasons'])
-    remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved', 'text_loop_coverage_unresolved', 'text_input_modalities_unmeasured'}
+    remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved',
+                'text_loop_coverage_unresolved', 'text_input_modalities_unmeasured', 'audio_input_unmeasured', *audio_requirements}
     remaining.update(reason for item in record.get('stages', []) for reason in item['reasons'])
     evidence.update(complete=not remaining, reasons=sorted(remaining))
     if state.get('progress') and stage['kind'] in ('sampling', 'inference'):

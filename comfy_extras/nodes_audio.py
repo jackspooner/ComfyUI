@@ -1,5 +1,6 @@
 import av
 import comfy.audio
+import comfy.execution_metrics
 import torch
 import comfy.model_management
 import folder_paths
@@ -90,6 +91,8 @@ class VAEEncodeAudio(IO.ComfyNode):
         else:
             waveform = audio["waveform"]
 
+        comfy.execution_metrics.observe_shape('audio_vae_encode_input', waveform, sample_rate=vae_sample_rate,
+                                              source_sample_rate=sample_rate)
         t = vae.encode(waveform.movedim(1, -1))
         return IO.NodeOutput({"samples": t})
 
@@ -101,6 +104,8 @@ def vae_decode_audio(vae, samples, tile=None, overlap=None, normalize=True):
     if latent.is_nested:
         latent = latent.unbind()[-1]
 
+    comfy.execution_metrics.observe_shape('audio_vae_decode_input', latent, tiled=tile is not None,
+                                          tile_size=tile, overlap=overlap, normalize=normalize)
     if tile is not None:
         audio = vae.decode_tiled(latent, tile_x=tile, tile_y=tile, overlap=overlap).movedim(-1, 1)
     else:
@@ -111,7 +116,9 @@ def vae_decode_audio(vae, samples, tile=None, overlap=None, normalize=True):
         std[std < 1.0] = 1.0
         audio /= std
     vae_sample_rate = getattr(vae, "audio_sample_rate_output", getattr(vae, "audio_sample_rate", 44100))
-    return {"waveform": audio, "sample_rate": vae_sample_rate if "sample_rate" not in samples else samples["sample_rate"]}
+    sample_rate = vae_sample_rate if "sample_rate" not in samples else samples["sample_rate"]
+    comfy.execution_metrics.observe_shape('audio_decoded', audio, sample_rate=sample_rate)
+    return {"waveform": audio, "sample_rate": sample_rate}
 
 
 class VAEDecodeAudio(IO.ComfyNode):
@@ -420,6 +427,7 @@ class LoadAudio(IO.ComfyNode):
         audio_path = folder_paths.get_annotated_filepath(audio)
         waveform, sample_rate = load(audio_path)
         audio = {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
+        comfy.execution_metrics.observe_shape('audio_loaded', audio['waveform'], sample_rate=sample_rate)
         return IO.NodeOutput(audio)
 
     @classmethod
