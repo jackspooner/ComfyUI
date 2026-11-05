@@ -5,6 +5,7 @@ from app.run_timing_workload import workload_reasons
 from app.run_timing_image import image_pipeline_complete
 from app.run_timing_clip_vision import clip_vision_plan_complete
 from app.run_timing_ltx_audio import ltx_audio_encode_complete, ltx_audio_decode_complete
+from app.run_timing_av import av_preparation_complete, av_preparation_execution_complete
 
 
 def apply_metrics(record, stage, state, observed_at, completed=False):
@@ -63,6 +64,14 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         workload['resolved']['executionPrecision'] = precision
         evidence['resolved'][stage['id'] + '.executionPrecision'] = precision
     reasons = set(stage['reasons'])
+    av_operation = workload['resolved'].get('jointPreparation.operation')
+    if 'jointPreparation.nativePlanRequired' in workload['resolved']:
+        if av_operation and av_preparation_complete(state, av_operation['value']):
+            reasons.discard('joint_preparation_workload_unmeasured')
+            if completed and not av_preparation_execution_complete(state):
+                reasons.add('joint_preparation_execution_unresolved')
+        else:
+            reasons.add('joint_preparation_workload_unmeasured')
     image_loader = workload['resolved'].get('imageLoader.maskSelectionRequired')
     if image_loader is not None:
         reused = stage['reused'] is True and stage['startedOffsetSeconds'] is None
@@ -164,6 +173,7 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
                 'moge_workload_unmeasured', 'moge_publication_input_unmeasured', 'reference_processing_unmeasured',
                 'image_encode_workload_unmeasured', 'clip_vision_workload_unmeasured', *audio_requirements}
     remaining -= {'ltx_audio_encode_workload_unmeasured', 'ltx_audio_decode_workload_unmeasured'}
+    remaining.discard('joint_preparation_workload_unmeasured')
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)
     evidence.update(complete=not input_reasons, reasons=input_reasons)

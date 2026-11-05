@@ -33,6 +33,23 @@ def observe_shape(event, tensor, **facts):
             emit('tensor_shape_unavailable', operation=event)
 
 
+def observe_shapes(event, tensors, streams=None, **facts):
+    """Observe a bounded set of named native tensor shapes without retaining tensors."""
+    if enabled():
+        try:
+            if len(tensors) > 8:
+                raise ValueError('Too many tensor shapes')
+            shapes = {name: tuple(tensor.shape) for name, tensor in tensors.items()}
+            if any(len(shape) > 8 for shape in shapes.values()):
+                raise ValueError('Too many tensor axes')
+            if streams is not None:
+                facts['input_streams'] = len(streams)
+            emit(event, shapes=shapes, precisions={name: str(tensor.dtype) for name, tensor in tensors.items()},
+                 devices={name: str(tensor.device) for name, tensor in tensors.items()}, **facts)
+        except Exception:
+            emit('tensor_shape_unavailable', operation=event)
+
+
 @contextmanager
 def evaluation_scope():
     """Temporary identity for one native noise evaluation, including CFG batches."""

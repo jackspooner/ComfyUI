@@ -20,6 +20,7 @@ AUDIO_NODES = {'LoadAudio': 'preparation', 'EmptyLatentAudio': 'preparation',
                'SaveAudio': 'publication', 'SaveAudioMP3': 'publication', 'SaveAudioOpus': 'publication',
                'PreviewAudio': 'publication'}
 AUDIO_INPUTS = {'VAEEncodeAudio': ('audio',), 'LTXVAudioVAEEncode': ('audio',)}
+AV_INPUTS = {'LTXVConcatAVLatent': ('video_latent', 'audio_latent'), 'LTXVSeparateAVLatent': ('av_latent',)}
 
 
 NODE_STAGES = {
@@ -42,6 +43,7 @@ NODE_STAGES = {
     'VAEDecode': 'decoding', 'VAEDecodeTiled': 'decoding', 'SaveImage': 'publication', 'PreviewImage': 'publication',
     'TextGenerate': 'inference', 'TextGenerateLTX2Prompt': 'inference',
     **AUDIO_NODES,
+    **{name: 'preparation' for name in AV_INPUTS},
     **MOGE_NODES,
 }
 CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_step', 'end_at_step',
@@ -124,6 +126,10 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             value = inputs.get('latent_image')
             if isinstance(value, list) and len(value) == 2 and value[1] == 0:
                 return latent_shape(value[0], (*seen, node_id))
+        if kind in AV_INPUTS:
+            value = inputs.get('video_latent' if kind == 'LTXVConcatAVLatent' else 'av_latent')
+            if isinstance(value, list) and len(value) == 2 and value[1] == 0:
+                return latent_shape(value[0], (*seen, node_id))
         return {}
 
     def audio_latent(node_id, seen=()):
@@ -134,9 +140,24 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if kind in ('EmptyLatentAudio', 'VAEEncodeAudio', 'LTXVEmptyLatentAudio', 'LTXVAudioVAEEncode'):
             return True
         value = node.get('inputs', {}).get('latent_image')
+        if (kind in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced')
+                and isinstance(value, list) and len(value) == 2 and value[0] in graph
+                and node_kind(graph[value[0]]) == 'LTXVSeparateAVLatent'):
+            return value[1] == 1
         return (kind in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced')
                 and isinstance(value, list) and len(value) == 2 and value[1] == 0
                 and audio_latent(value[0], (*seen, node_id)))
+
+    def joint_latent(node_id, seen=()):
+        if node_id in seen or node_id not in graph:
+            return False
+        node = graph[node_id]
+        if node_kind(node) == 'LTXVConcatAVLatent':
+            return True
+        value = node.get('inputs', {}).get('latent_image')
+        return (node_kind(node) in ('KSampler', 'KSamplerAdvanced', 'SamplerCustom', 'SamplerCustomAdvanced')
+                and isinstance(value, list) and len(value) == 2 and value[1] == 0
+                and joint_latent(value[0], (*seen, node_id)))
 
     components, resolved, requested, stages, base_models = [], {}, {}, [], []
     model_sources, stage_revisions, implementations, stage_profiles = {}, {}, {}, {}
@@ -200,7 +221,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                 reasons.add('latent_shape_unresolved')
                 stage_reasons.append('latent_shape_unresolved')
             node_facts.update({key: fact(value, kind + '.latent_image') for key, value in shape.items()})
-            node_profile = 'audio' if audio_latent(node_id) else 'diffusion_video' if shape.get('latentFrames', 1) > 1 else 'diffusion_image'
+            node_profile = 'audio' if audio_latent(node_id) else 'diffusion_video' if joint_latent(node_id) or shape.get('latentFrames', 1) > 1 else 'diffusion_image'
             sampling_profiles.add(node_profile)
             # Step callbacks are measured later; configured steps do not assert NFE or CFG branch execution.
             stage_reasons.append('model_evaluations_unmeasured')
@@ -215,12 +236,21 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             components.append({'kind': 'reference', 'identity': None, 'role': 'audio_input', 'order': order,
                                'features': {'sourceStage': fact(node_id, kind)}})
             stage_reasons.append('audio_source_workload_unmeasured')
-        for role in IMAGE_INPUTS.get(kind, ()) + AUDIO_INPUTS.get(kind, ()):
+        for role in IMAGE_INPUTS.get(kind, ()) + AUDIO_INPUTS.get(kind, ()) + AV_INPUTS.get(kind, ()):
             source = inputs.get(role)
             features = {'sourceStage': fact(source[0], kind)} if isinstance(source, list) and len(source) == 2 and isinstance(source[0], str) and source[0] in graph else {}
+            if kind in AV_INPUTS:
+                if features and type(source[1]) is int and source[1] >= 0:
+                    features['sourceOutput'] = fact(source[1], kind)
+                else:
+                    features = {}
             components.append({'kind': 'reference', 'identity': None, 'role': node_id + ':' + role, 'order': order, 'features': features})
             if not features:
                 stage_reasons.append('reference_source_unresolved')
+        if kind in AV_INPUTS:
+            node_facts['jointPreparation.nativePlanRequired'] = fact(True, kind)
+            node_facts['jointPreparation.operation'] = fact('concat' if kind == 'LTXVConcatAVLatent' else 'separate', kind)
+            stage_reasons.append('joint_preparation_workload_unmeasured')
         if kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint'):
             node_facts['imageEncode.nativePlanRequired'] = fact(True, kind)
             stage_reasons.append('image_encode_workload_unmeasured')
@@ -302,6 +332,8 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
                               if parent in stage_profiles and stage_profiles[parent] != 'unknown'}
         if kind in MOGE_NODES or kind in IMAGE_LOADERS or kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint', 'CLIPVisionLoader', 'CLIPVisionEncode'):
             stage_profile = 'vision'
+        elif kind in AV_INPUTS:
+            stage_profile = 'diffusion_video'
         elif kind in AUDIO_NODES or audio_latent(node_id):
             stage_profile = 'audio'
         elif kind in ('CLIPTextEncode', 'LTXAVTextEncoderLoader'):
@@ -323,6 +355,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
     model_identity = digest(base_models) if base_models and all(identity for _, identity in base_models) else None
     evidence = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
                 'profile': next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else
+                           'diffusion_video' if not sampling_profiles and any(node_kind(node) in AV_INPUTS for node in graph.values()) else
                            'audio' if not sampling_profiles and any(node_kind(node) in AUDIO_NODES for node in graph.values()) else
                            'vision' if not sampling_profiles and any(node_kind(node) in MOGE_NODES or node_kind(node) in ('CLIPVisionLoader', 'CLIPVisionEncode') for node in graph.values()) else 'unknown',
                 'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
