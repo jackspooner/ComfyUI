@@ -12,6 +12,7 @@ import torch
 from functools import partial
 import collections
 import math
+import inspect
 import logging
 import comfy.sampler_helpers
 import comfy.model_patcher
@@ -1195,6 +1196,40 @@ def cast_transformer_options(transformer_options: dict[str], device=None, dtype=
                             for cast in casts:
                                 wc_list[i] = wc_list[i].to(cast)
 
+FIXED_NFE_SAMPLERS = {k_diffusion_sampling.sample_euler: 'euler',
+                      k_diffusion_sampling.sample_euler_ancestral: 'euler_ancestral',
+                      k_diffusion_sampling.sample_res_multistep: 'res_multistep',
+                      k_diffusion_sampling.sample_er_sde: 'er_sde'}
+
+
+def sampler_metrics_plan(sampler):
+    """Reviewed fixed-NFE native paths only; never inspect sigma tensor values."""
+    if type(sampler) is not KSAMPLER or sampler.inpaint_options:
+        return None, {}
+    name = FIXED_NFE_SAMPLERS.get(sampler.sampler_function)
+    if name is None or type(sampler.extra_options) is not dict:
+        return None, {}
+    parameters = {key: parameter for key, parameter in inspect.signature(sampler.sampler_function).parameters.items()
+                  if key not in ('model', 'x', 'sigmas', 'extra_args', 'callback', 'disable')}
+    if sampler.extra_options.keys() - parameters.keys():
+        return None, {}
+    options = {}
+    for key, parameter in parameters.items():
+        value = sampler.extra_options.get(key, parameter.default)
+        if key in ('noise_sampler', 'noise_scaler'):
+            if value is not None:
+                return None, {}
+            value = 'native_default'
+        elif type(value) not in (int, float) or not math.isfinite(value):
+            # Euler's unbounded churn cutoff is a semantic value, not JSON Infinity.
+            if name == 'euler' and key == 's_tmax' and type(value) is float and value == math.inf:
+                value = 'positive_infinity'
+            else:
+                return None, {}
+        options[key] = value
+    return name, options
+
+
 def sampling_metrics_callback(guider, shapes, sampler, sigmas, callback):
     if not comfy.execution_metrics.enabled():
         return callback
@@ -1213,8 +1248,10 @@ def sampling_metrics_callback(guider, shapes, sampler, sigmas, callback):
             audio_layout = {comfy.latent_formats.LTXAV: 'bctf', comfy.latent_formats.MiniMaxH3AV: 'bcat'}.get(type(model.model.latent_format))
         except AttributeError:
             audio_layout = None
+        sampler_name, sampler_options = sampler_metrics_plan(sampler)
         comfy.execution_metrics.emit('sampling_plan', shapes=shapes, shape=shapes[0] if len(shapes) == 1 else None,
-                                     evaluations=max(0, len(sigmas) - 1) if type(sampler) is KSAMPLER and sampler.sampler_function is k_diffusion_sampling.sample_euler else None,
+                                     evaluations=max(0, len(sigmas) - 1) if sampler_name is not None else None,
+                                     sampler=sampler_name, sampler_options=sampler_options,
                                      branches=branches if simple_cfg else None, precision=str(model.model_dtype()),
                                      memory_strategy='dynamic' if model.is_dynamic() else 'standard',
                                      offload_device=str(model.offload_device), load_device=str(model.load_device), audio_layout=audio_layout,

@@ -40,6 +40,7 @@ NODE_STAGES = {
     'VAEEncodeForInpaint': 'encoding', 'KSampler': 'sampling', 'KSamplerAdvanced': 'sampling',
     'SamplerCustom': 'sampling', 'SamplerCustomAdvanced': 'sampling', 'BasicGuider': 'preparation',
     'CFGGuider': 'preparation', 'DualCFGGuider': 'preparation', 'KSamplerSelect': 'preparation',
+    'SamplerEulerAncestral': 'preparation',
     'BasicScheduler': 'preparation', 'RandomNoise': 'preparation', 'DisableNoise': 'preparation',
     'VAEDecode': 'decoding', 'VAEDecodeTiled': 'decoding', 'SaveImage': 'publication', 'PreviewImage': 'publication',
     'TextGenerate': 'inference', 'TextGenerateLTX2Prompt': 'inference',
@@ -54,7 +55,7 @@ CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_st
             'strength_model', 'strength_clip', 'strength', 'start_percent', 'end_percent',
             'weight_dtype', 'type', 'device', 'max_length', 'mtp', 'thinking', 'response_format',
             'context_budget', 'fps', 'source_fps', 'auto_resize', 'min_short_edge', 'seconds', 'normalize', 'quality', 'crop',
-            'frames_number', 'frame_rate'}
+            'frames_number', 'frame_rate', 'eta', 's_noise'}
 LATENTS = {'EmptyLatentImage': (8, 1, 4), 'EmptySD3LatentImage': (8, 1, 16),
            'EmptyHunyuanLatentVideo': (8, 4, 16), 'EmptyHunyuanVideo15Latent': (16, 4, 32),
            'EmptyLTXVLatentVideo': (32, 8, 128)}
