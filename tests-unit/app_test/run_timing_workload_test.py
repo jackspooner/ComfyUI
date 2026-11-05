@@ -148,10 +148,28 @@ def test_unknown_nodes_and_references_do_not_acquire_invented_coverage():
     evidence, stages = description(value)
     assert 'unsupported_workload_adapter' in evidence['reasons']
     assert 'reference_processing_unmeasured' in evidence['reasons']
+    image = next(stage for stage in stages if stage['id'] == 'image')
+    assert not image['workload']['complete']
+    assert 'reference_processing_unmeasured' in image['workload']['reasons']
     assert next(stage for stage in stages if stage['id'] == 'custom')['kind'] == 'unknown'
     assert len([component for component in evidence['components'] if component['kind'] == 'lora']) == 2
     assert 'SECRET' not in json.dumps(evidence)
     assert '/PRIVATE' not in json.dumps(evidence)
+
+
+def test_unresolved_weight_identities_belong_to_the_owning_stage():
+    value = graph()
+    value['control_loader'] = {'class_type': 'ControlNetLoader', 'inputs': {'control_net_name': 'missing-control'}}
+    value['control'] = {'class_type': 'ControlNetApplyAdvanced', 'inputs': {
+        'control_net': ['control_loader', 0], 'strength': 0, 'start_percent': 0, 'end_percent': 1}}
+    evidence, stages = describe(value, {'profileRevision': 'implementation'},
+        {'hostId': 'host', 'gpuUuid': None, 'instanceId': 'boot', 'laneId': 'comfyui'},
+        '2026-11-05T00:00:00Z', lambda *_: None, digest)
+    assert 'component_identity_unresolved' in evidence['reasons']
+    for name in ('base', 'lora', 'lora2', 'control_loader', 'control'):
+        stage = next(stage for stage in stages if stage['id'] == name)
+        assert not stage['workload']['complete']
+        assert 'component_identity_unresolved' in stage['workload']['reasons']
 
 
 def test_stage_durations_overlap_cache_and_progress_are_observations(tmp_path):
