@@ -69,6 +69,10 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
             reasons.discard(reason)
     if 'audioInput.durationSeconds' in workload['resolved']:
         reasons.discard('audio_input_unmeasured')
+    if state.get('moge_workload_complete'):
+        reasons.discard('moge_workload_unmeasured')
+    if state.get('moge_exports') == 1 and state.get('moge_export_input_known'):
+        reasons.discard('moge_publication_input_unmeasured')
     if workload['profile'] == 'audio' and state.get('measurements', {}).get('vaeTileCountingComplete') is False:
         reasons.add('audio_tile_work_unmeasured')
     if state.get('text_plans') == 1 and all(key in state.get('resolved', {}) for key in ('inputPositions', 'textBatch', 'outputTokenLimit', 'kvCapacity')):
@@ -93,7 +97,8 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     input_reasons = workload_reasons(reasons)
     workload.update(complete=not input_reasons, reasons=input_reasons)
     remaining = set(evidence['reasons']) - {'model_evaluations_unmeasured', 'latent_shape_unresolved',
-                'text_loop_coverage_unresolved', 'text_input_modalities_unmeasured', 'audio_input_unmeasured', *audio_requirements}
+                'text_loop_coverage_unresolved', 'text_input_modalities_unmeasured', 'audio_input_unmeasured',
+                'moge_workload_unmeasured', 'moge_publication_input_unmeasured', *audio_requirements}
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)
     evidence.update(complete=not input_reasons, reasons=input_reasons)

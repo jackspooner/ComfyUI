@@ -236,6 +236,11 @@ unsupported synthesis paths retain explicit limitations; audio matching stays ex
 Workload completeness excludes known missing output measurements or end spans;
 their stage reasons remain visible. Missing input work and unobserved execution
 still prevent complete comparison. Sampling/text precision is also stage-scoped.
+Native MoGe timing adds actual image/view chunks, token budgets, encoder input
+shapes, compute/activation precision and v3 refinement entry shapes. Requested
+controls ignored by v1/v2 remain audit data. Loading/forward elapsed time is
+separate from matching inputs; depth-PNG publication observes its geometry input.
+Panorama merge work, incomplete references and other vision/3D paths retain gaps.
 Upstream documentation and licensing below remain applicable:
 [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) and its
 [README](https://github.com/Comfy-Org/ComfyUI/blob/master/README.md).
