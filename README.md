@@ -227,6 +227,9 @@ sampling progress; generic node progress remains unreliable. Reviewed native Eul
 Euler ancestral, non-CFG++ res-multistep and ER-SDE plans retain effective scalar
 options and fixed evaluation counts without reading sigma values. Custom noise
 callables, specialized inpaint options and other unreviewed paths remain incomplete.
+Native H3 plans require observed packed text/guide/reference/audio/video token work;
+missing or conflicting layouts retain coverage gaps. These live facts do not
+complete upstream reference preparation or establish RefMod cache reuse.
 Composite descriptions
 can correlate native expansion IDs and optional nested-call telemetry scopes without
 replacing the executor's context. Joint AV stream shapes stay separate.
