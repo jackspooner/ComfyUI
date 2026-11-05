@@ -34,8 +34,13 @@ def links(graph, node):
             if isinstance(value, list) and len(value) == 2 and isinstance(value[0], str) and value[0] in graph]
 
 
-def describe(graph, base, resource, observed_at, file_identity, digest, available_at='submission'):
+def describe(graph, base, resource, observed_at, file_identity, digest, available_at='submission', loader_aliases=None):
     reasons, ordered, visiting = set(), [], set()
+
+    def node_kind(node):
+        declared = node.get('class_type', '')
+        native = (loader_aliases or {}).get(declared)
+        return native if NODE_STAGES.get(native) == 'loading' else declared
 
     def visit(node_id):
         if node_id in visiting or node_id in ordered:
@@ -65,7 +70,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if node_id in seen or node_id not in graph:
             return {}
         node = graph[node_id]
-        kind, inputs = node.get('class_type'), node.get('inputs', {})
+        kind, inputs = node_kind(node), node.get('inputs', {})
         if kind in LATENTS:
             spatial, temporal, channels = LATENTS[kind]
             values = {key: scalar(inputs.get(key, default)) for key, default in
@@ -86,7 +91,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
     for order, node_id in enumerate(ordered):
         component_start = len(components)
         node = graph[node_id]
-        kind, inputs = node.get('class_type', ''), node.get('inputs', {})
+        kind, inputs = node_kind(node), node.get('inputs', {})
         stage_kind = NODE_STAGES.get(kind, 'unknown')
         stage_reasons = [] if stage_kind != 'unknown' else ['unsupported_workload_adapter']
         if stage_reasons:

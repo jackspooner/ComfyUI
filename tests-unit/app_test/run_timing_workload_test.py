@@ -89,10 +89,22 @@ def graph():
     }
 
 
-def description(value):
+def description(value, **options):
     return describe(value, {'profileRevision': 'implementation'},
                     {'hostId': 'host', 'gpuUuid': None, 'instanceId': 'boot', 'laneId': 'comfyui'},
-                    '2026-11-05T00:00:00Z', lambda key, value: digest([key, value]), digest)
+                    '2026-11-05T00:00:00Z', lambda key, value: digest([key, value]), digest, **options)
+
+
+def test_owner_declared_loader_aliases_do_not_broaden_unknown_node_inference():
+    value = {'pool': {'class_type': 'OwnedPoolLoader', 'inputs': {'clip_name': 'encoder', 'type': 'flux'}},
+             'custom': {'class_type': 'LooksLikeSampler', 'inputs': {'lora_name': 'PRIVATE', 'steps': 20}}}
+    _, unknown = description(value)
+    assert unknown[0]['kind'] == 'unknown'
+    evidence, stages = description(value, loader_aliases={'OwnedPoolLoader': 'CLIPLoader', 'LooksLikeSampler': 'KSampler'})
+    assert stages[0]['kind'] == 'loading' and stages[1]['kind'] == 'unknown'
+    assert len(evidence['components']) == 1 and evidence['components'][0]['role'] == 'clip_name'
+    assert evidence['components'][0]['identity'] == digest(['clip_name', 'encoder'])
+    assert 'PRIVATE' not in json.dumps(evidence)
 
 
 def test_linked_dimensions_video_padding_and_separate_stage_work():
