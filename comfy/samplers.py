@@ -1256,6 +1256,7 @@ def sampling_metrics_callback(guider, shapes, sampler, sigmas, callback):
                                      memory_strategy='dynamic' if model.is_dynamic() else 'standard',
                                      offload_device=str(model.offload_device), load_device=str(model.load_device), audio_layout=audio_layout,
                                      h3_layout_required=audio_layout == 'bcat',
+                                     managed_load_required=True,
                                      stream_layout='video_audio' if len(shapes) == 2 and audio_layout is not None else None)
     except Exception:
         comfy.execution_metrics.emit('sampling_plan_unavailable')

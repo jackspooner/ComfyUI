@@ -30,6 +30,7 @@ import gc
 import os
 from contextlib import contextmanager, nullcontext
 import comfy.memory_management
+import comfy.execution_metrics
 import comfy.system_memory
 import comfy.utils
 import comfy.quant_ops
@@ -916,9 +917,13 @@ def free_memory(memory_required, device, keep_loaded=[], for_dynamic=False, pins
                 #as that works on-demand.
                 memory_required -= current_loaded_models[i].model.loaded_size()
                 memory_to_free = 0
-        if memory_to_free > 0 and current_loaded_models[i].model_unload(memory_to_free):
-            logging.debug(f"Unloading {current_loaded_models[i].model.model.__class__.__name__}")
-            unloaded_model.append(i)
+        if memory_to_free > 0:
+            with comfy.execution_metrics.measure('managed_model_unload', requested_bytes=memory_to_free):
+                fully_unloaded = current_loaded_models[i].model_unload(memory_to_free)
+            comfy.execution_metrics.emit('managed_model_unload_result', detached=fully_unloaded)
+            if fully_unloaded:
+                logging.debug(f"Unloading {current_loaded_models[i].model.model.__class__.__name__}")
+                unloaded_model.append(i)
 
     for i in sorted(unloaded_model, reverse=True):
         unloaded_models.append(current_loaded_models.pop(i))
@@ -956,12 +961,19 @@ def load_models_gpu(models, memory_required=0, force_patch_weights=False, minimu
 
     models = list(models_temp)
     models.reverse()
+    observe_loading = comfy.execution_metrics.enabled()
+    loading_operation = object() if observe_loading else None
+    if observe_loading:
+        comfy.execution_metrics.emit('managed_load_plan', operation=loading_operation, models=len(models),
+                                     force_patch_weights=force_patch_weights, force_full_load=force_full_load,
+                                     requested_bytes=memory_required, minimum_bytes=minimum_memory_required)
 
     models_to_load = []
 
     free_for_dynamic=True
-    for x in models:
-        if not x.is_dynamic():
+    for index, x in enumerate(models):
+        dynamic = x.is_dynamic()
+        if not dynamic:
             free_for_dynamic = False
         loaded_model = LoadedModel(x)
         try:
@@ -977,22 +989,31 @@ def load_models_gpu(models, memory_required=0, force_patch_weights=False, minimu
             if hasattr(x, "model"):
                 logging.info(f"Requested to load {x.model.__class__.__name__}")
             models_to_load.append(loaded_model)
+        if observe_loading and index < 64:
+            comfy.execution_metrics.emit('managed_load_selection', operation=loading_operation, index=index,
+                                         reused=loaded_model_index is not None, dynamic=dynamic, device=models_to_load[-1].device)
 
-    for loaded_model in models_to_load:
+    for index, loaded_model in enumerate(models_to_load):
         to_unload = []
         for i in range(len(current_loaded_models)):
             if loaded_model.model.is_clone(current_loaded_models[i].model):
                 to_unload = [i] + to_unload
+        if observe_loading and index < 64:
+            comfy.execution_metrics.emit('managed_load_clones', operation=loading_operation, index=index, count=len(to_unload))
         for i in to_unload:
             model_to_unload = current_loaded_models.pop(i)
-            model_to_unload.model.detach(unpatch_all=False)
-            model_to_unload.model_finalizer.detach()
+            with comfy.execution_metrics.measure('managed_model_clone_detach', operation=loading_operation, index=index):
+                model_to_unload.model.detach(unpatch_all=False)
+                model_to_unload.model_finalizer.detach()
 
     total_memory_required = {}
     total_pins_required = {}
-    for loaded_model in models_to_load:
+    for index, loaded_model in enumerate(models_to_load):
         device = loaded_model.device
-        total_memory_required[device] = total_memory_required.get(device, 0) + loaded_model.model_memory_required(device)
+        required = loaded_model.model_memory_required(device)
+        total_memory_required[device] = total_memory_required.get(device, 0) + required
+        if observe_loading and index < 64:
+            comfy.execution_metrics.emit('managed_load_requirement', operation=loading_operation, index=index, bytes=required)
         if not loaded_model.model.is_dynamic():
             total_pins_required[device] = total_pins_required.get(device, 0) + loaded_model.model_memory()
 
@@ -1010,7 +1031,7 @@ def load_models_gpu(models, memory_required=0, force_patch_weights=False, minimu
                 models_l = free_memory(minimum_memory_required, device, for_dynamic=free_for_dynamic)
                 logging.info("{} models unloaded.".format(len(models_l)))
 
-    for loaded_model in models_to_load:
+    for index, loaded_model in enumerate(models_to_load):
         model = loaded_model.model
         torch_dev = model.load_device
         if is_device_cpu(torch_dev):
@@ -1018,8 +1039,10 @@ def load_models_gpu(models, memory_required=0, force_patch_weights=False, minimu
         else:
             vram_set_state = vram_state
         lowvram_model_memory = 0
+        manager_loaded_memory = None
         if lowvram_available and (vram_set_state == VRAMState.LOW_VRAM or vram_set_state == VRAMState.NORMAL_VRAM) and not force_full_load:
             loaded_memory = loaded_model.model_loaded_memory()
+            manager_loaded_memory = loaded_memory
             current_free_mem = get_free_memory(torch_dev) + loaded_memory
 
             lowvram_model_memory = max(0, (current_free_mem - minimum_memory_required), min(current_free_mem * MIN_WEIGHT_MEMORY_RATIO, current_free_mem - minimum_inference_memory()))
@@ -1031,9 +1054,17 @@ def load_models_gpu(models, memory_required=0, force_patch_weights=False, minimu
         if vram_set_state == VRAMState.NO_VRAM:
             lowvram_model_memory = 0.1
 
-        loaded_model.model_load(lowvram_model_memory, force_patch_weights=force_patch_weights)
+        if observe_loading and index < 64:
+            comfy.execution_metrics.emit('managed_load_entry_plan', operation=loading_operation, index=index,
+                                         vram_state=vram_set_state.name, loaded_bytes=manager_loaded_memory,
+                                         budget_bytes=lowvram_model_memory)
+        with comfy.execution_metrics.measure('managed_model_load', operation=loading_operation, index=index):
+            loaded_model.model_load(lowvram_model_memory, force_patch_weights=force_patch_weights)
         vram_used = 0 if is_device_cpu(torch_dev) else loaded_model.model_loaded_memory()
         ram_used = model.loaded_ram_size() if model.is_dynamic() else loaded_model.model_memory() - vram_used
+        if observe_loading and index < 64:
+            comfy.execution_metrics.emit('managed_load_usage', operation=loading_operation, index=index,
+                                         ram_bytes=ram_used, vram_bytes=vram_used)
         detail("Model loaded: patcher=%s model=%s ram_mb=%.1f vram_mb=%.1f", model.__class__.__name__, model.model.__class__.__name__, ram_used / (1024 ** 2), vram_used / (1024 ** 2))
         current_loaded_models.insert(0, loaded_model)
     return
