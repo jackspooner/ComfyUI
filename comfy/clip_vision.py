@@ -9,6 +9,7 @@ import comfy.model_management
 import comfy.storage
 import comfy.utils
 import comfy.clip_model
+import comfy.execution_metrics
 import comfy.image_encoders.dino2
 import comfy.image_encoders.dino3
 from comfy.image_encoders.naf import NAF
@@ -64,12 +65,24 @@ class ClipVisionModel():
         return self.model.state_dict()
 
     def encode_image(self, image, crop=True):
+        comfy.execution_metrics.observe_shape('clip_vision_source', image, crop=crop)
         comfy.model_management.load_model_gpu(self.patcher)
-        if self.model_type == "siglip2_vision_model":
-            pixel_values = comfy.clip_model.siglip2_preprocess(image.to(self.load_device), size=self.image_size, patch_size=self.config.get("patch_size", 16), num_patches=self.config.get("num_patches", 256), mean=self.image_mean, std=self.image_std, crop=crop).float()
-        else:
-            pixel_values = comfy.clip_model.clip_preprocess(image.to(self.load_device), size=self.image_size, mean=self.image_mean, std=self.image_std, crop=crop).float()
-        out = self.model(pixel_values=pixel_values, intermediate_output='all' if self.return_all_hidden_states else -2)
+        with comfy.execution_metrics.measure('clip_vision_preprocess'):
+            if self.model_type == "siglip2_vision_model":
+                pixel_values = comfy.clip_model.siglip2_preprocess(image.to(self.load_device), size=self.image_size, patch_size=self.config.get("patch_size", 16), num_patches=self.config.get("num_patches", 256), mean=self.image_mean, std=self.image_std, crop=crop).float()
+            else:
+                pixel_values = comfy.clip_model.clip_preprocess(image.to(self.load_device), size=self.image_size, mean=self.image_mean, std=self.image_std, crop=crop).float()
+        if comfy.execution_metrics.enabled():
+            try:
+                comfy.execution_metrics.observe_shape('clip_vision_plan', pixel_values, crop=crop, model_type=self.model_type,
+                                                      precision=str(self.dtype), load_device=str(self.load_device),
+                                                      offload_device=str(self.patcher.offload_device),
+                                                      memory_strategy='dynamic' if self.patcher.is_dynamic() else 'standard')
+            except Exception:
+                comfy.execution_metrics.emit('clip_vision_metadata_unavailable')
+        with comfy.execution_metrics.measure('clip_vision_forward'):
+            out = self.model(pixel_values=pixel_values, intermediate_output='all' if self.return_all_hidden_states else -2)
+        comfy.execution_metrics.observe_shape('clip_vision_output', out[0])
 
         outputs = Output()
         outputs["last_hidden_state"] = out[0].to(comfy.model_management.intermediate_device())

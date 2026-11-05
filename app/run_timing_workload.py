@@ -7,6 +7,7 @@ EXTRACTOR_VERSION = 'comfy-explicit-7'
 IMAGE_LOADERS = {'LoadImage', 'LoadImageOutput', 'LoadImageMask'}
 IMAGE_INPUTS = {'VAEEncode': ('pixels',), 'VAEEncodeTiled': ('pixels',), 'VAEEncodeForInpaint': ('pixels', 'mask'),
                 'ControlNetApply': ('image',), 'ControlNetApplyAdvanced': ('image',),
+                'CLIPVisionEncode': ('image',),
                 'MoGeInference': ('image',), 'MoGePanoramaInference': ('image',)}
 MEASUREMENT_ONLY_REASONS = frozenset((
     'audio_output_unmeasured', 'audio_output_metadata_unavailable', 'stage_completion_unobserved',
@@ -21,7 +22,7 @@ AUDIO_NODES = {'LoadAudio': 'preparation', 'EmptyLatentAudio': 'preparation',
 NODE_STAGES = {
     'CheckpointLoaderSimple': 'loading', 'CheckpointLoader': 'loading', 'UNETLoader': 'loading',
     'CLIPLoader': 'loading', 'DualCLIPLoader': 'loading', 'TripleCLIPLoader': 'loading',
-    'VAELoader': 'loading', 'ControlNetLoader': 'loading', 'DiffControlNetLoader': 'loading',
+    'VAELoader': 'loading', 'ControlNetLoader': 'loading', 'DiffControlNetLoader': 'loading', 'CLIPVisionLoader': 'loading',
     'LoraLoader': 'preparation', 'LoraLoaderModelOnly': 'preparation',
     'EmptyLatentImage': 'preparation', 'EmptySD3LatentImage': 'preparation',
     'EmptyHunyuanLatentVideo': 'preparation', 'EmptyHunyuanVideo15Latent': 'preparation',
@@ -29,7 +30,7 @@ NODE_STAGES = {
     'LoadImageOutput': 'preparation', 'LoadImageMask': 'preparation',
     'PrimitiveInt': 'preparation', 'PrimitiveFloat': 'preparation', 'PrimitiveBoolean': 'preparation',
     'ControlNetApply': 'preparation', 'ControlNetApplyAdvanced': 'preparation',
-    'CLIPTextEncode': 'encoding', 'VAEEncode': 'encoding', 'VAEEncodeTiled': 'encoding',
+    'CLIPTextEncode': 'encoding', 'CLIPVisionEncode': 'encoding', 'VAEEncode': 'encoding', 'VAEEncodeTiled': 'encoding',
     'VAEEncodeForInpaint': 'encoding', 'KSampler': 'sampling', 'KSamplerAdvanced': 'sampling',
     'SamplerCustom': 'sampling', 'SamplerCustomAdvanced': 'sampling', 'BasicGuider': 'preparation',
     'CFGGuider': 'preparation', 'DualCFGGuider': 'preparation', 'KSamplerSelect': 'preparation',
@@ -44,7 +45,7 @@ CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_st
             'tile_size', 'overlap', 'temporal_size', 'temporal_overlap', 'grow_mask_by',
             'strength_model', 'strength_clip', 'strength', 'start_percent', 'end_percent',
             'weight_dtype', 'type', 'device', 'max_length', 'mtp', 'thinking', 'response_format',
-            'context_budget', 'fps', 'source_fps', 'auto_resize', 'min_short_edge', 'seconds', 'normalize', 'quality'}
+            'context_budget', 'fps', 'source_fps', 'auto_resize', 'min_short_edge', 'seconds', 'normalize', 'quality', 'crop'}
 LATENTS = {'EmptyLatentImage': (8, 1, 4), 'EmptySD3LatentImage': (8, 1, 16),
            'EmptyHunyuanLatentVideo': (8, 4, 16), 'EmptyHunyuanVideo15Latent': (16, 4, 32),
            'EmptyLTXVLatentVideo': (32, 8, 128)}
@@ -165,7 +166,8 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             value = inputs.get(key)
             if not isinstance(value, str):
                 continue
-            identity = file_identity('moge_model_name' if kind == 'LoadMoGeModel' else key, value)
+            selection = 'moge_model_name' if kind == 'LoadMoGeModel' else 'clip_vision_name' if kind == 'CLIPVisionLoader' and key == 'clip_name' else key
+            identity = file_identity(selection, value)
             component_kind = 'lora' if key == 'lora_name' else 'controlnet' if key == 'control_net_name' else 'model'
             if identity is None:
                 stage_reasons.append('component_identity_unresolved')
@@ -209,6 +211,9 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint'):
             node_facts['imageEncode.nativePlanRequired'] = fact(True, kind)
             stage_reasons.append('image_encode_workload_unmeasured')
+        if kind == 'CLIPVisionEncode':
+            node_facts['visionEncode.nativePlanRequired'] = fact(True, kind)
+            stage_reasons.append('clip_vision_workload_unmeasured')
         if kind in ('MoGeInference', 'MoGePanoramaInference'):
             stage_reasons.append('moge_workload_unmeasured')
             if kind == 'MoGePanoramaInference':
@@ -274,7 +279,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         input_reasons = workload_reasons(stage_reasons)
         reasons.update(input_reasons)
         stage_workload = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
-                          'profile': 'vision' if kind in MOGE_NODES or kind in IMAGE_LOADERS or kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint') else 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
+                          'profile': 'vision' if kind in MOGE_NODES or kind in IMAGE_LOADERS or kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint', 'CLIPVisionLoader', 'CLIPVisionEncode') else 'audio' if kind in AUDIO_NODES or audio_latent(node_id) else
                                      next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else 'unknown',
                           'implementation': {'revision': stage_revision, 'compatibilityId': None},
                           'modelIdentity': stage_model, 'requested': {}, 'resolved': node_facts, 'measurements': {},
@@ -287,7 +292,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
     evidence = {'version': 2, 'extractorVersion': EXTRACTOR_VERSION, 'observedAt': observed_at,
                 'profile': next(iter(sampling_profiles)) if len(sampling_profiles) == 1 else
                            'audio' if not sampling_profiles and any(node_kind(node) in AUDIO_NODES for node in graph.values()) else
-                           'vision' if not sampling_profiles and any(node_kind(node) in MOGE_NODES for node in graph.values()) else 'unknown',
+                           'vision' if not sampling_profiles and any(node_kind(node) in MOGE_NODES or node_kind(node) in ('CLIPVisionLoader', 'CLIPVisionEncode') for node in graph.values()) else 'unknown',
                 'implementation': {'revision': base['profileRevision'], 'compatibilityId': None},
                 'modelIdentity': model_identity, 'requested': requested, 'resolved': resolved, 'measurements': {},
                 'components': components, 'complete': not reasons, 'reasons': sorted(reasons)}
