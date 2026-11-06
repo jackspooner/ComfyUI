@@ -12,6 +12,7 @@ from app.run_timing_h3_references import h3_reference_preparation_complete
 from app.run_timing_h3_conditioning import h3_conditioning_complete
 from app.run_timing_h3_vision import h3_vision_complete
 from app.run_timing_h3_vae import h3_video_vae_complete, h3_reference_video_vae_complete
+from app.run_timing_h3_audio import h3_audio_complete, h3_reference_audio_complete, scoped_h3_audio_replaces_legacy_limit
 from app.run_timing_model_loading import managed_loading_complete
 
 
@@ -84,13 +85,18 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     if 'h3References.required' in workload['resolved']:
         if h3_reference_preparation_complete(state):
             reasons.discard('h3_reference_preparation_unmeasured')
-            if h3_reference_video_vae_complete(state):
+            if h3_reference_video_vae_complete(state) and h3_reference_audio_complete(state):
                 reasons.discard('h3_reference_encoding_work_unmeasured')
             else:
                 reasons.add('h3_reference_encoding_work_unmeasured')
         else:
             reasons.add('h3_reference_preparation_unmeasured')
             reasons.add('h3_reference_encoding_work_unmeasured')
+    if 'h3AudioVae.required' in workload['resolved']:
+        if h3_audio_complete(state):
+            reasons.discard('h3_audio_work_unmeasured')
+        else:
+            reasons.add('h3_audio_work_unmeasured')
     if 'h3VideoVae.required' in workload['resolved']:
         if h3_video_vae_complete(state):
             reasons.discard('h3_video_vae_work_unmeasured')
@@ -208,6 +214,9 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     if state.get('resolved', {}).get('modalityCoverageComplete') is True:
         reasons.discard('text_input_modalities_unmeasured')
     reasons.update(state.get('reasons', []))
+    if scoped_h3_audio_replaces_legacy_limit(state):
+        reasons.discard('multiple_audio_invocations')
+        reasons.discard('audio_invocation_limit')
     if completed and state.get('measurements', {}).get('noiseEvaluations') != state.get('resolved', {}).get('modelEvaluations'):
         reasons.add('sampling_evaluation_count_unresolved')
     if completed and state.get('resolved', {}).get('cfgBranches') is not None:
@@ -230,6 +239,9 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     remaining.discard('h3_conditioning_text_work_unmeasured')
     remaining.discard('h3_conditioning_vision_work_unmeasured')
     remaining.discard('h3_video_vae_work_unmeasured')
+    remaining.discard('h3_audio_work_unmeasured')
+    remaining.discard('multiple_audio_invocations')
+    remaining.discard('audio_invocation_limit')
     remaining.discard('managed_load_plan_unresolved')
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)

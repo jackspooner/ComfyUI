@@ -5,6 +5,7 @@ import pytest
 from app.run_timing_h3_vae import (MAX_OPERATIONS, MAX_CLIPS, MAX_FORWARDS, h3_video_vae_complete,
     h3_reference_video_vae_complete, observe_h3_vae_metrics)
 from app.run_timing_h3_references import observe_h3_reference_metrics
+from app.run_timing_h3_audio import h3_reference_audio_complete
 from app_test.run_timing_h3_references_test import metadata, source, processed, start, latest
 
 
@@ -89,11 +90,12 @@ def test_reference_correlation_requires_one_matching_operation_and_output_per_se
     for event, facts in events(object()):
         observe_h3_vae_metrics(value, event, facts)
     assert h3_reference_video_vae_complete(value)
-    for mutation in ('audio', 'index', 'shape', 'duplicate'):
+    value['h3_reference_entries'][0]['audio_encode'] = True
+    assert h3_reference_video_vae_complete(value) and not h3_reference_audio_complete(value)
+    value['h3_reference_entries'][0]['audio_encode'] = False
+    for mutation in ('index', 'shape', 'duplicate'):
         other = copy.deepcopy(value)
-        if mutation == 'audio':
-            other['h3_reference_entries'][0]['audio_encode'] = True
-        elif mutation == 'index':
+        if mutation == 'index':
             next(iter(other['h3_vae_operations'].values()))['reference_index'] = None
         elif mutation == 'shape':
             other['h3_reference_entries'][0]['visual_shape'] = (1, 64, 32, 3)

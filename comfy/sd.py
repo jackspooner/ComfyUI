@@ -1514,6 +1514,14 @@ class VAE:
                     value = self.pad_channel_value
 
                 pixels = torch.nn.functional.pad(pixels, (0, self.output_channels - pixels.shape[-1]), mode=mode, value=value)
+        if comfy.execution_metrics.enabled():
+            try:
+                comfy.execution_metrics.observe_h3_audio('h3_audio_wrapper', {'pixels': pixels},
+                    native=type(self) is VAE, crop_input=self.crop_input,
+                    crop_ratio=downscale_ratio if self.crop_input else None,
+                    output_channels=self.output_channels, pad_channel_value=self.pad_channel_value)
+            except Exception:
+                comfy.execution_metrics.observe_h3_audio('h3_audio_metadata_unavailable')
         return pixels
 
     def vae_output_dtype(self):
