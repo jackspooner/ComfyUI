@@ -14,6 +14,7 @@ from app.run_timing_h3_vision import h3_vision_complete
 from app.run_timing_h3_vae import h3_video_vae_complete, h3_reference_video_vae_complete
 from app.run_timing_h3_audio import h3_audio_complete, h3_reference_audio_complete, scoped_h3_audio_replaces_legacy_limit
 from app.run_timing_model_loading import managed_loading_complete
+from app.run_timing_refmod import refmod_loader_complete
 
 
 def apply_metrics(record, stage, state, observed_at, completed=False):
@@ -72,6 +73,11 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         workload['resolved']['executionPrecision'] = precision
         evidence['resolved'][stage['id'] + '.executionPrecision'] = precision
     reasons = set(stage['reasons'])
+    if 'refmodLoader.required' in workload['resolved']:
+        if refmod_loader_complete(state):
+            reasons.discard('refmod_loader_work_unmeasured')
+        else:
+            reasons.add('refmod_loader_work_unmeasured')
     if 'managedLoading.required' in workload['resolved'] or state.get('managed_load_operations'):
         if managed_loading_complete(state):
             reasons.discard('managed_load_plan_unresolved')
