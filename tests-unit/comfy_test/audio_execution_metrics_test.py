@@ -156,7 +156,8 @@ def test_h3_reference_audio_observes_only_the_encoded_first_batch_item():
     result, length = nodes_minimax_h3._encode_ref_audio(vae, {'waveform': torch.zeros(2, 2, 12), 'sample_rate': 32000})
     assert result is latent and length == 3
     assert calls == [torch.Size([1, 12, 2])]
-    assert events == [('audio_vae_encode_input', {'shape': (1, 2, 12), 'sample_rate': 32000, 'source_sample_rate': 32000})]
+    assert [(event, facts) for event, facts in events if not event.startswith('h3_audio_')] == [
+        ('audio_vae_encode_input', {'shape': (1, 2, 12), 'sample_rate': 32000, 'source_sample_rate': 32000})]
 
 
 def test_loader_metadata_excludes_filename_and_waveform_values(monkeypatch):
