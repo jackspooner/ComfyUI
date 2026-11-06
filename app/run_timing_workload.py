@@ -3,6 +3,7 @@ import math
 import re
 from app.run_timing_audio import waveform_features
 from app.run_timing_vision import MOGE_NODES, MOGE_CONTROLS
+from app.run_timing_refmod import REFMOD_LOADERS
 
 EXTRACTOR_VERSION = 'comfy-explicit-7'
 IMAGE_LOADERS = {'LoadImage', 'LoadImageOutput', 'LoadImageMask'}
@@ -50,6 +51,7 @@ NODE_STAGES = {
     **{name: 'preparation' for name in AV_INPUTS},
     **{name: 'preparation' for name in AV_ALLOCATORS},
     **MOGE_NODES,
+    **{name: 'loading' for name in REFMOD_LOADERS},
 }
 CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_step', 'end_at_step',
             'add_noise', 'return_with_leftover_noise', 'width', 'height', 'length', 'batch_size',
@@ -177,6 +179,9 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if stage_reasons:
             reasons.add('unsupported_workload_adapter')
         node_facts, node_requested = {}, {}
+        if kind in REFMOD_LOADERS:
+            node_facts['refmodLoader.required'] = fact(True, kind)
+            stage_reasons.append('refmod_loader_work_unmeasured')
         controls = MOGE_CONTROLS if kind in MOGE_NODES else CONTROLS
         for key in (controls & inputs.keys()) if stage_kind != 'unknown' else ():
             value = scalar(inputs[key])

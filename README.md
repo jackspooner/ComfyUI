@@ -269,6 +269,12 @@ preparation, retaining supported parsed ranks as live component evidence. See
 loaded-image dimensions, post-crop VAE encode shapes, actual standard 2D VAE tile
 forwards, conditioning output positions and native vision-feature reuse. Internal
 tilers and other reference paths retain explicit coverage limitations.
+Explicit RefMod Loader/Axis adapters consume optional extension observations for
+actual slots, modality filtering, ordered members/copies, CPU shapes/precision,
+standalone cache reuse and uncached bundle reads. Hashed file stamps and CPU read
+durations stay audit/measurement evidence. Invalid, oversized or absent plans
+remain incomplete; these model-free loaders gain no invented model identity or
+forecast. Extraction, application and audio-creation coverage remain unfinished.
 Standard `CLIPVisionLoader`/`CLIPVisionEncode` stages resolve the native vision
 weight category, actual source/processed shapes, crop behavior, dtype/devices and
 encoded positions. Preprocessing/forward durations are CPU monotonic boundaries;
