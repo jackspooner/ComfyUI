@@ -175,6 +175,7 @@ tests-unit/app_test/run_timing_workload_test.py tests-unit/comfy_test/execution_
 tests-unit/app_test/run_timing_sampler_test.py tests-unit/comfy_test/sampling_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_layout_test.py tests-unit/comfy_test/h3_layout_execution_metrics_test.py
 tests-unit/app_test/run_timing_model_loading_test.py tests-unit/comfy_test/model_loading_execution_metrics_test.py
+tests-unit/app_test/run_timing_h3_references_test.py tests-unit/comfy_test/h3_reference_execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/clip_vision_execution_metrics_test.py
@@ -198,8 +199,42 @@ GPU probe and does not change the serving process.
 Resolved node-input observers attribute processed VAE/control image and mask
 dimensions, batch sizes and encoded conditioning-token shapes without retaining
 tensor contents or source paths. Only explicit adapters observe arguments; unknown
-nodes do not acquire workload coverage from input names. Native reference hooks
-also observe loaded-image dimensions, VAE encode shapes after native cropping and
+nodes do not acquire workload coverage from input names.
+
+`MiniMaxH3ReferenceToVideo` has an explicit preparation adapter. Bounded native
+`h3References.*` facts record up to 32 ordered nonempty image/video/audio inputs,
+actual source resize dimensions/precision/device, resized-frame work, selected
+visual frames and tokenizer frames, and visual/audio encoder selection. Video
+soundtracks retain their native same-numbered socket relationship. Stills resize
+only their first RGB item, so unused source batch/channel dimensions are audit
+measurements. Videos resize all incoming frames before trimming to the target
+length and H3's 17k+5 grid; those incoming resize frames remain strict workload
+facts even when the final reference latent has the same shape. Tokenizer video
+selection is observed after the native 2 FPS selection, without reading pixels.
+Audio encoding records the consumed first batch's source samples, channels and
+sample rate; unconsumed audio metadata remains audit-only. Source graph slots and
+output indices remain explicit reference-component provenance.
+
+The initial required marker prevents preparation coverage before native evidence.
+The final prepared snapshot coalesces per-reference events, without per-frame SQL
+writes. Missing, malformed, repeated, uncorrelated or over-limit metadata retains
+coverage reasons instead of silently truncating. Output latent shapes and CPU
+monotonic resize/visual-encode/audio-encode/tokenize/text-encode spans are
+measurements, excluded from matching and queue-stage summation. Observer/probe
+failures cannot fail or replay native work. No new model/device queries, tensor
+value reads, GPU synchronization or retained tensor references are added.
+
+This resolves the preparation subsection only. Complete native text/VAE encoding,
+internal tiling/resampling and cache proof still have explicit
+`h3_conditioning_text_work_unmeasured`/`h3_reference_encoding_work_unmeasured`
+reasons, so the composite stage remains incomplete. Cached stages without plans
+and unknown custom nodes stay incomplete. Packed sampler tokens cannot clear
+these gaps or establish RefMod extraction/file/cache coverage. The tiny CPU
+fixtures exercise native resize/control flow with stub encoder forwards; source
+delivery, configured Main/SecondPC activation and GPU/accuracy acceptance remain
+separate.
+
+Native reference hooks also observe loaded-image dimensions, VAE encode shapes after native cropping and
 temporal truncation, conditioning output positions, vision-forward attempts and
 verified feature-cache hits. Each VAE invocation retains its own axis shapes;
 positions are conditioning output lengths, not tokenizer input counts. Standard
