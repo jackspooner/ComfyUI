@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import comfy.model_management
+import comfy.execution_metrics
 import comfy.ops
 import comfy.quant_ops
 import comfy.rmsnorm
@@ -644,7 +645,9 @@ class MiniMaxH3VideoVAE(nn.Module):
     # single-shot forward
 
     def _encode_moments(self, x):
-        return self.quant_conv(self.encoder(x))
+        comfy.execution_metrics.observe_h3_vae('h3_vae_forward_input', {'pixels': x})
+        with comfy.execution_metrics.measure_h3_vae('h3_vae_forward'):
+            return self.quant_conv(self.encoder(x))
 
     def _decode_pixels(self, z):
         return self.decoder(self.post_quant_conv(z))
@@ -670,6 +673,7 @@ class MiniMaxH3VideoVAE(nn.Module):
         return (b, self.decoder.out_channels, frames, h * self.vae_ratio, w * self.vae_ratio)
 
     def _adaptive_encode(self, x):
+        comfy.execution_metrics.observe_h3_vae('h3_vae_clip', {'pixels': x})
         if self.tiling:
             return self.tiled_encode(x)
         return self._encode_moments(x)
@@ -734,6 +738,17 @@ class MiniMaxH3VideoVAE(nn.Module):
         height, width = x.shape[-2], x.shape[-1]
         y_idx, y_len, y_overlap = self.split_tiles(height)
         x_idx, x_len, x_overlap = self.split_tiles(width)
+        if comfy.execution_metrics.enabled():
+            # The existing split result is observed once, never recomputed.
+            try:
+                axes = (y_idx, y_len, y_overlap, x_idx, x_len, x_overlap)
+                if any(len(axis) > 64 for axis in axes):
+                    raise ValueError('Unbounded tile metadata')
+                comfy.execution_metrics.observe_h3_vae('h3_vae_tiles',
+                    y_starts=tuple(y_idx), y_lengths=tuple(y_len), y_overlaps=tuple(y_overlap),
+                    x_starts=tuple(x_idx), x_lengths=tuple(x_len), x_overlaps=tuple(x_overlap))
+            except Exception:
+                comfy.execution_metrics.observe_h3_vae('h3_vae_metadata_unavailable')
 
         rows = []
         for i_pos, i_len in zip(y_idx, y_len):
@@ -967,17 +982,32 @@ class MiniMaxH3VideoVAE(nn.Module):
         if device is None:
             device = x.device
 
-        if x.shape[2] == 1:
-            moments = self._adaptive_encode(self._normalize_pixels(x.to(device)))
-            moments = moments[:, :, -1:, :, :]
-        else:
-            moments = self.encode_temporal(x, device)
+        with comfy.execution_metrics.h3_vae_scope():
+            if comfy.execution_metrics.enabled():
+                try:
+                    comfy.execution_metrics.observe_h3_vae('h3_vae_begin', {'pixels': x},
+                        native=type(self) is MiniMaxH3VideoVAE and type(self.encoder) is EncoderFCN3D,
+                        tiling=self.tiling, tile_size=self.tile_size, tile_overlap_min=self.tile_overlap_min,
+                        clip_length=self.clip_length, token_drop=self.token_drop,
+                        spatial_ratio=self.vae_ratio, temporal_ratio=self.vae_ratio_t,
+                        tokens_chunk_size=self.tokens_chunk_size, device=str(device), training=self.training,
+                        grad_enabled=torch.is_grad_enabled(), inference_mode=torch.is_inference_mode_enabled())
+                except Exception:
+                    comfy.execution_metrics.observe_h3_vae('h3_vae_metadata_unavailable')
+            with comfy.execution_metrics.measure_h3_vae('h3_vae_encode'):
+                if x.shape[2] == 1:
+                    moments = self._adaptive_encode(self._normalize_pixels(x.to(device)))
+                    moments = moments[:, :, -1:, :, :]
+                else:
+                    moments = self.encode_temporal(x, device)
 
-        mean = torch.chunk(moments.float(), 2, dim=1)[0]
+                mean = torch.chunk(moments.float(), 2, dim=1)[0]
 
-        latents_mean = self.latents_mean.view(1, -1, 1, 1, 1).to(mean)
-        latents_std = self.latents_std.view(1, -1, 1, 1, 1).to(mean)
-        return (mean - latents_mean) / latents_std
+                latents_mean = self.latents_mean.view(1, -1, 1, 1, 1).to(mean)
+                latents_std = self.latents_std.view(1, -1, 1, 1, 1).to(mean)
+                result = (mean - latents_mean) / latents_std
+            comfy.execution_metrics.observe_h3_vae('h3_vae_output', {'latents': result})
+            return result
 
     def encode_tiled(self, x, **kwargs):
         # tiling is always on internally with the reference's semantic tile sizes, ignore tiling fallbacks
