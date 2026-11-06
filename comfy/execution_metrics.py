@@ -11,6 +11,8 @@ _observer = None
 _stage = ContextVar('execution_metrics_stage', default=None)
 _evaluation = ContextVar('execution_metrics_evaluation', default=None)
 _vision = ContextVar('execution_metrics_vision', default=None)
+_h3_vae = ContextVar('execution_metrics_h3_vae', default=None)
+_h3_reference = ContextVar('execution_metrics_h3_reference', default=None)
 
 
 def set_observer(observer):
@@ -24,6 +26,43 @@ def enabled():
 
 def current_stage():
     return _stage.get()
+
+
+@contextmanager
+def h3_reference_vae_scope(index):
+    token = _h3_reference.set(index)
+    try:
+        yield
+    finally:
+        _h3_reference.reset(token)
+
+
+@contextmanager
+def h3_vae_scope():
+    token = _h3_vae.set(object() if enabled() else None)
+    try:
+        yield
+    finally:
+        _h3_vae.reset(token)
+
+
+def observe_h3_vae(event, tensors=None, **facts):
+    binding = _h3_vae.get()
+    if enabled() and binding is not None:
+        try:
+            observe_shapes(event, tensors or {}, binding=binding, reference_index=_h3_reference.get(), **facts)
+        except Exception:
+            emit('h3_vae_metadata_unavailable', binding=binding)
+
+
+@contextmanager
+def measure_h3_vae(event):
+    binding = _h3_vae.get()
+    if binding is None:
+        yield
+    else:
+        with measure(event, binding=binding):
+            yield
 
 
 def observe_shape(event, tensor, **facts):

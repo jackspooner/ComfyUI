@@ -242,8 +242,10 @@ input shape, compute precision, layer count and output selection before forwardi
 A complete reference plan with no selected VAE work can resolve that encoding gap;
 correlated native H3 vision plans can additionally prove preprocessing geometry,
 actual forward/reuse decisions and output verification for image embeddings.
-Selected VAE internals, audio embeddings, custom variants/options and unproved
-cache reuse remain incomplete. The normal H3 CLIP path stays uncached; telemetry
+Correlated native H3 video-VAE encodes can prove actual temporal chunks, padding,
+spatial tile/overlap geometry and completed encoder forwards for selected visual
+references. Missing/unknown VAE work, audio embeddings, custom variants/options and
+unproved cache reuse remain incomplete. The normal H3 CLIP path stays uncached; telemetry
 does not enable feature reuse. Token counts cannot qualify missing
 managed-loading evidence. CPU forward spans overlap their owning node's elapsed
 time and are never added as extra queue work.
