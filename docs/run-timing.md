@@ -662,9 +662,43 @@ stage transitions rather than every member.
 The adapters do not infer a backbone from an asset name. Loader-only work retains
 unknown model/profile identity and receives no stage forecast under the existing
 matching policy. Old producers remain usable with missing loader coverage. This
-does not establish extraction/refinement/application/audio-creation coverage,
+does not establish extraction/refinement/audio-creation coverage,
 deployment or real-world forecast accuracy. Run `run_timing_refmod_test.py` with
 the native CPU suite and the extension's documented real-file CPU checks.
+
+## RefMod application
+
+The explicit `MiniMaxH3RefModApply` adapter preserves conditioning/mod source-stage
+and output-slot relationships. Optional extension v1 events describe the actual
+post-override, post-scramble selection and each ordered reference/copy's real
+drop/reuse/scalar-mix/frame-mix branch. Native input axes, precision/device,
+default precision and gradient/inference regime are live work; curve-position
+counts and blur factor/backend distinguish actual preparation. No curve, shuffle,
+latent transfer or tensor operation is repeated for timing. Effective strengths
+and source ordinals are audit-only, not automatic exact-match boundaries.
+
+The same scope observes real graph-preset read/save decisions, 1024-square debug
+render geometry and 160 curve samples, conversion and conditioning attachment.
+Output shapes/precision and CPU monotonic reference/blur/preset/render/conversion/
+total spans are measurements. They overlap, and must not be summed as extra queue
+work. These events do not declare a preparation cache or infer a backbone; model
+and profile provenance still come from the graph's existing dependency owners.
+
+At most 256 selected references including copies are collected; every original
+reference executes after the limit while coverage stays explicitly incomplete.
+Only matching begin/settings/selection/reference plans and outputs/phases/debug/
+attachment/end proof clears `refmod_apply_work_unmeasured`. Invalid, missing,
+duplicate, uncorrelated, custom RefMod classes and MPS blur transfer retain gaps.
+Snapshots occur at begin/end/metadata failure and native stage transitions, not
+every reference or tensor operation. Parent evidence removes a loader/application
+gap only when all corresponding stage reasons have cleared; other source gaps
+remain. Old producers remain usable with missing coverage.
+
+CPU verification includes 50 native application reducer checks and the extension's
+real tiny visual/audio weakening, debug/preset and SQLite/schema tests. Observer
+failures preserve outputs and original failure counts. This does not establish
+Step Curve/Continuum/Text Encode, extraction/refinement/direct audio creation,
+live activation, real-model output acceptance or forecast accuracy.
 
 ## Native MoGe workload boundaries
 
