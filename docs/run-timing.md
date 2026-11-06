@@ -176,6 +176,7 @@ tests-unit/app_test/run_timing_sampler_test.py tests-unit/comfy_test/sampling_ex
 tests-unit/app_test/run_timing_h3_layout_test.py tests-unit/comfy_test/h3_layout_execution_metrics_test.py
 tests-unit/app_test/run_timing_model_loading_test.py tests-unit/comfy_test/model_loading_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_references_test.py tests-unit/comfy_test/h3_reference_execution_metrics_test.py
+tests-unit/app_test/run_timing_h3_conditioning_test.py tests-unit/comfy_test/h3_conditioning_execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/clip_vision_execution_metrics_test.py
@@ -224,15 +225,40 @@ measurements, excluded from matching and queue-stage summation. Observer/probe
 failures cannot fail or replay native work. No new model/device queries, tensor
 value reads, GPU synchronization or retained tensor references are added.
 
-This resolves the preparation subsection only. Complete native text/VAE encoding,
-internal tiling/resampling and cache proof still have explicit
-`h3_conditioning_text_work_unmeasured`/`h3_reference_encoding_work_unmeasured`
-reasons, so the composite stage remains incomplete. Cached stages without plans
-and unknown custom nodes stay incomplete. Packed sampler tokens cannot clear
-these gaps or establish RefMod extraction/file/cache coverage. The tiny CPU
-fixtures exercise native resize/control flow with stub encoder forwards; source
-delivery, configured Main/SecondPC activation and GPU/accuracy acceptance remain
-separate.
+Native `MiniMaxQwen3VL.forward` additionally records its full-sequence conditioning
+plan after ordinary SDClip embedding expansion and before forwarding. Live
+`h3Conditioning.*` facts retain batch/sequence/embedding width, text/image/audio/
+padding positions, input dtype/device, actual configured compute dtype and layer
+count, intermediate-output selection, output dtype and normalization. Token IDs,
+prompt contents and embedding values are never collected. Native embedding-row
+metadata must agree with the actual input shape and contain no unknown modality.
+The exact native class is admitted; custom subclasses (including the distinct
+p-h3-image connector path), extra options, masked calls, unknown precision,
+unmatched/repeated plans and more than 64 selected layer indices retain gaps.
+This is full-sequence conditioning, not autoregressive decode or a prefix-cache
+claim. Input embeddings are normally float32 even with lower-precision model
+compute; those two observations remain separate.
+
+The forward plan atomically requires managed-loading evidence, so resolved token
+work cannot qualify a missing loading plan. A complete reference plan proving no
+visual/audio VAE calls were selected can clear
+`h3_reference_encoding_work_unmeasured`. A valid native text plan can clear
+`h3_conditioning_text_work_unmeasured`; nonzero image/audio positions retain
+`h3_conditioning_vision_work_unmeasured` because their internal preprocessing and
+feature-cache work is not established here. Selected VAE internals, tiling/
+resampling, unknown custom nodes and cached stages without input proof remain
+incomplete. Packed sampler tokens cannot clear these gaps or establish RefMod
+extraction/file/cache coverage.
+
+The CPU-monotonic `h3Conditioning.forward.*` measurements preserve native success
+or failure without retries. They overlap `h3References.text_encode.*` and the
+owner node's elapsed time; never sum them or add queue stages. First plans and
+coverage transitions coalesce writes. Tiny CPU fixtures exercise native tokenizer
+presentation, embedding expansion, token-weight assembly and H3 forwarding with
+stub tokens/weights. Five equivalent text-only/no-VAE histories qualify exactly;
+changed token work/compute precision/layers/selection and absent loading/input
+evidence do not. Source delivery, configured Main/SecondPC activation and real
+model/accuracy acceptance remain separate.
 
 Native reference hooks also observe loaded-image dimensions, VAE encode shapes after native cropping and
 temporal truncation, conditioning output positions, vision-forward attempts and
