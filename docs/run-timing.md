@@ -637,6 +637,35 @@ forecast accuracy. Run `tests-unit/app_test/run_timing_image_test.py`,
 `tests-unit/comfy_test/reference_execution_metrics_test.py` with the CPU launcher
 above, plus decoder/external-image regressions and schema freshness checks.
 
+## RefMod file loading
+
+`MiniMaxH3RefModsLoader` and `MiniMaxH3RefModsAxis` have explicit loading adapters.
+They require the extension's optional v1 bridge before clearing
+`refmod_loader_work_unmeasured`. Correlated begin/slot/read/member/selection/end
+observations prove the actual eight-slot selection, A/B side (audit), effective
+strengths and copies, selected ordered visual/audio members, CPU latent axes,
+precision and token count. Standalone reuse is observed at the existing cache-hit
+branch; bundles remain uncached. Metadata, standalone and bundle reads, and the
+inclusive total, are separate CPU-monotonic measurements. They overlap and must
+not be summed as independent queue stages. No extra file or GPU reads occur.
+
+The existing cache owner's hashed path/size/mtime/ctime stamp is audit-only; it
+does not prove content identity or inode/device identity. Unavailable stamps stay
+explicit, including uncached bundles and files immediately evicted by the current
+byte limit. No filenames, descriptions, prompts, tensor values or correlation
+objects are persisted. Workload facts become available live after actual loads;
+durations and stamp evidence cannot affect an earlier forecast. Collection caps
+the combined invocation at 256 members and marks excess, duplicate, invalid or
+uncorrelated evidence incomplete. Snapshots occur at begin/end and normal owner
+stage transitions rather than every member.
+
+The adapters do not infer a backbone from an asset name. Loader-only work retains
+unknown model/profile identity and receives no stage forecast under the existing
+matching policy. Old producers remain usable with missing loader coverage. This
+does not establish extraction/refinement/application/audio-creation coverage,
+deployment or real-world forecast accuracy. Run `run_timing_refmod_test.py` with
+the native CPU suite and the extension's documented real-file CPU checks.
+
 ## Native MoGe workload boundaries
 
 Extractor 6 explicitly describes `LoadMoGeModel`, `MoGeInference`,
