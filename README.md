@@ -230,6 +230,13 @@ callables, specialized inpaint options and other unreviewed paths remain incompl
 Native H3 plans require observed packed text/guide/reference/audio/video token work;
 missing or conflicting layouts retain coverage gaps. These live facts do not
 complete upstream reference preparation or establish RefMod cache reuse.
+Native `MiniMaxH3ReferenceToVideo` observations additionally distinguish ordered
+image/video/audio sources, actual resize work, video trimming, tokenizer frame
+selection and optional paired soundtrack encoding. Unused still batch items stay
+audit-only; all incoming video resize frames remain workload evidence. Output
+latents and CPU preparation/encoding spans are measurements. This preparation
+adapter retains gaps for complete text/VAE encoding work, cache reuse and RefMod
+extraction; it does not make that composite stage fully comparable.
 Native model-manager observations separate loading/unloading/clone CPU work and
 retain observed entry reuse, memory policy and effective load budgets. Unknown
 physical residency stays unknown; these measurements add no GPU queries or queue work.
