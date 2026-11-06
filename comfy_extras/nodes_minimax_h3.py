@@ -92,6 +92,22 @@ def _encode_ref_audio(audio_vae, audio):
     return z, z.shape[-1]
 
 
+def _observe_reference(event, index, role, group, name, tensors=None, audio=None, **facts):
+    if not comfy.execution_metrics.enabled():
+        return
+    try:
+        prefixes = {'ref_images': 'ref_image_', 'ref_videos': 'ref_video_', 'ref_audios': 'ref_audio_'}
+        if not isinstance(name, str) or not re.fullmatch(prefixes[group] + r'\d{1,4}', name):
+            raise ValueError('Unknown reference socket')
+        tensors = {key: value for key, value in (tensors or {}).items() if value is not None}
+        if audio is not None:
+            tensors['waveform'] = audio['waveform']
+            facts['sample_rate'] = audio['sample_rate']
+        comfy.execution_metrics.observe_shapes(event, tensors, index=index, role=role, slot=group + '.' + name, **facts)
+    except Exception:
+        comfy.execution_metrics.emit('h3_reference_metadata_unavailable')
+
+
 def _av_latent(width, height, latent_t, audio_t, batch_size=1):
     video_shape = [batch_size, 24, latent_t, height // 16, width // 16]
     audio_shape = [batch_size, 32, 2, audio_t]
@@ -312,8 +328,10 @@ class MiniMaxH3ReferenceToVideo(io.ComfyNode):
 
         ref_items = []   # for the tokenizer presentation, in request order
         ref_blocks = []  # for the DiT payload, same order
+        reference_index = 0
+        comfy.execution_metrics.emit('h3_reference_begin')
 
-        for img in (ref_images or {}).values():
+        for name, img in (ref_images or {}).items():
             if img is None:
                 continue
             h, w = img.shape[1], img.shape[2]
@@ -324,11 +342,20 @@ class MiniMaxH3ReferenceToVideo(io.ComfyNode):
                 scale = min(1.0, REF_IMAGE_SHORT_EDGE / min(w, h))
             tw = max(CANVAS_MULTIPLE, round(w * scale / CANVAS_MULTIPLE) * CANVAS_MULTIPLE)
             th = max(CANVAS_MULTIPLE, round(h * scale / CANVAS_MULTIPLE) * CANVAS_MULTIPLE)
-            resized = _resize(img[:1], tw, th, "disabled")
+            _observe_reference('h3_reference_source', reference_index, 'image', 'ref_images', name,
+                               {'source': img}, resize_width=tw, resize_height=th,
+                               visual_encode=vae is not None, audio_encode=False, soundtrack=False)
+            with comfy.execution_metrics.measure('h3_reference_resize', index=reference_index):
+                resized = _resize(img[:1], tw, th, "disabled")
+            _observe_reference('h3_reference_processed', reference_index, 'image', 'ref_images', name,
+                               {'visual': resized, 'tokenizer': resized})
             ref_items.append({"type": "image", "data": resized})
             if vae is not None:
-                z = vae.encode(resized)
+                with comfy.execution_metrics.measure('h3_reference_visual_encode', index=reference_index):
+                    z = vae.encode(resized)
+                _observe_reference('h3_reference_output', reference_index, 'image', 'ref_images', name, {'visual': z})
                 ref_blocks.append({"kind": "image", "latent_h": th // 16, "latent_w": tw // 16, "latent": z})
+            reference_index += 1
 
         ref_video_audios = ref_video_audios or {}
         for name, video_frames in (ref_videos or {}).items():
@@ -341,7 +368,13 @@ class MiniMaxH3ReferenceToVideo(io.ComfyNode):
             if vw * vh < cw * ch:
                 cw = max(CANVAS_MULTIPLE, round(vw / CANVAS_MULTIPLE) * CANVAS_MULTIPLE)
                 ch = max(CANVAS_MULTIPLE, round(vh / CANVAS_MULTIPLE) * CANVAS_MULTIPLE)
-            frames = _resize(video_frames, cw, ch, "disabled")
+            _observe_reference('h3_reference_source', reference_index, 'video', 'ref_videos', name,
+                               {'source': video_frames}, audio=soundtrack, resize_width=cw, resize_height=ch,
+                               frame_limit=frame_count,
+                               visual_encode=vae is not None, audio_encode=vae is not None and soundtrack is not None and audio_vae is not None,
+                               soundtrack=soundtrack is not None)
+            with comfy.execution_metrics.measure('h3_reference_resize', index=reference_index):
+                frames = _resize(video_frames, cw, ch, "disabled")
             if frames.shape[0] > frame_count:
                 frames = frames[:frame_count]
             n = frames.shape[0]
@@ -356,28 +389,44 @@ class MiniMaxH3ReferenceToVideo(io.ComfyNode):
             # Qwen sees the video at 2 fps with timestamps
             sample_idx = list(range(0, frames.shape[0], FPS // 2))
             qwen_frames = frames[sample_idx]
+            _observe_reference('h3_reference_processed', reference_index, 'video', 'ref_videos', name,
+                               {'visual': frames, 'tokenizer': qwen_frames})
             ref_items.append({"type": "video", "data": qwen_frames,
                               "timestamps": [i / 2.0 for i in range(len(sample_idx))]})
             if vae is None:
+                reference_index += 1
                 continue
-            z = vae.encode(frames)
+            with comfy.execution_metrics.measure('h3_reference_visual_encode', index=reference_index):
+                z = vae.encode(frames)
             audio_latent, ref_audio_t = (None, 0)
             if soundtrack is not None and audio_vae is not None:
-                audio_latent, ref_audio_t = _encode_ref_audio(audio_vae, soundtrack)
+                with comfy.execution_metrics.measure('h3_reference_audio_encode', index=reference_index):
+                    audio_latent, ref_audio_t = _encode_ref_audio(audio_vae, soundtrack)
+            _observe_reference('h3_reference_output', reference_index, 'video', 'ref_videos', name,
+                               {'visual': z, 'audio': audio_latent})
             ref_blocks.append({"kind": "video_audio" if ref_audio_t else "video",
                                "latent_t": z.shape[2], "latent_h": ch // 16, "latent_w": cw // 16,
                                "ref_audio_t": ref_audio_t, "latent": z, "audio_latent": audio_latent})
+            reference_index += 1
 
-        for audio in (ref_audios or {}).values():
+        for name, audio in (ref_audios or {}).items():
             if audio is None:
                 continue
+            _observe_reference('h3_reference_source', reference_index, 'audio', 'ref_audios', name,
+                               audio=audio, visual_encode=False, audio_encode=audio_vae is not None, soundtrack=False)
             ref_items.append({"type": "audio"})
             if audio_vae is not None:
-                audio_latent, ref_audio_t = _encode_ref_audio(audio_vae, audio)
+                with comfy.execution_metrics.measure('h3_reference_audio_encode', index=reference_index):
+                    audio_latent, ref_audio_t = _encode_ref_audio(audio_vae, audio)
+                _observe_reference('h3_reference_output', reference_index, 'audio', 'ref_audios', name, {'audio': audio_latent})
                 ref_blocks.append({"kind": "audio", "ref_audio_t": ref_audio_t, "audio_latent": audio_latent})
+            reference_index += 1
 
-        tokens = clip.tokenize(prompt, minimax_ref_items=ref_items)
-        cond = clip.encode_from_tokens_scheduled(tokens)
+        comfy.execution_metrics.emit('h3_reference_prepared', references=reference_index, tokenizer_items=len(ref_items), blocks=len(ref_blocks))
+        with comfy.execution_metrics.measure('h3_reference_tokenize'):
+            tokens = clip.tokenize(prompt, minimax_ref_items=ref_items)
+        with comfy.execution_metrics.measure('h3_reference_text_encode'):
+            cond = clip.encode_from_tokens_scheduled(tokens)
         if ref_blocks:
             cond = node_helpers.conditioning_set_values(cond, {"minimax_refs": ref_blocks})
         return io.NodeOutput(cond, latent)
