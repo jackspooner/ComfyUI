@@ -185,6 +185,7 @@ def observe_h3_reference_metrics(state, event, facts):
             missing('h3_reference_preparation_unresolved')
             return True
         entry['processed'] = True
+        entry['visual_shape'] = shapes['visual']
         values = {'processedFrames': frames, 'processedWidth': entry['width'], 'processedHeight': entry['height'],
                   'tokenizerFrames': expected_tokenizer[0], 'tokenizerFrameStride': 0 if role == 'image' else 12}
         for name in ('visual', 'tokenizer'):

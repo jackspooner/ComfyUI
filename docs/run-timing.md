@@ -178,6 +178,7 @@ tests-unit/app_test/run_timing_model_loading_test.py tests-unit/comfy_test/model
 tests-unit/app_test/run_timing_h3_references_test.py tests-unit/comfy_test/h3_reference_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_conditioning_test.py tests-unit/comfy_test/h3_conditioning_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_vision_test.py tests-unit/comfy_test/h3_vision_execution_metrics_test.py
+tests-unit/app_test/run_timing_h3_vae_test.py tests-unit/comfy_test/h3_vae_execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/clip_vision_execution_metrics_test.py
@@ -242,11 +243,12 @@ compute; those two observations remain separate.
 
 The forward plan atomically requires managed-loading evidence, so resolved token
 work cannot qualify a missing loading plan. A complete reference plan proving no
-visual/audio VAE calls were selected can clear
+visual/audio VAE calls were selected, or the correlated native visual-VAE proof
+below with no selected audio VAE, can clear
 `h3_reference_encoding_work_unmeasured`. A valid native text plan can clear
 `h3_conditioning_text_work_unmeasured`. Nonzero image positions require the
 correlated vision proof below to clear `h3_conditioning_vision_work_unmeasured`;
-nonzero audio embedding positions retain it. Selected VAE internals, tiling/
+nonzero audio embedding positions retain it. Unproved VAE internals, tiling/
 resampling, unknown custom nodes and cached stages without input proof remain
 incomplete. Packed sampler tokens cannot clear these gaps or establish RefMod
 extraction/file/cache coverage.
@@ -282,8 +284,37 @@ vision fixtures preserve original forward/RNG/equality/grid-read traces, numeric
 outputs and exception identity. Functional fixtures cover native PNG loading,
 shared source deduplication, ordinary uncached CLIP lifecycle and a test-only
 explicit cache owner; changed depth/precision/cache and missing geometry reject
-exact matching. Selected VAE and RefMod work, actual checkpoint/GPU behavior,
+exact matching. Unproved VAE and RefMod work, actual checkpoint/GPU behavior,
 configured activation and chronological accuracy remain separate acceptance.
+
+Native `MiniMaxH3VideoVAE.encode` additionally scopes each actual encoder operation.
+Live `h3VideoVae.*` facts retain normalized-source dimensions, input precision/device,
+training/grad regime, actual padded temporal chunks, existing spatial split starts/
+lengths/overlaps and every encoder input shape/precision/device. Tile lists are
+bounded JSON scalar strings, not tensor values. Raw tile-size/overlap settings
+remain audit measurements because the actual split governs work. Temporal settings
+unused for a still are also audit-only. The existing split is never repeated;
+no tensor-value reads, model/device queries or GPU synchronization are added.
+
+Up to 32 operations, 128 clips and 512 planned/observed forwards per stage are
+retained, with at most 64 tiles per spatial axis. Every operation requires matching
+chunk/tile/forward completion and output shape verification. Outputs and CPU encode/
+forward spans are measurements; they overlap the owner stage and add no queue work.
+Temporary scope bindings retain no model or tensor and never enter stored records.
+First evidence, coverage changes and owner stage transitions coalesce persistence.
+
+`MiniMaxH3ReferenceToVideo` binds each visual encode to its ordered reference index.
+Only exactly one matching native operation per selected visual, equal processed
+source and verified reference output, and no selected audio VAE can clear the
+reference-encoding gap. Text/vision/loading and dependency proof remain necessary.
+Missing/duplicate/malformed/over-limit plans, OOM retries, audio VAE, PH3/custom
+variants and RefMod preparation remain incomplete. Direct H3 VAE calls are observable
+but do not clear unrelated or unsupported node adapters. This changes no VAE/cache/
+chunk/tiling policy. CPU fixtures use tiny native encoder kernels and constant
+weights, preserving original split/forward calls, numerical outputs and errors.
+The native wrapper/reference/reader/SQLite/public fixture proves selected still
+encoding propagation and exact five-sample matching; real checkpoint/GPU behavior,
+configured activation and accuracy remain unverified.
 
 Native reference hooks also observe loaded-image dimensions, VAE encode shapes after native cropping and
 temporal truncation, conditioning output positions, vision-forward attempts and

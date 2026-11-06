@@ -11,6 +11,7 @@ from app.run_timing_h3_layout import h3_layout_complete
 from app.run_timing_h3_references import h3_reference_preparation_complete
 from app.run_timing_h3_conditioning import h3_conditioning_complete
 from app.run_timing_h3_vision import h3_vision_complete
+from app.run_timing_h3_vae import h3_video_vae_complete, h3_reference_video_vae_complete
 from app.run_timing_model_loading import managed_loading_complete
 
 
@@ -83,13 +84,18 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     if 'h3References.required' in workload['resolved']:
         if h3_reference_preparation_complete(state):
             reasons.discard('h3_reference_preparation_unmeasured')
-            if not any(entry['visual_encode'] or entry['audio_encode'] for entry in state.get('h3_reference_entries', [])):
+            if h3_reference_video_vae_complete(state):
                 reasons.discard('h3_reference_encoding_work_unmeasured')
             else:
                 reasons.add('h3_reference_encoding_work_unmeasured')
         else:
             reasons.add('h3_reference_preparation_unmeasured')
             reasons.add('h3_reference_encoding_work_unmeasured')
+    if 'h3VideoVae.required' in workload['resolved']:
+        if h3_video_vae_complete(state):
+            reasons.discard('h3_video_vae_work_unmeasured')
+        else:
+            reasons.add('h3_video_vae_work_unmeasured')
     if 'h3Conditioning.required' in workload['resolved']:
         if h3_conditioning_complete(state):
             reasons.discard('h3_conditioning_text_work_unmeasured')
@@ -223,6 +229,7 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     remaining.discard('h3_reference_encoding_work_unmeasured')
     remaining.discard('h3_conditioning_text_work_unmeasured')
     remaining.discard('h3_conditioning_vision_work_unmeasured')
+    remaining.discard('h3_video_vae_work_unmeasured')
     remaining.discard('managed_load_plan_unresolved')
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)
