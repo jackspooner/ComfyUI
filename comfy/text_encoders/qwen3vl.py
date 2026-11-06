@@ -10,6 +10,7 @@ from transformers import Qwen2Tokenizer
 
 from comfy import sd1_clip
 import comfy.text_encoders.qwen_vl
+from comfy import execution_metrics
 from .qwen35 import Qwen35VisionModel
 from .llama import BaseLlama, BaseQwen3, BaseGenerate, Llama2_, Qwen3VL_4BConfig, Qwen3VL_8BConfig, Qwen3VL_32BConfig
 
@@ -97,9 +98,13 @@ class Qwen3VL(BaseLlama, BaseQwen3, BaseGenerate, torch.nn.Module):
     def preprocess_embed(self, embed, device):
         if embed["type"] == "image":
             # Qwen3-VL normalizes to [-1, 1] (mean/std 0.5), unlike Qwen2.5-VL's CLIP normalization.
-            image, grid = comfy.text_encoders.qwen_vl.process_qwen2vl_images(embed["data"], patch_size=16, image_mean=[0.5, 0.5, 0.5], image_std=[0.5, 0.5, 0.5])
+            with execution_metrics.measure_vision('h3_vision_preprocess'):
+                image, grid = comfy.text_encoders.qwen_vl.process_qwen2vl_images(embed["data"], patch_size=16, image_mean=[0.5, 0.5, 0.5], image_std=[0.5, 0.5, 0.5])
             if self.vision_feature_cache is None:
-                merged, deepstack = self.visual(image.to(device, dtype=torch.float32), grid)
+                execution_metrics.observe_vision('h3_vision_execution', {'patches': image},
+                                                native=True, reused=False, cache_eligible=False, device=str(device))
+                with execution_metrics.measure_vision('h3_vision_forward'):
+                    merged, deepstack = self.visual(image.to(device, dtype=torch.float32), grid)
             else:
                 merged, deepstack = self.vision_feature_cache.encode(self.visual, image, grid, device, self.dtype)
             return merged, {"grid": grid, "deepstack": deepstack}
