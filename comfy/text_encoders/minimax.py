@@ -25,6 +25,7 @@ import torch
 import torch.nn.functional as F
 import comfy.ops
 import comfy.sd1_clip
+import comfy.execution_metrics
 from .qwen3vl import Qwen3VL, Qwen3VLSDTokenizer
 
 VISION_START = 151652
@@ -86,6 +87,34 @@ def token_tags_from_embeds_info(seq_len, embeds_info):
     return tags
 
 
+def _observe_conditioning(model, inputs, input_kind, selection, layer_norm, dtype, attention_mask, extra_options):
+    if not comfy.execution_metrics.enabled():
+        return
+    try:
+        layers, precision = model.num_layers, model.dtype
+        if (type(layers) is not int or not isinstance(precision, torch.dtype)
+                or dtype is not None and not isinstance(dtype, torch.dtype) or type(layer_norm) is not bool):
+            raise ValueError('Unknown conditioning metadata')
+        indices = ()
+        if selection is None:
+            mode = 'last'
+        elif type(selection) is int:
+            mode, indices = 'indices', (selection,)
+        elif isinstance(selection, (list, tuple)) and len(selection) <= 64 and all(type(value) is int for value in selection):
+            mode, indices = 'indices', tuple(selection)
+        elif isinstance(selection, str) and selection == 'all':
+            mode = 'all'
+        else:
+            mode = 'unknown'
+        comfy.execution_metrics.observe_shapes('h3_conditioning_plan', {'input': inputs},
+            native=type(model) is MiniMaxQwen3VL, input_kind=input_kind,
+            layers=layers, compute_precision=str(precision), output_precision=str(dtype),
+            selection=mode, indices=indices, layer_norm=layer_norm,
+            attention_mask=attention_mask is not None, extra_options=bool(extra_options))
+    except Exception:
+        comfy.execution_metrics.emit('h3_conditioning_metadata_unavailable')
+
+
 class MiniMaxQwen3VL(Qwen3VL):
     model_type = "qwen3vl_32b"
 
@@ -101,10 +130,14 @@ class MiniMaxQwen3VL(Qwen3VL):
                 dtype=None, embeds_info=[], **kwargs):
         seq = embeds.shape[1] if embeds is not None else input_ids.shape[1]
         self.last_token_tags = token_tags_from_embeds_info(seq, embeds_info)
-        return super().forward(input_ids, attention_mask=attention_mask, embeds=embeds,
-                               num_tokens=num_tokens, intermediate_output=intermediate_output,
-                               final_layer_norm_intermediate=final_layer_norm_intermediate,
-                               dtype=dtype, embeds_info=embeds_info, **kwargs)
+        _observe_conditioning(self, embeds if embeds is not None else input_ids,
+                              'embeddings' if embeds is not None else 'input_ids', intermediate_output,
+                              final_layer_norm_intermediate, dtype, attention_mask, kwargs)
+        with comfy.execution_metrics.measure('h3_conditioning_forward'):
+            return super().forward(input_ids, attention_mask=attention_mask, embeds=embeds,
+                                   num_tokens=num_tokens, intermediate_output=intermediate_output,
+                                   final_layer_norm_intermediate=final_layer_norm_intermediate,
+                                   dtype=dtype, embeds_info=embeds_info, **kwargs)
 
 
 class TextConnector(torch.nn.Module):
