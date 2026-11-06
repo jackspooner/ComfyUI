@@ -1,5 +1,6 @@
 """Explicit, prompt-free workload adapters; no node execution or GPU queries."""
 import math
+import re
 from app.run_timing_audio import waveform_features
 from app.run_timing_vision import MOGE_NODES, MOGE_CONTROLS
 
@@ -41,6 +42,7 @@ NODE_STAGES = {
     'SamplerCustom': 'sampling', 'SamplerCustomAdvanced': 'sampling', 'BasicGuider': 'preparation',
     'CFGGuider': 'preparation', 'DualCFGGuider': 'preparation', 'KSamplerSelect': 'preparation',
     'SamplerEulerAncestral': 'preparation',
+    'MiniMaxH3ReferenceToVideo': 'preparation',
     'BasicScheduler': 'preparation', 'RandomNoise': 'preparation', 'DisableNoise': 'preparation',
     'VAEDecode': 'decoding', 'VAEDecodeTiled': 'decoding', 'SaveImage': 'publication', 'PreviewImage': 'publication',
     'TextGenerate': 'inference', 'TextGenerateLTX2Prompt': 'inference',
@@ -178,7 +180,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         controls = MOGE_CONTROLS if kind in MOGE_NODES else CONTROLS
         for key in (controls & inputs.keys()) if stage_kind != 'unknown' else ():
             value = scalar(inputs[key])
-            if kind == 'LTXVEmptyLatentAudio' or kind in AV_ALLOCATORS:
+            if kind == 'LTXVEmptyLatentAudio' or kind in AV_ALLOCATORS or kind == 'MiniMaxH3ReferenceToVideo':
                 # Native allocators own effective rounding and shape. Compare
                 # their observed allocation, retaining these as audit intent.
                 requested[node_id + '.' + key] = node_requested[key] = value
@@ -257,6 +259,25 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if kind in AV_ALLOCATORS:
             node_facts['jointAllocation.nativePlanRequired'] = fact(True, kind)
             stage_reasons.append('h3_allocation_workload_unmeasured')
+        if kind == 'MiniMaxH3ReferenceToVideo':
+            node_profile = 'diffusion_video'
+            node_facts['jointAllocation.nativePlanRequired'] = fact(True, kind)
+            node_facts['h3References.required'] = fact(True, kind)
+            stage_reasons.extend(('h3_allocation_workload_unmeasured', 'h3_reference_preparation_unmeasured',
+                                  'h3_conditioning_text_work_unmeasured', 'h3_reference_encoding_work_unmeasured'))
+            for group, prefix in (('ref_images', 'ref_image_'), ('ref_videos', 'ref_video_'),
+                                  ('ref_video_audios', 'ref_video_audio_'), ('ref_audios', 'ref_audio_')):
+                for socket, source in inputs.items():
+                    if not re.fullmatch(re.escape(group + '.' + prefix) + r'\d{1,4}', socket):
+                        continue
+                    features = {}
+                    if (isinstance(source, list) and len(source) == 2 and isinstance(source[0], str)
+                            and source[0] in graph and type(source[1]) is int and source[1] >= 0):
+                        features = {'sourceStage': fact(source[0], kind), 'sourceOutput': fact(source[1], kind)}
+                    else:
+                        stage_reasons.append('reference_source_unresolved')
+                    components.append({'kind': 'reference', 'identity': None, 'role': node_id + ':' + socket,
+                                       'order': order, 'features': features})
         if kind in ('VAEEncode', 'VAEEncodeTiled', 'VAEEncodeForInpaint'):
             node_facts['imageEncode.nativePlanRequired'] = fact(True, kind)
             stage_reasons.append('image_encode_workload_unmeasured')
