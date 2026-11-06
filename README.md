@@ -240,8 +240,11 @@ extraction unless the corresponding native plans prove the selected work.
 Native H3 full-sequence conditioning records expanded modality positions, actual
 input shape, compute precision, layer count and output selection before forwarding.
 A complete reference plan with no selected VAE work can resolve that encoding gap;
-nonzero vision embeddings, selected VAE internals, custom variants/options and
-unproved cache reuse remain incomplete. Token counts cannot qualify missing
+correlated native H3 vision plans can additionally prove preprocessing geometry,
+actual forward/reuse decisions and output verification for image embeddings.
+Selected VAE internals, audio embeddings, custom variants/options and unproved
+cache reuse remain incomplete. The normal H3 CLIP path stays uncached; telemetry
+does not enable feature reuse. Token counts cannot qualify missing
 managed-loading evidence. CPU forward spans overlap their owning node's elapsed
 time and are never added as extra queue work.
 Native model-manager observations separate loading/unloading/clone CPU work and

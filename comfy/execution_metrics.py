@@ -10,6 +10,7 @@ from time import monotonic
 _observer = None
 _stage = ContextVar('execution_metrics_stage', default=None)
 _evaluation = ContextVar('execution_metrics_evaluation', default=None)
+_vision = ContextVar('execution_metrics_vision', default=None)
 
 
 def set_observer(observer):
@@ -70,6 +71,41 @@ def observe_control(event, binding, tensor=None, **facts):
             emit(event, **facts)
         else:
             observe_shape(event, tensor, **facts)
+
+
+@contextmanager
+def vision_scope():
+    """Correlate one preprocessing/cache/forward call without retaining a model."""
+    if not enabled():
+        yield
+        return
+    token = _vision.set(object())
+    try:
+        yield
+    finally:
+        _vision.reset(token)
+
+
+def observe_vision(event, tensors=None, **facts):
+    binding = _vision.get()
+    if enabled() and binding is not None:
+        try:
+            if tensors is None:
+                emit(event, binding=binding, **facts)
+            else:
+                observe_shapes(event, tensors, binding=binding, **facts)
+        except Exception:
+            emit('h3_vision_metadata_unavailable', binding=binding)
+
+
+@contextmanager
+def measure_vision(event):
+    binding = _vision.get()
+    if binding is None:
+        yield
+    else:
+        with measure(event, binding=binding):
+            yield
 
 
 def observe_embedding_row(positions, active, embeddings):
