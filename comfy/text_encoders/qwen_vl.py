@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from typing import Optional, Tuple
 import math
 from comfy.ldm.modules.attention import optimized_attention_for_device
+from comfy import execution_metrics
 
 
 def image_size(height, width, patch_size=14, merge_size=2, min_pixels=3136, max_pixels=12845056):
@@ -99,6 +100,11 @@ def process_qwen2vl_images(
         grid_t * grid_h * grid_w,
         channel * temporal_patch_size * patch_size * patch_size
     )
+    execution_metrics.observe_vision('h3_vision_geometry', {'patches': flatten_patches},
+        processor='qwen_image', source_frames=1, source_height=height, source_width=width,
+        height=h_bar, width=w_bar, grid_t=grid_t, grid_h=grid_h, grid_w=grid_w,
+        patch_size=patch_size, temporal_patch_size=temporal_patch_size, merge_size=merge_size,
+        interpolation=interpolation)
 
     return flatten_patches, image_grid_thw
 
