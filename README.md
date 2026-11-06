@@ -274,7 +274,12 @@ actual slots, modality filtering, ordered members/copies, CPU shapes/precision,
 standalone cache reuse and uncached bundle reads. Hashed file stamps and CPU read
 durations stay audit/measurement evidence. Invalid, oversized or absent plans
 remain incomplete; these model-free loaders gain no invented model identity or
-forecast. Extraction, application and audio-creation coverage remain unfinished.
+forecast. The Apply adapter observes actual drop/reuse/scalar/frame mixing, source
+ordering, input shapes/precision/gradient regime, blur, preset I/O and debug work,
+with strict correlated completion and a 256-reference limit including copies.
+Extraction, refinement, Step Curve/Continuum/Text Encode, custom/MPS paths and
+audio-creation coverage remain unfinished. Parent evidence clears only gaps that
+the corresponding stage actually proves.
 Standard `CLIPVisionLoader`/`CLIPVisionEncode` stages resolve the native vision
 weight category, actual source/processed shapes, crop behavior, dtype/devices and
 encoded positions. Preprocessing/forward durations are CPU monotonic boundaries;

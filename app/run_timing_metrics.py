@@ -15,6 +15,7 @@ from app.run_timing_h3_vae import h3_video_vae_complete, h3_reference_video_vae_
 from app.run_timing_h3_audio import h3_audio_complete, h3_reference_audio_complete, scoped_h3_audio_replaces_legacy_limit
 from app.run_timing_model_loading import managed_loading_complete
 from app.run_timing_refmod import refmod_loader_complete
+from app.run_timing_refmod_apply import refmod_apply_complete
 
 
 def apply_metrics(record, stage, state, observed_at, completed=False):
@@ -73,6 +74,11 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
         workload['resolved']['executionPrecision'] = precision
         evidence['resolved'][stage['id'] + '.executionPrecision'] = precision
     reasons = set(stage['reasons'])
+    if 'refmodApply.required' in workload['resolved']:
+        if refmod_apply_complete(state):
+            reasons.discard('refmod_apply_work_unmeasured')
+        else:
+            reasons.add('refmod_apply_work_unmeasured')
     if 'refmodLoader.required' in workload['resolved']:
         if refmod_loader_complete(state):
             reasons.discard('refmod_loader_work_unmeasured')
@@ -249,6 +255,8 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     remaining.discard('multiple_audio_invocations')
     remaining.discard('audio_invocation_limit')
     remaining.discard('managed_load_plan_unresolved')
+    remaining.discard('refmod_loader_work_unmeasured')
+    remaining.discard('refmod_apply_work_unmeasured')
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)
     evidence.update(complete=not input_reasons, reasons=input_reasons)
