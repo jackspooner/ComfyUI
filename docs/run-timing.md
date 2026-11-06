@@ -6,7 +6,12 @@ It covers every native prompt, including direct tools and staged execution, with
 changing queue ordering, node execution, cancellation or maintenance policy.
 GET `/timing/observations?after=0&limit=100` returns version-1 timing observations,
 a durable cursor and an ordered active snapshot. Limit is 1–500. Follow nextCursor
-until null. Pending order follows the queue owner's full tuple comparison,
+until null. Responses also have a 4 MiB JSON budget; a page may contain fewer
+observations than requested. Continue using its returned cursor without skipping
+events. A single observation or complete active snapshot that cannot fit returns
+503 `timing_page_too_large`, retaining the cursor and owner records. Active records
+are never silently truncated or labelled complete after omission. Poll reads do
+not write timing/execution state. Pending order follows the queue owner's full tuple comparison,
 including prompt-ID tie breaking for equal priorities, without changing the heap.
 Expired cursors are explicitly marked. The endpoint accepts machine-local
 non-browser requests only and performs no outbound requests. SSH loopback tunnels
@@ -179,6 +184,8 @@ tests-unit/app_test/run_timing_h3_references_test.py tests-unit/comfy_test/h3_re
 tests-unit/app_test/run_timing_h3_conditioning_test.py tests-unit/comfy_test/h3_conditioning_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_vision_test.py tests-unit/comfy_test/h3_vision_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_vae_test.py tests-unit/comfy_test/h3_vae_execution_metrics_test.py
+tests-unit/app_test/run_timing_h3_audio_test.py tests-unit/comfy_test/h3_audio_execution_metrics_test.py
+tests-unit/app_test/run_timing_page_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/clip_vision_execution_metrics_test.py
@@ -243,8 +250,8 @@ compute; those two observations remain separate.
 
 The forward plan atomically requires managed-loading evidence, so resolved token
 work cannot qualify a missing loading plan. A complete reference plan proving no
-visual/audio VAE calls were selected, or the correlated native visual-VAE proof
-below with no selected audio VAE, can clear
+visual/audio VAE calls were selected, or the corresponding correlated native
+visual/audio VAE proofs below cover every selected source/output, can clear
 `h3_reference_encoding_work_unmeasured`. A valid native text plan can clear
 `h3_conditioning_text_work_unmeasured`. Nonzero image positions require the
 correlated vision proof below to clear `h3_conditioning_vision_work_unmeasured`;
@@ -305,9 +312,9 @@ First evidence, coverage changes and owner stage transitions coalesce persistenc
 
 `MiniMaxH3ReferenceToVideo` binds each visual encode to its ordered reference index.
 Only exactly one matching native operation per selected visual, equal processed
-source and verified reference output, and no selected audio VAE can clear the
+source and verified reference output, plus the corresponding audio proof, can clear the
 reference-encoding gap. Text/vision/loading and dependency proof remain necessary.
-Missing/duplicate/malformed/over-limit plans, OOM retries, audio VAE, PH3/custom
+Missing/duplicate/malformed/over-limit plans, OOM retries, unproved audio VAE, PH3/custom
 variants and RefMod preparation remain incomplete. Direct H3 VAE calls are observable
 but do not clear unrelated or unsupported node adapters. This changes no VAE/cache/
 chunk/tiling policy. CPU fixtures use tiny native encoder kernels and constant
@@ -315,6 +322,36 @@ weights, preserving original split/forward calls, numerical outputs and errors.
 The native wrapper/reference/reader/SQLite/public fixture proves selected still
 encoding propagation and exact five-sample matching; real checkpoint/GPU behavior,
 configured activation and accuracy remain unverified.
+
+H3 paired soundtracks and audio-only references additionally use scoped
+`h3AudioVae.*` evidence, up to 32 operations per stage. Source resampling records
+the full incoming batch before selecting its first item. Live facts separate
+post-resample samples, the actual native VAE wrapper's center crop/channel
+replication or truncation, native zero padding to the hop grid, and the actual
+mono encoder/causal-attention/posterior-mean input shapes, precision and device.
+Native configuration and training/grad regime remain strict inputs. Audio is
+represented by H3 text labels; this is not proof of Qwen audio embeddings.
+
+Every selected soundtrack/audio source requires one matching reference index,
+source shape/rate, all native phase completions and equal native/wrapper/reference
+output proof. Visual/text/vision/loading/dependency coverage remains independently
+required. Only this complete proof, with exactly the matching legacy processed
+call count and no other repeated audio family, can replace generic
+`multiple_audio_invocations`/`audio_invocation_limit` gaps. Unscoped, missing,
+duplicate, malformed, custom, retry and over-limit work stays incomplete. Outputs
+and CPU resample/encoder/projection/mean spans are measurements, excluded from
+matching and queue-stage summation. No samples, token values, additional DSP,
+model/device queries or synchronization are collected or performed.
+
+The CPU fixture decodes actual tiny FFV1/WAV files, shares each source once and
+executes image, paired-video/audio and audio-only references through native VAE/
+vision/conditioning code. Tiny constant weights and fixture language/residency
+backends preserve original calls, numeric outputs and error identity. Five
+synthetic successful histories match exactly; changed crop/attention/precision/
+resample work, absent plans/history and future samples reject. Normal 500-record
+poll requests paginate under the byte cap through the pinned reader and read-only
+public projection. This is functional fixture proof; actual checkpoint/GPU,
+Main/SecondPC activation, RefMod preparation and accuracy remain unverified.
 
 Native reference hooks also observe loaded-image dimensions, VAE encode shapes after native cropping and
 temporal truncation, conditioning output positions, vision-forward attempts and

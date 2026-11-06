@@ -15,6 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import comfy.ops
+import comfy.execution_metrics
 
 ops = comfy.ops.disable_weight_init
 
@@ -432,12 +433,33 @@ class MiniMaxH3AudioVAE(nn.Module):
         """
         b, s, length = waveform.shape
         right_pad = math.ceil(length / self.hop_length) * self.hop_length - length
-        waveform = F.pad(waveform, (0, right_pad))
-        x = waveform.reshape(b * s, 1, -1)
-        x = self.encoder(x)  # [b * s, latent_dim, T]
-        x = self.pre_block(x.transpose(1, 2)).transpose(1, 2)  # [b * s, 32, T]
-        z = self.mean_proj(x)
-        mean = self.latents_mean.view(1, -1, 1).to(device=z.device, dtype=z.dtype)
-        std = self.latents_std.view(1, -1, 1).to(device=z.device, dtype=z.dtype)
-        z = (z - mean) / std
-        return z.reshape(b, s, z.shape[1], z.shape[2]).permute(0, 2, 1, 3)
+        with comfy.execution_metrics.h3_audio_scope():
+            if comfy.execution_metrics.enabled():
+                try:
+                    comfy.execution_metrics.observe_h3_audio('h3_audio_plan', {'waveform': waveform},
+                        native=type(self) is MiniMaxH3AudioVAE and type(self.encoder) is Encoder
+                               and type(self.pre_block) is AttnProjection,
+                        hop_length=self.hop_length, right_pad=right_pad, sample_rate=self.sample_rate,
+                        latent_width=self.pre_block.proj.in_features, output_channels=self.mean_proj.out_channels,
+                        heads=self.pre_block.attn.num_heads, training=self.training,
+                        grad_enabled=torch.is_grad_enabled(), inference_mode=torch.is_inference_mode_enabled())
+                except Exception:
+                    comfy.execution_metrics.observe_h3_audio('h3_audio_metadata_unavailable')
+            waveform = F.pad(waveform, (0, right_pad))
+            x = waveform.reshape(b * s, 1, -1)
+            comfy.execution_metrics.observe_h3_audio('h3_audio_encoder_input', {'input': x})
+            with comfy.execution_metrics.measure_h3_audio('h3_audio_encoder'):
+                x = self.encoder(x)  # [b * s, latent_dim, T]
+            projection_input = x.transpose(1, 2)
+            comfy.execution_metrics.observe_h3_audio('h3_audio_projection_input', {'input': projection_input})
+            with comfy.execution_metrics.measure_h3_audio('h3_audio_projection'):
+                x = self.pre_block(projection_input).transpose(1, 2)  # [b * s, 32, T]
+            comfy.execution_metrics.observe_h3_audio('h3_audio_mean_input', {'input': x})
+            with comfy.execution_metrics.measure_h3_audio('h3_audio_mean'):
+                z = self.mean_proj(x)
+            mean = self.latents_mean.view(1, -1, 1).to(device=z.device, dtype=z.dtype)
+            std = self.latents_std.view(1, -1, 1).to(device=z.device, dtype=z.dtype)
+            z = (z - mean) / std
+            result = z.reshape(b, s, z.shape[1], z.shape[2]).permute(0, 2, 1, 3)
+            comfy.execution_metrics.observe_h3_audio('h3_audio_output', {'latents': result})
+            return result

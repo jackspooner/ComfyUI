@@ -19,8 +19,6 @@ def h3_video_vae_complete(state):
 
 def h3_reference_video_vae_complete(state):
     entries = state.get('h3_reference_entries', [])
-    if any(entry['audio_encode'] for entry in entries):
-        return False
     expected = {index for index, entry in enumerate(entries) if entry['visual_encode']}
     if not expected:
         return not state.get('h3_vae_operations')

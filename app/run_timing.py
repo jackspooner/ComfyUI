@@ -28,10 +28,17 @@ from app.run_timing_h3_references import observe_h3_reference_metrics
 from app.run_timing_h3_conditioning import observe_h3_conditioning_metrics
 from app.run_timing_h3_vision import observe_h3_vision_metrics
 from app.run_timing_h3_vae import observe_h3_vae_metrics, h3_video_vae_complete
+from app.run_timing_h3_audio import observe_h3_audio_metrics, h3_audio_complete
 from app.run_timing_model_loading import observe_model_loading_metrics, managed_loading_complete
 from app.run_timing_ltx_audio import observe_ltx_audio_metrics
 from app.run_timing_vision import observe_moge_metrics
 from app.run_timing_stream import TimingStreamHub
+
+MAX_TIMING_PAGE_BYTES = 4 * 1024 * 1024
+
+
+class TimingPageTooLarge(Exception):
+    """A complete active snapshot or single observation cannot fit the wire budget."""
 
 
 def utc():
@@ -526,6 +533,15 @@ class RunTimingStore:
                         or reasons != state.get('h3_layout_reason_snapshot', frozenset())):
                     self.safe_stage(prompt_id, node_id, 'metrics')
                 state['h3_layout_reason_snapshot'] = reasons
+            elif observe_h3_audio_metrics(state, event, facts):
+                ready, reasons = h3_audio_complete(state), frozenset(state['reasons'])
+                if (event == 'h3_audio_source' and not state.get('h3_audio_initial_snapshot')
+                        or ready != state.get('h3_audio_ready_snapshot', False)
+                        or reasons != state.get('h3_audio_reason_snapshot', frozenset())):
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+                if event == 'h3_audio_source':
+                    state['h3_audio_initial_snapshot'] = True
+                state['h3_audio_ready_snapshot'], state['h3_audio_reason_snapshot'] = ready, reasons
             elif observe_h3_vae_metrics(state, event, facts):
                 ready, reasons = h3_video_vae_complete(state), frozenset(state['reasons'])
                 if (event == 'h3_vae_begin' and not state.get('h3_vae_initial_snapshot')
@@ -792,8 +808,7 @@ class RunTimingStore:
             raise ValueError('Invalid timing cursor or limit')
         minimum, maximum = self.db.execute('SELECT min(seq),max(seq) FROM timing_events').fetchone()
         expired = bool(after and ((minimum and after < minimum - 1) or after > (maximum or 0)))
-        rows = self.db.execute('SELECT seq,record FROM timing_events WHERE seq>? ORDER BY seq LIMIT ?', (after, limit + 1)).fetchall()
-        selected, active = rows[:limit], []
+        active, active_bytes = [], 0
         reasons = [self.issue] if self.issue else []
         # PromptQueue compares full tuples, including prompt IDs for tied priority.
         for index, item in enumerate(list(running) + sorted(pending)):
@@ -812,11 +827,32 @@ class RunTimingStore:
                         record['workload']['features']['observed.gpuHoldWaitSeconds'] = held
                     else:
                         record['durations']['queueSeconds'] = max(0, self.now() - clock[0])
+                active_bytes += len(json.dumps(record, allow_nan=False).encode('utf8')) + 2
+                if active_bytes > MAX_TIMING_PAGE_BYTES:
+                    raise TimingPageTooLarge()
                 active.append(record)
             else:
                 reasons.append('timing_acceptance_missing')
-        current = str(selected[-1][0] if selected else maximum or 0)
-        return {'version': 1, 'resource': self.resource, 'sourceId': self.source_id, 'instanceId': self.instance_id, 'cursor': current,
-                'nextCursor': current if len(rows) > limit else None, 'cursorExpired': expired,
-                'observedAt': utc(), 'observations': [json.loads(row[1]) for row in selected],
+        page = {'version': 1, 'resource': self.resource, 'sourceId': self.source_id, 'instanceId': self.instance_id, 'cursor': str(after),
+                'nextCursor': None, 'cursorExpired': expired, 'observedAt': utc(), 'observations': [],
                 'active': {'complete': not reasons, 'records': active, 'reasons': sorted(set(reasons))}}
+        # Reserve cursor/envelope growth; count the same JSON representation used by HTTP.
+        used = len(json.dumps(page, allow_nan=False).encode('utf8')) + 256
+        if used > MAX_TIMING_PAGE_BYTES:
+            raise TimingPageTooLarge()
+        selected, more = [], False
+        rows = self.db.execute('SELECT seq,record FROM timing_events WHERE seq>? ORDER BY seq LIMIT ?', (after, limit + 1))
+        for seq, raw in rows:
+            record = json.loads(raw)
+            size = len(json.dumps(record, allow_nan=False).encode('utf8')) + 2
+            if len(selected) == limit or used + size > MAX_TIMING_PAGE_BYTES:
+                more = True
+                break
+            selected.append((seq, record))
+            used += size
+        if more and not selected:
+            # Never skip an event, advance past it or truncate a complete active snapshot.
+            raise TimingPageTooLarge()
+        current = str(selected[-1][0] if selected else maximum or 0)
+        page.update(cursor=current, nextCursor=current if more else None, observations=[row[1] for row in selected])
+        return page

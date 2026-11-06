@@ -84,12 +84,19 @@ def _encode_ref_audio(audio_vae, audio):
     waveform = audio["waveform"]  # [B, C, L]
     sr = audio["sample_rate"]
     vae_sr = getattr(audio_vae, "audio_sample_rate", 32000)
-    if sr != vae_sr:
-        waveform = comfy.audio.resample(waveform, sr, vae_sr)
-    comfy.execution_metrics.observe_shape('audio_vae_encode_input', waveform[:1], sample_rate=vae_sr,
-                                          source_sample_rate=sr)
-    z = audio_vae.encode(waveform[:1].movedim(1, -1))  # [1, 32, 2, T]
-    return z, z.shape[-1]
+    with comfy.execution_metrics.h3_audio_scope():
+        comfy.execution_metrics.observe_h3_audio('h3_audio_source', {'waveform': waveform},
+                                                  sample_rate=sr, target_rate=vae_sr)
+        if sr != vae_sr:
+            with comfy.execution_metrics.measure_h3_audio('h3_audio_resample'):
+                waveform = comfy.audio.resample(waveform, sr, vae_sr)
+        comfy.execution_metrics.observe_shape('audio_vae_encode_input', waveform[:1], sample_rate=vae_sr,
+                                              source_sample_rate=sr)
+        prepared = waveform[:1].movedim(1, -1)
+        comfy.execution_metrics.observe_h3_audio('h3_audio_prepared', {'pixels': prepared})
+        z = audio_vae.encode(prepared)  # [1, 32, 2, T]
+        comfy.execution_metrics.observe_h3_audio('h3_audio_result', {'latents': z})
+        return z, z.shape[-1]
 
 
 def _observe_reference(event, index, role, group, name, tensors=None, audio=None, **facts):
@@ -400,7 +407,7 @@ class MiniMaxH3ReferenceToVideo(io.ComfyNode):
                 z = vae.encode(frames)
             audio_latent, ref_audio_t = (None, 0)
             if soundtrack is not None and audio_vae is not None:
-                with comfy.execution_metrics.measure('h3_reference_audio_encode', index=reference_index):
+                with comfy.execution_metrics.h3_reference_vae_scope(reference_index), comfy.execution_metrics.measure('h3_reference_audio_encode', index=reference_index):
                     audio_latent, ref_audio_t = _encode_ref_audio(audio_vae, soundtrack)
             _observe_reference('h3_reference_output', reference_index, 'video', 'ref_videos', name,
                                {'visual': z, 'audio': audio_latent})
@@ -416,7 +423,7 @@ class MiniMaxH3ReferenceToVideo(io.ComfyNode):
                                audio=audio, visual_encode=False, audio_encode=audio_vae is not None, soundtrack=False)
             ref_items.append({"type": "audio"})
             if audio_vae is not None:
-                with comfy.execution_metrics.measure('h3_reference_audio_encode', index=reference_index):
+                with comfy.execution_metrics.h3_reference_vae_scope(reference_index), comfy.execution_metrics.measure('h3_reference_audio_encode', index=reference_index):
                     audio_latent, ref_audio_t = _encode_ref_audio(audio_vae, audio)
                 _observe_reference('h3_reference_output', reference_index, 'audio', 'ref_audios', name, {'audio': audio_latent})
                 ref_blocks.append({"kind": "audio", "ref_audio_t": ref_audio_t, "audio_latent": audio_latent})
