@@ -28,6 +28,7 @@ from app.run_timing_h3_references import observe_h3_reference_metrics
 from app.run_timing_h3_conditioning import observe_h3_conditioning_metrics
 from app.run_timing_h3_vision import observe_h3_vision_metrics
 from app.run_timing_refmod import observe_refmod_loader_metrics
+from app.run_timing_refmod_apply import observe_refmod_apply_metrics
 from app.run_timing_h3_vae import observe_h3_vae_metrics, h3_video_vae_complete
 from app.run_timing_h3_audio import observe_h3_audio_metrics, h3_audio_complete
 from app.run_timing_model_loading import observe_model_loading_metrics, managed_loading_complete
@@ -528,6 +529,9 @@ class RunTimingStore:
                         or usage_complete or reasons != state.get('managed_load_reason_snapshot', frozenset())):
                     self.safe_stage(prompt_id, node_id, 'metrics')
                 state['managed_load_ready_snapshot'], state['managed_load_reason_snapshot'] = ready, reasons
+            elif observe_refmod_apply_metrics(state, event, facts):
+                if event in ('refmod_apply_begin', 'refmod_apply_end', 'refmod_apply_metadata_unavailable'):
+                    self.safe_stage(prompt_id, node_id, 'metrics')
             elif observe_refmod_loader_metrics(state, event, facts):
                 if event in ('refmod_loader_begin', 'refmod_loader_end', 'refmod_loader_metadata_unavailable'):
                     self.safe_stage(prompt_id, node_id, 'metrics')

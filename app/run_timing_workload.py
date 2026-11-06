@@ -24,6 +24,7 @@ AUDIO_NODES = {'LoadAudio': 'preparation', 'EmptyLatentAudio': 'preparation',
 AUDIO_INPUTS = {'VAEEncodeAudio': ('audio',), 'LTXVAudioVAEEncode': ('audio',)}
 AV_INPUTS = {'LTXVConcatAVLatent': ('video_latent', 'audio_latent'), 'LTXVSeparateAVLatent': ('av_latent',)}
 AV_ALLOCATORS = {'EmptyMiniMaxH3LatentAV'}
+REFMOD_INPUTS = {'MiniMaxH3RefModApply': ('conditioning', 'mods')}
 
 
 NODE_STAGES = {
@@ -52,6 +53,7 @@ NODE_STAGES = {
     **{name: 'preparation' for name in AV_ALLOCATORS},
     **MOGE_NODES,
     **{name: 'loading' for name in REFMOD_LOADERS},
+    **{name: 'preparation' for name in REFMOD_INPUTS},
 }
 CONTROLS = {'steps', 'cfg', 'denoise', 'sampler_name', 'scheduler', 'start_at_step', 'end_at_step',
             'add_noise', 'return_with_leftover_noise', 'width', 'height', 'length', 'batch_size',
@@ -182,6 +184,9 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
         if kind in REFMOD_LOADERS:
             node_facts['refmodLoader.required'] = fact(True, kind)
             stage_reasons.append('refmod_loader_work_unmeasured')
+        if kind in REFMOD_INPUTS:
+            node_facts['refmodApply.required'] = fact(True, kind)
+            stage_reasons.append('refmod_apply_work_unmeasured')
         controls = MOGE_CONTROLS if kind in MOGE_NODES else CONTROLS
         for key in (controls & inputs.keys()) if stage_kind != 'unknown' else ():
             value = scalar(inputs[key])
@@ -246,10 +251,10 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             components.append({'kind': 'reference', 'identity': None, 'role': 'audio_input', 'order': order,
                                'features': {'sourceStage': fact(node_id, kind)}})
             stage_reasons.append('audio_source_workload_unmeasured')
-        for role in IMAGE_INPUTS.get(kind, ()) + AUDIO_INPUTS.get(kind, ()) + AV_INPUTS.get(kind, ()):
+        for role in IMAGE_INPUTS.get(kind, ()) + AUDIO_INPUTS.get(kind, ()) + AV_INPUTS.get(kind, ()) + REFMOD_INPUTS.get(kind, ()):
             source = inputs.get(role)
             features = {'sourceStage': fact(source[0], kind)} if isinstance(source, list) and len(source) == 2 and isinstance(source[0], str) and source[0] in graph else {}
-            if kind in AV_INPUTS:
+            if kind in AV_INPUTS or kind in REFMOD_INPUTS:
                 if features and type(source[1]) is int and source[1] >= 0:
                     features['sourceOutput'] = fact(source[1], kind)
                 else:
