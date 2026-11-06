@@ -26,7 +26,7 @@ import torch.nn.functional as F
 import comfy.ops
 import comfy.sd1_clip
 import comfy.execution_metrics
-from .qwen3vl import Qwen3VL, Qwen3VLSDTokenizer
+from .qwen3vl import Qwen3VL, Qwen3VLSDTokenizer, Qwen3VLVisionModel
 
 VISION_START = 151652
 VISION_END = 151653
@@ -74,6 +74,11 @@ def process_video_block(frames, patch_size=16, temporal_patch_size=2, merge_size
     patches = patches.permute(0, 3, 6, 4, 7, 2, 1, 5, 8)
     flatten = patches.reshape(grid_h * grid_w, 3 * temporal_patch_size * patch_size * patch_size)
     grid_thw = torch.stack([torch.tensor([1, grid_h, grid_w], device=frames.device, dtype=torch.long)])
+    comfy.execution_metrics.observe_vision('h3_vision_geometry', {'patches': flatten},
+        processor='h3_video', source_frames=t, source_height=height, source_width=width,
+        height=h_bar, width=w_bar, grid_t=1, grid_h=grid_h, grid_w=grid_w,
+        patch_size=patch_size, temporal_patch_size=temporal_patch_size, merge_size=merge_size,
+        interpolation='bilinear')
     return flatten, grid_thw
 
 
@@ -115,15 +120,63 @@ def _observe_conditioning(model, inputs, input_kind, selection, layer_norm, dtyp
         comfy.execution_metrics.emit('h3_conditioning_metadata_unavailable')
 
 
+def _observe_vision_begin(model, embed, mode):
+    if not comfy.execution_metrics.enabled():
+        return
+    try:
+        visual = model.visual
+        values = dict(layers=len(visual.blocks), hidden_size=visual.hidden_size, heads=visual.num_heads,
+                      patch_size=visual.patch_size, merge_size=visual.spatial_merge_size,
+                      temporal_patch_size=visual.patch_embed.temporal_patch_size,
+                      output_width=visual.merger.linear_fc2.out_features)
+        indices = visual.deepstack_visual_indexes
+        if (any(type(value) is not int or value <= 0 for value in values.values())
+                or not isinstance(indices, (list, tuple)) or len(indices) > 64 or any(type(value) is not int for value in indices)
+                or not isinstance(model.dtype, torch.dtype) or type(visual.training) is not bool):
+            raise ValueError('Unknown vision metadata')
+        comfy.execution_metrics.observe_vision('h3_vision_begin', {'source': embed['data']},
+            native=type(model) is MiniMaxQwen3VL and type(visual) is Qwen3VLVisionModel, mode=mode,
+            compute_precision=str(model.dtype), deepstack=tuple(indices), training=visual.training,
+            grad_enabled=torch.is_grad_enabled(), inference_mode=torch.is_inference_mode_enabled(), **values)
+    except Exception:
+        comfy.execution_metrics.observe_vision('h3_vision_metadata_unavailable')
+
+
+def _observe_vision_output(result):
+    if not comfy.execution_metrics.enabled():
+        return
+    try:
+        merged, extra = result
+        deepstack = extra['deepstack']
+        if not isinstance(deepstack, (list, tuple)) or len(deepstack) > 7:
+            raise ValueError('Unknown deepstack metadata')
+        tensors = {'merged': merged, **{'deepstack.' + str(index): tensor for index, tensor in enumerate(deepstack)}}
+        comfy.execution_metrics.observe_vision('h3_vision_output', tensors)
+    except Exception:
+        comfy.execution_metrics.observe_vision('h3_vision_metadata_unavailable')
+
+
 class MiniMaxQwen3VL(Qwen3VL):
     model_type = "qwen3vl_32b"
 
     def preprocess_embed(self, embed, device):
-        if embed["type"] == "image" and embed.get("minimax_video_block", False):
-            flatten, grid = process_video_block(embed["data"])
-            merged, deepstack = self.visual(flatten.to(device, dtype=torch.float32), grid)
-            return merged, {"grid": grid, "deepstack": deepstack}
-        return super().preprocess_embed(embed, device)
+        if embed['type'] != 'image':
+            return super().preprocess_embed(embed, device)
+        with comfy.execution_metrics.vision_scope():
+            video = embed.get('minimax_video_block', False)
+            _observe_vision_begin(self, embed, 'video' if video else 'image')
+            if video:
+                with comfy.execution_metrics.measure_vision('h3_vision_preprocess'):
+                    flatten, grid = process_video_block(embed['data'])
+                comfy.execution_metrics.observe_vision('h3_vision_execution', {'patches': flatten},
+                    native=True, reused=False, cache_eligible=False, device=str(device))
+                with comfy.execution_metrics.measure_vision('h3_vision_forward'):
+                    merged, deepstack = self.visual(flatten.to(device, dtype=torch.float32), grid)
+                result = merged, {'grid': grid, 'deepstack': deepstack}
+            else:
+                result = super().preprocess_embed(embed, device)
+            _observe_vision_output(result)
+            return result
 
     def forward(self, input_ids, attention_mask=None, embeds=None, num_tokens=None,
                 intermediate_output=None, final_layer_norm_intermediate=True,

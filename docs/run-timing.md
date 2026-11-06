@@ -177,6 +177,7 @@ tests-unit/app_test/run_timing_h3_layout_test.py tests-unit/comfy_test/h3_layout
 tests-unit/app_test/run_timing_model_loading_test.py tests-unit/comfy_test/model_loading_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_references_test.py tests-unit/comfy_test/h3_reference_execution_metrics_test.py
 tests-unit/app_test/run_timing_h3_conditioning_test.py tests-unit/comfy_test/h3_conditioning_execution_metrics_test.py
+tests-unit/app_test/run_timing_h3_vision_test.py tests-unit/comfy_test/h3_vision_execution_metrics_test.py
 tests-unit/comfy_test/lora_execution_metrics_test.py
 tests-unit/comfy_test/reference_execution_metrics_test.py
 tests-unit/comfy_test/clip_vision_execution_metrics_test.py
@@ -243,9 +244,9 @@ The forward plan atomically requires managed-loading evidence, so resolved token
 work cannot qualify a missing loading plan. A complete reference plan proving no
 visual/audio VAE calls were selected can clear
 `h3_reference_encoding_work_unmeasured`. A valid native text plan can clear
-`h3_conditioning_text_work_unmeasured`; nonzero image/audio positions retain
-`h3_conditioning_vision_work_unmeasured` because their internal preprocessing and
-feature-cache work is not established here. Selected VAE internals, tiling/
+`h3_conditioning_text_work_unmeasured`. Nonzero image positions require the
+correlated vision proof below to clear `h3_conditioning_vision_work_unmeasured`;
+nonzero audio embedding positions retain it. Selected VAE internals, tiling/
 resampling, unknown custom nodes and cached stages without input proof remain
 incomplete. Packed sampler tokens cannot clear these gaps or establish RefMod
 extraction/file/cache coverage.
@@ -259,6 +260,30 @@ stub tokens/weights. Five equivalent text-only/no-VAE histories qualify exactly;
 changed token work/compute precision/layers/selection and absent loading/input
 evidence do not. Source delivery, configured Main/SecondPC activation and real
 model/accuracy acceptance remain separate.
+
+Native `MiniMaxQwen3VL.preprocess_embed` scopes each image or two-frame video-block
+operation. Live `h3Vision.*` facts retain already-computed processed patch/grid
+geometry, source spatial dimensions, native vision configuration/deepstack taps,
+configured compute precision, input devices/dtypes, training/grad regime and the
+existing forward/cache decision. Source unused batch/channel dimensions are audit
+measurements. Output shapes/dtypes/devices verify the plan but are completion
+measurements, excluded from matching. All correlated operations must agree with
+the full-sequence image positions and width; text/loading proof is still required.
+Unknown variants, missing/duplicate/malformed evidence or more than 128 operations
+keep explicit gaps. Ordinary H3 CLIP remains uncached: instrumentation observes
+an existing `VisionFeatures` owner only if one was explicitly configured; it does
+not install one or change cache eligibility, lookup, capacity or RNG checks.
+
+Preprocess/forward/reuse CPU-monotonic measurements overlap the owning encoding
+stage and add no queue work. Scope bindings retain no models/tensors and are never
+serialized. No grid value reads, transfers, device queries or GPU synchronization
+are added. First plans and coverage changes coalesce writes. Tiny native CPU
+vision fixtures preserve original forward/RNG/equality/grid-read traces, numeric
+outputs and exception identity. Functional fixtures cover native PNG loading,
+shared source deduplication, ordinary uncached CLIP lifecycle and a test-only
+explicit cache owner; changed depth/precision/cache and missing geometry reject
+exact matching. Selected VAE and RefMod work, actual checkpoint/GPU behavior,
+configured activation and chronological accuracy remain separate acceptance.
 
 Native reference hooks also observe loaded-image dimensions, VAE encode shapes after native cropping and
 temporal truncation, conditioning output positions, vision-forward attempts and

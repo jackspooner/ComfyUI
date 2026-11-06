@@ -10,6 +10,7 @@ from app.run_timing_h3_allocation import h3_allocation_complete
 from app.run_timing_h3_layout import h3_layout_complete
 from app.run_timing_h3_references import h3_reference_preparation_complete
 from app.run_timing_h3_conditioning import h3_conditioning_complete
+from app.run_timing_h3_vision import h3_vision_complete
 from app.run_timing_model_loading import managed_loading_complete
 
 
@@ -92,10 +93,12 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     if 'h3Conditioning.required' in workload['resolved']:
         if h3_conditioning_complete(state):
             reasons.discard('h3_conditioning_text_work_unmeasured')
-            if state['resolved']['h3Conditioning.imagePositions'] or state['resolved']['h3Conditioning.audioPositions']:
-                reasons.add('h3_conditioning_vision_work_unmeasured')
         else:
             reasons.add('h3_conditioning_text_work_unmeasured')
+        if h3_conditioning_complete(state) and h3_vision_complete(state):
+            reasons.discard('h3_conditioning_vision_work_unmeasured')
+        elif state.get('h3_vision_operations') or state['resolved'].get('h3Conditioning.imagePositions') or state['resolved'].get('h3Conditioning.audioPositions'):
+            reasons.add('h3_conditioning_vision_work_unmeasured')
     if 'jointAllocation.nativePlanRequired' in workload['resolved']:
         if h3_allocation_complete(state):
             reasons.discard('h3_allocation_workload_unmeasured')
@@ -219,6 +222,7 @@ def apply_metrics(record, stage, state, observed_at, completed=False):
     remaining.discard('h3_reference_preparation_unmeasured')
     remaining.discard('h3_reference_encoding_work_unmeasured')
     remaining.discard('h3_conditioning_text_work_unmeasured')
+    remaining.discard('h3_conditioning_vision_work_unmeasured')
     remaining.discard('managed_load_plan_unresolved')
     remaining.update(reason for item in record.get('stages', []) for reason in item.get('workload', {}).get('reasons', []))
     input_reasons = workload_reasons(remaining)
