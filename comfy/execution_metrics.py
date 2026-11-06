@@ -13,6 +13,7 @@ _evaluation = ContextVar('execution_metrics_evaluation', default=None)
 _vision = ContextVar('execution_metrics_vision', default=None)
 _h3_vae = ContextVar('execution_metrics_h3_vae', default=None)
 _h3_reference = ContextVar('execution_metrics_h3_reference', default=None)
+_h3_audio = ContextVar('execution_metrics_h3_audio', default=None)
 
 
 def set_observer(observer):
@@ -26,6 +27,35 @@ def enabled():
 
 def current_stage():
     return _stage.get()
+
+
+@contextmanager
+def h3_audio_scope():
+    # The helper and nested native encoder share one operation without retaining either owner.
+    token = _h3_audio.set((_h3_audio.get() or object()) if enabled() else None)
+    try:
+        yield
+    finally:
+        _h3_audio.reset(token)
+
+
+def observe_h3_audio(event, tensors=None, **facts):
+    binding = _h3_audio.get()
+    if enabled() and binding is not None:
+        try:
+            observe_shapes(event, tensors or {}, binding=binding, reference_index=_h3_reference.get(), **facts)
+        except Exception:
+            emit('h3_audio_metadata_unavailable', binding=binding)
+
+
+@contextmanager
+def measure_h3_audio(event):
+    binding = _h3_audio.get()
+    if binding is None:
+        yield
+    else:
+        with measure(event, binding=binding):
+            yield
 
 
 @contextmanager

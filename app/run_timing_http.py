@@ -3,6 +3,7 @@ import ipaddress
 import asyncio
 from urllib.parse import urlsplit
 from aiohttp import web
+from app.run_timing import TimingPageTooLarge
 
 
 def local_request(request):
@@ -60,6 +61,8 @@ def add_routes(routes, queue):
                 running, pending = queue.get_current_queue_volatile()
                 page = queue.timing.page(request.query.get('after', '0'), int(request.query.get('limit', '100')), running, pending)
             return web.json_response(page, headers={'Cache-Control': 'no-store'})
+        except TimingPageTooLarge:
+            return web.json_response({'error': 'timing_page_too_large'}, status=503, headers={'Cache-Control': 'no-store'})
         except ValueError:
             return web.json_response({'error': 'timing_invalid_cursor'}, status=400)
         except Exception:

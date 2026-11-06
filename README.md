@@ -245,7 +245,12 @@ actual forward/reuse decisions and output verification for image embeddings.
 Correlated native H3 video-VAE encodes can prove actual temporal chunks, padding,
 spatial tile/overlap geometry and completed encoder forwards for selected visual
 references. Missing/unknown VAE work, audio embeddings, custom variants/options and
-unproved cache reuse remain incomplete. The normal H3 CLIP path stays uncached; telemetry
+unproved cache reuse remain incomplete. Scoped H3 audio-VAE plans additionally
+measure full-batch resampling, wrapper cropping/channel adjustment, native padding
+and encoder/attention/mean work for paired or audio-only references. Both visual
+and audio proof must match every selected source/output. Native poll pages are
+byte-bounded while preserving cursors and complete active snapshots. The normal
+H3 CLIP path stays uncached; telemetry
 does not enable feature reuse. Token counts cannot qualify missing
 managed-loading evidence. CPU forward spans overlap their owning node's elapsed
 time and are never added as extra queue work.
