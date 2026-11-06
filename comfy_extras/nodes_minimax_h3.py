@@ -351,7 +351,7 @@ class MiniMaxH3ReferenceToVideo(io.ComfyNode):
                                {'visual': resized, 'tokenizer': resized})
             ref_items.append({"type": "image", "data": resized})
             if vae is not None:
-                with comfy.execution_metrics.measure('h3_reference_visual_encode', index=reference_index):
+                with comfy.execution_metrics.h3_reference_vae_scope(reference_index), comfy.execution_metrics.measure('h3_reference_visual_encode', index=reference_index):
                     z = vae.encode(resized)
                 _observe_reference('h3_reference_output', reference_index, 'image', 'ref_images', name, {'visual': z})
                 ref_blocks.append({"kind": "image", "latent_h": th // 16, "latent_w": tw // 16, "latent": z})
@@ -396,7 +396,7 @@ class MiniMaxH3ReferenceToVideo(io.ComfyNode):
             if vae is None:
                 reference_index += 1
                 continue
-            with comfy.execution_metrics.measure('h3_reference_visual_encode', index=reference_index):
+            with comfy.execution_metrics.h3_reference_vae_scope(reference_index), comfy.execution_metrics.measure('h3_reference_visual_encode', index=reference_index):
                 z = vae.encode(frames)
             audio_latent, ref_audio_t = (None, 0)
             if soundtrack is not None and audio_vae is not None:
