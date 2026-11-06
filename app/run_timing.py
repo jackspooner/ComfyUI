@@ -25,6 +25,7 @@ from app.run_timing_av import observe_av_metrics
 from app.run_timing_h3_allocation import observe_h3_allocation_metrics
 from app.run_timing_h3_layout import observe_h3_layout_metrics
 from app.run_timing_h3_references import observe_h3_reference_metrics
+from app.run_timing_h3_conditioning import observe_h3_conditioning_metrics
 from app.run_timing_model_loading import observe_model_loading_metrics, managed_loading_complete
 from app.run_timing_ltx_audio import observe_ltx_audio_metrics
 from app.run_timing_vision import observe_moge_metrics
@@ -523,6 +524,12 @@ class RunTimingStore:
                         or reasons != state.get('h3_layout_reason_snapshot', frozenset())):
                     self.safe_stage(prompt_id, node_id, 'metrics')
                 state['h3_layout_reason_snapshot'] = reasons
+            elif observe_h3_conditioning_metrics(state, event, facts):
+                reasons = frozenset(state['reasons'])
+                if (event == 'h3_conditioning_plan' and state.get('h3_conditioning_plans') == 1
+                        or reasons != state.get('h3_conditioning_reason_snapshot', frozenset())):
+                    self.safe_stage(prompt_id, node_id, 'metrics')
+                state['h3_conditioning_reason_snapshot'] = reasons
             elif observe_h3_reference_metrics(state, event, facts):
                 reasons = frozenset(state['reasons'])
                 if (event == 'h3_reference_begin' and state.get('h3_reference_begins') == 1

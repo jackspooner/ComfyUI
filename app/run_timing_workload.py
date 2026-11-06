@@ -263,6 +263,7 @@ def describe(graph, base, resource, observed_at, file_identity, digest, availabl
             node_profile = 'diffusion_video'
             node_facts['jointAllocation.nativePlanRequired'] = fact(True, kind)
             node_facts['h3References.required'] = fact(True, kind)
+            node_facts['h3Conditioning.required'] = fact(True, kind)
             stage_reasons.extend(('h3_allocation_workload_unmeasured', 'h3_reference_preparation_unmeasured',
                                   'h3_conditioning_text_work_unmeasured', 'h3_reference_encoding_work_unmeasured'))
             for group, prefix in (('ref_images', 'ref_image_'), ('ref_videos', 'ref_video_'),

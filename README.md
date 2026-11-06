@@ -236,7 +236,14 @@ selection and optional paired soundtrack encoding. Unused still batch items stay
 audit-only; all incoming video resize frames remain workload evidence. Output
 latents and CPU preparation/encoding spans are measurements. This preparation
 adapter retains gaps for complete text/VAE encoding work, cache reuse and RefMod
-extraction; it does not make that composite stage fully comparable.
+extraction unless the corresponding native plans prove the selected work.
+Native H3 full-sequence conditioning records expanded modality positions, actual
+input shape, compute precision, layer count and output selection before forwarding.
+A complete reference plan with no selected VAE work can resolve that encoding gap;
+nonzero vision embeddings, selected VAE internals, custom variants/options and
+unproved cache reuse remain incomplete. Token counts cannot qualify missing
+managed-loading evidence. CPU forward spans overlap their owning node's elapsed
+time and are never added as extra queue work.
 Native model-manager observations separate loading/unloading/clone CPU work and
 retain observed entry reuse, memory policy and effective load budgets. Unknown
 physical residency stays unknown; these measurements add no GPU queries or queue work.
