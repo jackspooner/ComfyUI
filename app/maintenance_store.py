@@ -78,6 +78,8 @@ class MaintenanceStore:
                 state TEXT NOT NULL, created REAL NOT NULL, terminal REAL,
                 history TEXT, visible INTEGER NOT NULL DEFAULT 1);
             CREATE INDEX IF NOT EXISTS receipts_terminal ON receipts(terminal);
+            CREATE TABLE IF NOT EXISTS receipt_recoveries (
+                prompt_id TEXT PRIMARY KEY, request TEXT NOT NULL, confirmed REAL NOT NULL);
         """)
         self.generation = str(uuid.uuid4())
         self.invocation = os.environ.get("INVOCATION_ID") or self.generation
@@ -126,7 +128,31 @@ class MaintenanceStore:
             raise MaintenanceError("interrupted_work_unresolved", 503)
 
     def unresolved(self):
-        return self.read("SELECT count(*) FROM receipts WHERE state='interrupted_unknown'")[0][0]
+        return self.read("""SELECT count(*) FROM receipts r WHERE state='interrupted_unknown'
+                            AND NOT EXISTS (SELECT 1 FROM receipt_recoveries c WHERE c.prompt_id=r.id)""")[0][0]
+
+    def confirm_ended(self, prompt_id, request, quiescent):
+        recorded = self.read("SELECT request FROM receipt_recoveries WHERE prompt_id=?", (prompt_id,))
+        payload = encode(request)
+        if recorded:
+            if recorded[0]["request"] != payload:
+                raise MaintenanceError("receipt_recovery_conflict")
+            return
+        self.check_operator(request)
+        receipt = self.receipt(prompt_id)
+        if receipt is None:
+            raise MaintenanceError("receipt_not_found", 404)
+        if receipt["state"] != "interrupted_unknown":
+            raise MaintenanceError("receipt_not_interrupted")
+        if request["previousInvocationId"] == self.invocation:
+            raise MaintenanceError("invocation_still_current")
+        if request["physicalWorkEnded"] is not True or not quiescent or self.failure:
+            raise MaintenanceError("native_work_unsettled")
+        # Operator evidence certifies ended physical work, never its missing outcome.
+        # Keep the original receipt/digest and NULL terminal time indefinitely.
+        with self.transaction():
+            self.db.execute("INSERT INTO receipt_recoveries VALUES (?,?,?)", (prompt_id, payload, time.time()))
+            self.db.execute("UPDATE state SET revision=revision+1 WHERE singleton=1")
 
     def accept(self, item):
         # Hash execution-affecting content, not queue priority or server timestamps.
@@ -169,6 +195,9 @@ class MaintenanceStore:
             return None
         receipt = dict(rows[0])
         receipt["history"] = json.loads(receipt["history"]) if receipt["history"] else None
+        recovery = self.read("SELECT request,confirmed FROM receipt_recoveries WHERE prompt_id=?", (prompt_id,))
+        if recovery:
+            receipt["recovery"] = {**json.loads(recovery[0]["request"]), "confirmedAt": recovery[0]["confirmed"]}
         return receipt
 
     def histories(self):

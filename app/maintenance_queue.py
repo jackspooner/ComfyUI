@@ -178,6 +178,14 @@ class MaintenanceQueue(PromptQueue):
         self.store.failure = errors[0]["code"] if errors else None
         return errors
 
+    def confirm_ended(self, prompt_id, request):
+        with self.mutex:
+            status = self.maintenance_status()
+            quiescent = not any(value for name, value in status["counts"].items() if name != "interruptedUnknown")
+            self.store.confirm_ended(prompt_id, request, quiescent)
+            self.not_empty.notify_all()
+            return self.store.receipt(prompt_id)
+
     def maintenance_command(self, action, request):
         with self.mutex:
             errors = None

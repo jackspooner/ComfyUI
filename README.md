@@ -75,6 +75,10 @@ non-executable completion receipts across restart. The server starts still fence
 until the owning operation explicitly resumes. It does not pause tensors, restore
 unfinished prompts, deploy code, or release GPU holds. Crashed unfinished work is
 reported as interrupted/unknown, not replayed or declared safe.
+An authenticated operator can separately confirm that a specific interrupted
+prompt's physical work has ended, under an owned fence with no current native
+work. This retains its unknown outcome, original receipt and duplicate protection
+while allowing new work after explicit resume; see the recovery procedure below.
 
 Set both `COMFYUI_MAINTENANCE_DIR` and `COMFYUI_MAINTENANCE_TOKEN_FILE` at startup;
 see [authentication, exact API, recovery and rollout limits](docs/maintenance.md).
@@ -107,6 +111,10 @@ Restart an idle instance to load updated core code; source integration alone doe
 not update an already-running process.
 
 ## External image references in this fork
+
+Load Image and Load Image (as Mask) list nested input images as sorted relative
+paths, omitting non-image files and `.git` directories. This requires no external
+path flag and keeps the existing validation.
 
 Start with `--allow-external-image-paths` to let **Load Image** and **Load Image
 (as Mask)** read an absolute image filename anywhere the process can read. The
