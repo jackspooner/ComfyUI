@@ -108,6 +108,11 @@ not update an already-running process.
 
 ## External image references in this fork
 
+**Load Image** and **Load Image (as Mask)** list images from nested input folders
+as sorted relative paths, including staged `routervideo_refs/` images. Non-image
+files and `.git` directories are omitted. This input dropdown behavior requires
+no external-path flag and preserves the existing image path validation.
+
 Start with `--allow-external-image-paths` to let **Load Image** and **Load Image
 (as Mask)** read an absolute image filename anywhere the process can read. The
 file stays in its original location; changing it changes subsequent executions,

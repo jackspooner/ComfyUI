@@ -1753,8 +1753,19 @@ class PreviewImage(SaveImage):
 class LoadImage:
     @classmethod
     def INPUT_TYPES(s):
+        # Stock behaviour: list the whole input tree, including subfolders, as relative paths.
+        # A flat os.listdir here makes LoadImage silently unable to reference any staged
+        # subfolder file (e.g. routervideo_refs/<hash>.png used by RouterVideo RefMods),
+        # while resolve_image_path already resolves those same relative paths correctly.
+        # This fork does not register an "input" folder_paths key, so walk the directory.
         input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        files = []
+        for root, dirs, names in os.walk(input_dir):
+            dirs[:] = [d for d in dirs if d != ".git"]
+            for name in names:
+                full = os.path.join(root, name)
+                if os.path.isfile(full):
+                    files.append(os.path.relpath(full, input_dir).replace(os.sep, "/"))
         files = folder_paths.filter_files_content_types(files, ["image"])
         return {"required":
                     {"image": (sorted(files), {"image_upload": True})},
