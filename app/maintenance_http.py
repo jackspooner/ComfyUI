@@ -72,6 +72,20 @@ def command_request(action, data):
     return data
 
 
+def recovery_request(data):
+    fields = {"operationId", "ownerId", "expectedRevision", "expectedGeneration",
+              "previousInvocationId", "physicalWorkEnded", "evidence"}
+    if not isinstance(data, dict) or set(data) != fields:
+        raise MaintenanceError("invalid_maintenance_request", 400)
+    command_request("resume", {key: data[key] for key in fields - {"previousInvocationId", "physicalWorkEnded", "evidence"}})
+    if (data["physicalWorkEnded"] is not True
+            or not isinstance(data["previousInvocationId"], str) or not IDENTITY.fullmatch(data["previousInvocationId"])
+            or not isinstance(data["evidence"], str) or not 1 <= len(data["evidence"].strip()) <= 2048
+            or len(data["evidence"]) > 2048 or any(ord(c) < 32 or ord(c) == 127 for c in data["evidence"])):
+        raise MaintenanceError("invalid_maintenance_request", 400)
+    return data
+
+
 def middleware(queue, token):
     @web.middleware
     async def boundary(request, handler):
@@ -117,5 +131,18 @@ def add_routes(routes, queue):
         if result is None:
             return web.json_response({"error": {"type": "receipt_not_found"}, "acceptance": "unknown"}, status=404)
         # Digest is internal collision evidence, not part of operator readback.
+        del result["digest"]
+        return web.json_response(result)
+
+    @routes.post("/maintenance/receipts/{prompt_id}/confirm-ended")
+    async def confirm_ended(request):
+        prompt_id = request.match_info["prompt_id"]
+        if not IDENTITY.fullmatch(prompt_id):
+            raise MaintenanceError("invalid_maintenance_request", 400)
+        try:
+            data = recovery_request(await request.json())
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise MaintenanceError("invalid_maintenance_request", 400) from exc
+        result = queue.confirm_ended(prompt_id, data)
         del result["digest"]
         return web.json_response(result)

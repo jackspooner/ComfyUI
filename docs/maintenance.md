@@ -94,7 +94,7 @@ when a new fence is acquired; `generation` changes every process start.
 
 `safeToStop=true` means this exact active fence is held, there are no native
 validation reservations, pending/running prompts, unpublished completions, prior
-unknown receipts or storage faults, and the native worker has entered its next
+unconfirmed physical executions or storage faults, and the native worker has entered its next
 dequeue after completion notifications/housekeeping. Counts are sampled under the
 same mutex as admission and operator mutations. A receipt commit precedes removal
 from the running set. Failed/cancelled executions can be terminal; readiness does
@@ -162,6 +162,61 @@ are Unix seconds (`terminal` may be null). States are `accepted`, `terminal`, or
 `{prompt,outputs,status}` projection. `visible` is 0/1 for native history display.
 Missing receipt: HTTP 404, `{"error":{"type":"receipt_not_found"},"acceptance":"unknown"}`;
 absence never proves rejection. Internal digests are not exposed.
+
+### `POST /maintenance/receipts/{prompt_id}/confirm-ended`
+
+Confirm a specific interrupted prompt's **physical work has ended**, retaining its
+unknown outcome. This is an authenticated operator assertion after independent
+investigation, not an automatic inference from age, a missing PID or an empty queue.
+First prove the original invocation/cgroup terminated and its GPU/resource holds
+and any independently dispatched effects ended. Record bounded evidence references
+without credentials. Legacy receipts do not contain invocation provenance; the
+operator must establish that association from retained journal/provider evidence.
+
+```json
+{
+  "operationId": "owned-maintenance-uuid",
+  "ownerId": "deployment-operator",
+  "expectedRevision": 3,
+  "expectedGeneration": "current-process-uuid",
+  "previousInvocationId": "verified-ended-invocation-id",
+  "physicalWorkEnded": true,
+  "evidence": "Reference to verified old cgroup termination, exact resource-hold cleanup and independent effect-owner checks; outcome remains unknown."
+}
+```
+
+Requires the exact active fence owner/current revision and generation, an existing
+`interrupted_unknown` receipt, a previous invocation different from the current
+one, and no current native pending/running/validation/finishing/publication/accepted
+work or storage fault. The queue mutex serializes these checks and the write.
+`evidence` is nonempty, at most 2,048 characters, and contains no control characters;
+`physicalWorkEnded` must be boolean true. All other identity rules still apply.
+
+The owner atomically appends a separate recovery audit and increments revision.
+It does not change the receipt's state, digest, creation time, NULL terminal time,
+history or visibility, submit work, release the fence, delete evidence or certify
+success/cancellation. GET receipt gains an optional `recovery` object containing
+the exact accepted body and `confirmedAt` Unix seconds. The POST returns the same
+receipt projection. Same-ID/same-digest submissions remain replay-only, changed
+content conflicts, and these nonterminal receipts/audits never expire automatically.
+
+`counts.interruptedUnknown` in the unchanged version-1 status means interrupted
+physical executions **without** this confirmation; confirmed historical unknown
+outcomes remain visible on their receipt. Other unconfirmed receipts still block
+admission/readiness. Once all actual work is settled, resume explicitly through
+the ordinary owner operation. Exact retries of a successful body return the
+original audit even after restart/release; they do not mutate or release any newer
+operation. Changed bodies conflict with `receipt_recovery_conflict`.
+
+Additional failures: 404 `receipt_not_found`; 409 `receipt_not_interrupted`,
+`invocation_still_current`, `native_work_unsettled`, plus existing fence/CAS errors;
+400 `invalid_maintenance_request` for malformed bodies. Authentication, loopback,
+origin/proxy rejection and `/api` aliases match other maintenance routes.
+
+The audit table is an additive schema-2 extension. Older compatible readers keep
+the receipt and duplicate protection but conservatively ignore confirmations and
+block on its unknown state again. Never remove the audit/store or fabricate a
+terminal outcome to make rollback readiness pass.
 
 ### Errors and native `/prompt`
 
@@ -242,9 +297,10 @@ awaiting publication; maintenance separates these as `publishing` rather than
 in-memory results: all persisted accepted-but-not-terminal receipts become
 `interrupted_unknown`, and the executable queue stays empty. They block both
 admission and readiness, even if no operation was active at the crash. Neither
-resume, abort nor publication retry acknowledges these away. V1 has no generic
-unknown-work reconciliation endpoint: retain evidence and escalate for explicit
-operator recovery; never delete the database or replay to make it look idle.
+resume, abort nor publication retry acknowledges these away. When independent
+owner evidence proves physical execution ended, use the specific confirm-ended
+operation above; the historical outcome stays unknown. Otherwise retain evidence
+and escalate; never delete the database or replay to make it look idle.
 
 ## Rollout and bypass limits
 

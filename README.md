@@ -75,6 +75,10 @@ non-executable completion receipts across restart. The server starts still fence
 until the owning operation explicitly resumes. It does not pause tensors, restore
 unfinished prompts, deploy code, or release GPU holds. Crashed unfinished work is
 reported as interrupted/unknown, not replayed or declared safe.
+An authenticated operator can separately confirm that a specific interrupted
+prompt's physical work has ended, under an owned fence with no current native
+work. This retains its unknown outcome, original receipt and duplicate protection
+while allowing new work after explicit resume; see the recovery procedure below.
 
 Set both `COMFYUI_MAINTENANCE_DIR` and `COMFYUI_MAINTENANCE_TOKEN_FILE` at startup;
 see [authentication, exact API, recovery and rollout limits](docs/maintenance.md).
