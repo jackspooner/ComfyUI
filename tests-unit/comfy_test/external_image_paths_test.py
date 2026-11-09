@@ -60,6 +60,24 @@ def test_node_validation_and_content_change(external):
     assert "Invalid image file" in loader.VALIDATE_INPUTS(str(external))
 
 
+def test_input_dropdown_includes_nested_images_and_mask_loader(tmp_path, monkeypatch):
+    monkeypatch.setattr(folder_paths, "input_directory", str(tmp_path))
+    for relative in ("root.png", "routervideo_refs/reference.png", "nested/ü image.jpg",
+                     ".git/hidden.png", "nested/.git/hidden.png", "audio.wav", "nested/notes.txt"):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    (tmp_path / "directory.png").mkdir()
+    namespace = {"folder_paths": folder_paths, "os": os}
+    loader = source_definition("nodes.py", "LoadImage", namespace)
+    mask_loader = source_definition("nodes.py", "LoadImageMask", namespace)
+    expected = ["nested/ü image.jpg", "root.png", "routervideo_refs/reference.png"]
+    for node in (loader, mask_loader):
+        image, options = node.INPUT_TYPES()["required"]["image"]
+        assert image == expected
+        assert options == {"image_upload": True}
+
+
 def test_rejects_non_images_and_directories(external):
     with pytest.raises(ValueError):
         resolve_image_path(str(external.parent))
