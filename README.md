@@ -1,3 +1,16 @@
+## Dedicated MiniMax H3 Image in this fork
+
+The fork includes the focused upstream
+[native image integration](https://github.com/Comfy-Org/ComfyUI/commit/ede4e5fe8d15445c6fcd6828d70b202c22f9502c).
+Use standard diffusion, minimax CLIP and VAE loaders with
+`MiniMaxH3ImageConditioning`, the dedicated image checkpoint/VAE and existing H3
+Qwen3-VL encoder. This differs from video-derived still workflows and P-H3-Image.
+Six Euler/simple steps at CFG 1 use the checkpoint's distilled grid. The publisher
+supports up to 16 ordered references; every reference conditions text and image
+latents when the VAE is connected. See the [publisher model card](https://huggingface.co/MiniMaxAI/MiniMax-H3-Image)
+for image-specific prompting and licensing. Source/CPU validation does not verify
+maximum-size or 16-reference GPU quality; deploy and use the ordinary queue.
+
 ## Durable queued-prompt pause in this fork
 
 Local owners can atomically hold and resume exact pending prompt IDs through
