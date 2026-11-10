@@ -174,6 +174,16 @@ class MaintenanceStore:
             self.db.execute("INSERT INTO receipts (id,digest,number,state,created,terminal,history,visible) VALUES (?,?,?,'accepted',?,NULL,NULL,1)",
                             (item[1], digest, item[0], time.time()))
 
+    def restore_held_receipt(self, item):
+        """A durable pre-dequeue hold proves this exact prompt never ran."""
+        extra = {k: v for k, v in item[3].items() if k not in ('create_time', 'client_id')}
+        digest = hashlib.sha256(encode([item[2], extra, item[4], item[5:]]).encode()).hexdigest()
+        receipt = self.receipt(item[1])
+        if not receipt or receipt['digest'] != digest or receipt['state'] not in ('accepted', 'interrupted_unknown'):
+            raise MaintenanceError('held_receipt_conflict', 503)
+        with self.transaction():
+            self.db.execute("UPDATE receipts SET state='accepted' WHERE id=?", (item[1],))
+
     def complete(self, prompt_id, history):
         try:
             payload = encode(history)

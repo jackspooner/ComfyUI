@@ -67,6 +67,7 @@ from app.custom_node_manager import CustomNodeManager
 from app.subgraph_manager import SubgraphManager
 from app.node_replace_manager import NodeReplaceManager
 from app import maintenance_http
+from app import queue_control_http
 from app import run_timing_http
 from app.run_timing_queue import create_timed_queue
 from typing import TYPE_CHECKING, Optional, Union
@@ -333,6 +334,7 @@ class PromptServer():
         routes = web.RouteTableDef()
         self.routes = routes
         run_timing_http.add_routes(routes, self.prompt_queue)
+        queue_control_http.add_routes(routes, self.prompt_queue)
         if maintenance_store:
             maintenance_http.add_routes(routes, self.prompt_queue)
         self.last_node_id = None

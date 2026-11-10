@@ -132,8 +132,11 @@ class MaintenanceQueue(PromptQueue):
             running = len(self.currently_running.keys() - self.publication_pending.keys())
             unpublished = sum((self.store.receipt(history["prompt"][1]) or {}).get("state") == "accepted"
                               for history in self.publication_pending.values())
-            return self.store.status(len(self.queue), running,
+            return self.store.status(self.maintenance_pending(), running,
                                      self.validating, self.finishing, publishing, unpublished)
+
+    def maintenance_pending(self):
+        return len(self.queue)
 
     def wipe_history(self):
         with self.mutex:
