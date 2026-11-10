@@ -1,3 +1,12 @@
+## Durable queued-prompt pause in this fork
+
+Local owners can atomically hold and resume exact pending prompt IDs through
+`GET/POST /queue/control`. Held prompts leave the runnable heap, retain their
+original graphs and seeds, and survive restarts without automatic execution.
+Running prompts reject pause. This endpoint is for owner services; batch-child
+dependencies and shared native stages require their owner's separate controls.
+See [queue control](docs/queue-control.md) for revisions, receipts and recovery.
+
 ## Image count planning in this fork
 
 `Load CLIP → Plan Text Image Budget` estimates how many same-size images fit

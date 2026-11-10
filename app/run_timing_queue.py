@@ -1,5 +1,7 @@
 """Instrument the native queue adapter without changing PromptExecutor."""
 import logging
+from pathlib import Path
+from app.queue_control import QueueControlMixin
 from app.run_timing import RunTimingStore, physical_gpu_uuid
 from app.maintenance_queue import MaintenanceQueue
 from execution import PromptQueue
@@ -46,16 +48,35 @@ class TimingQueueMixin:
             return result
 
 
-class TimedPromptQueue(TimingQueueMixin, PromptQueue):
+class TimedPromptQueue(QueueControlMixin, TimingQueueMixin, PromptQueue):
     pass
 
 
-class TimedMaintenanceQueue(TimingQueueMixin, MaintenanceQueue):
-    pass
+class TimedMaintenanceQueue(QueueControlMixin, TimingQueueMixin, MaintenanceQueue):
+    def maintenance_pending(self):
+        return len(self.queue) + len(self.queue_control_store.held())
+
+    def restore_held_receipt(self, item):
+        self.store.restore_held_receipt(item)
+
+    def check_control_resume(self):
+        self.store.check_admission()
+
+    def maintenance_status(self):
+        result = super().maintenance_status()
+        # Held executable payloads remain retained owner work. Do not certify a
+        # maintenance window that silently abandons them.
+        if self.queue_control_store.held():
+            result['safeToStop'] = False
+            result['blockers'].append('queued_work_paused')
+            if result['operationId']:
+                result['phase'] = 'blocked'
+        return result
 
 
 def create_timed_queue(server, maintenance_store, filename):
     queue = TimedMaintenanceQueue(server, maintenance_store) if maintenance_store else TimedPromptQueue(server)
+    queue.configure_queue_control(str(Path(filename).with_name('queue-controls.sqlite')))
     try:
         queue.timing = RunTimingStore(filename, gpu_uuid=physical_gpu_uuid())
         from app.run_timing_metrics import attach_runtime_metrics
