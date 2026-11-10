@@ -5,6 +5,8 @@ Local owners can atomically hold and resume exact pending prompt IDs through
 original graphs and seeds, and survive restarts without automatic execution.
 Running prompts reject pause. This endpoint is for owner services; batch-child
 dependencies and shared native stages require their owner's separate controls.
+Resume retries require retained queue/history evidence, including after restart;
+an old release receipt alone cannot confirm that work is still accounted for.
 See [queue control](docs/queue-control.md) for revisions, receipts and recovery.
 
 ## Image count planning in this fork

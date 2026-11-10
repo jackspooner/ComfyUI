@@ -84,6 +84,40 @@ def test_uncertain_resume_after_restart_is_never_replayed(tmp_path):
     assert q.get(0) is None
 
 
+def test_confirmed_resume_retry_requires_retained_native_evidence(tmp_path):
+    q = queue(tmp_path)
+    q.put(item('a'))
+    control(q, 'pause', ['a'])
+    request = {'action': 'resume', 'promptIds': ['a'], 'operationId': 'resume',
+               'expectedRevision': q.queue_control_snapshot()['revision']}
+    receipt = q.control_pending(request)
+    assert q.control_pending(request) == receipt
+    q.queue_control_store.close()
+
+    # Restart loses the in-memory pending prompt. Its old release receipt must
+    # not stand in for current queue/history evidence or authorize replay.
+    q = queue(tmp_path)
+    with pytest.raises(QueueControlError, match='queue_control_uncertain'):
+        q.control_pending(request)
+    assert q.get(0) is None
+    assert q.queue_control_snapshot()['prompts'] == [{'promptId': 'a', 'state': 'released'}]
+    q.queue_control_store.close()
+
+
+def test_confirmed_resume_retry_accepts_running_and_terminal_evidence(tmp_path):
+    q = queue(tmp_path)
+    q.put(item('a'))
+    control(q, 'pause', ['a'])
+    request = {'action': 'resume', 'promptIds': ['a'], 'operationId': 'resume',
+               'expectedRevision': q.queue_control_snapshot()['revision']}
+    receipt = q.control_pending(request)
+    _, index = q.get(0)
+    assert q.control_pending(request) == receipt
+    q.task_done(index, {'outputs': {}}, PromptQueue.ExecutionStatus('success', True, []))
+    assert q.control_pending(request) == receipt
+    q.queue_control_store.close()
+
+
 def test_retry_and_stale_revision_cannot_undo_newer_control(tmp_path):
     q = queue(tmp_path)
     q.put(item('a'))

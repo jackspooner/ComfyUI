@@ -97,9 +97,12 @@ class QueueControlMixin:
             active = {item[1] for item in [*self.queue, *self.currently_running.values()]}
             if response['state'] == 'paused' and any(key in active or self.get_history(key) for key in request['promptIds']):
                 raise QueueControlError('queue_control_uncertain')
-            if response['state'] == 'resuming':
+            if response['state'] in ('resuming', 'resumed'):
+                # A committed release does not prove that the in-memory prompt
+                # survived a later restart. Retrying must not conceal that loss.
                 if not all(key in active or self.get_history(key) for key in request['promptIds']):
                     raise QueueControlError('queue_control_uncertain')
+            if response['state'] == 'resuming':
                 response['state'] = 'resumed'
                 with db:
                     db.executemany("UPDATE held_prompts SET state='released' WHERE id=?", [(key,) for key in request['promptIds']])
