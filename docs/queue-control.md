@@ -31,7 +31,10 @@ the control endpoint. Held identities reject a second `/prompt` acceptance.
 Resume records durable intent before enqueue. After an interrupted resume, a
 `resuming` or `released` row absent from queue/history is uncertain. Never submit a
 replacement prompt or infer completion from absence. Reconcile its original
-owner and native process. A durable `paused` row can be explicitly resumed after
+owner and native process. Retrying even a previously confirmed resume returns
+`queue_control_uncertain` when its selected prompts lack queue/history evidence;
+the old receipt cannot establish that the released work survived a restart.
+A durable `paused` row can be explicitly resumed after
 restart; matching maintenance receipts are restored only after digest validation.
 Maintenance stays blocked while held executable work exists. It must not be
 abandoned for a restart. Timing acceptance is retained and resume does not create
