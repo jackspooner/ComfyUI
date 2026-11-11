@@ -408,6 +408,14 @@ class Qwen3VL_4BConfig(Qwen3VL_8BConfig):
     lm_head: bool = False  # 4B ties word embeddings
 
 @dataclass
+class Qwen3VL_2BConfig(Qwen3VL_8BConfig):
+    hidden_size: int = 2048
+    intermediate_size: int = 6144
+    num_hidden_layers: int = 28
+    num_attention_heads: int = 16
+    lm_head: bool = False  # 2B ties word embeddings
+
+@dataclass
 class Qwen3VL_32BConfig(Qwen3VL_8BConfig):
     # MiniMax H3 conditioning checkpoint: truncated to the first 50 of 64 layers,
     # consumed as the unnormalized hidden state after layer 50 (no final norm, no lm_head)
@@ -681,6 +689,7 @@ class Attention(nn.Module):
             self.q_proj = ops.Linear(config.hidden_size, self.inner_size, bias=config.qkv_bias, device=device, dtype=dtype)
             self.k_proj = ops.Linear(config.hidden_size, self.kv_size, bias=config.qkv_bias, device=device, dtype=dtype)
             self.v_proj = ops.Linear(config.hidden_size, self.kv_size, bias=config.qkv_bias, device=device, dtype=dtype)
+            self.combined_qkv = comfy.ops.CombinedLinear((self.q_proj, self.k_proj, self.v_proj))
         self.o_proj = ops.Linear(self.inner_size, config.hidden_size, bias=False, device=device, dtype=dtype)
 
         self.q_norm = None
@@ -705,9 +714,13 @@ class Attention(nn.Module):
         if self.merged_qkv:
             xq, xk, xv = self.qkv_proj(hidden_states).split((self.inner_size, self.kv_size, self.kv_size), dim=-1)
         else:
-            xq = self.q_proj(hidden_states)
-            xk = self.k_proj(hidden_states)
-            xv = self.v_proj(hidden_states)
+            qkv = self.combined_qkv.forward(hidden_states)
+            if qkv is NotImplemented:
+                xq = self.q_proj(hidden_states)
+                xk = self.k_proj(hidden_states)
+                xv = self.v_proj(hidden_states)
+            else:
+                xq, xk, xv = qkv.split((self.inner_size, self.kv_size, self.kv_size), dim=-1)
 
         xq = xq.view(batch_size, seq_length, self.num_heads, self.head_dim).transpose(1, 2)
         xk = xk.view(batch_size, seq_length, self.num_kv_heads, self.head_dim).transpose(1, 2)
@@ -795,6 +808,7 @@ class MLP(nn.Module):
         else:
             self.gate_proj = ops.Linear(config.hidden_size, intermediate_size, bias=False, device=device, dtype=dtype)
             self.up_proj = ops.Linear(config.hidden_size, intermediate_size, bias=False, device=device, dtype=dtype)
+            self.combined_gate_up = comfy.ops.CombinedLinear((self.gate_proj, self.up_proj))
         self.down_proj = ops.Linear(intermediate_size, config.hidden_size, bias=False, device=device, dtype=dtype)
         if config.mlp_activation == "silu":
             self.activation = torch.nn.functional.silu
@@ -805,14 +819,15 @@ class MLP(nn.Module):
 
     def forward(self, x, norm=None):
         # norm: the block's pre-norm, folded into the merged projection's input quantizer where supported
-        if self.merged_mlp:
-            if norm is not None:
-                x = comfy.ops.linear_input_act(self.gate_up_proj, x, "rms_norm", norm.scale(), norm.eps)
-            else:
-                x = self.gate_up_proj(x)
+        gate_up = self.gate_up_proj if self.merged_mlp else self.combined_gate_up
+        if norm is not None:
+            combined = comfy.ops.linear_input_act(gate_up, x, "rms_norm", norm.scale(), norm.eps)
+        else:
+            combined = comfy.ops.linear_input_act(gate_up, x, None)
+        if combined is not NotImplemented:
             if self.merged_input_act is not None:
-                return comfy.ops.linear_input_act(self.down_proj, x, self.merged_input_act)
-            gate, up = x.chunk(2, dim=-1)
+                return comfy.ops.linear_input_act(self.down_proj, combined, self.merged_input_act)
+            gate, up = combined.chunk(2, dim=-1)
             return self.down_proj(self.activation(gate) * up)
         if norm is not None:
             x = norm(x)
@@ -1187,6 +1202,11 @@ def apply_penalty(logits, repetition_penalty, presence_penalty):
     return logits
 
 
+def generate_dtype(device):
+    # the dtype generation and its multimodal preprocessing run in
+    return torch.bfloat16 if comfy.model_management.should_use_bf16(device) else torch.float32
+
+
 class BaseGenerate:
     def prepare_generation_tokens(self, tokens, context_budget, max_length, auto_resize=False,
                                   memory_budget=None, device=None, mtp=True, min_short_edge=0):
@@ -1269,10 +1289,7 @@ class BaseGenerate:
             raise ValueError("Structured generation stop tokens differ from preparation.")
 
         if execution_dtype is None:
-            if comfy.model_management.should_use_bf16(device):
-                execution_dtype = torch.bfloat16
-            else:
-                execution_dtype = torch.float32
+            execution_dtype = generate_dtype(device)
         embeds = embeds.to(execution_dtype)
 
         if embeds.ndim == 2:
@@ -1300,9 +1317,9 @@ class BaseGenerate:
             if init_decode_buffers is not None:
                 decode_buffers = init_decode_buffers(embeds.shape[0], device, execution_dtype)
         decode_tokens = torch.empty((embeds.shape[0], 1), dtype=torch.long, device=device)
-        # Precompute decode RoPE once; explicit MRoPE positions keep their existing path.
+        # Precompute decode RoPE once; MRoPE decode positions (t = h = w) index it from next_pos.
         rope = None
-        if decode_buffers is not None and next_pos is None:
+        if decode_buffers is not None:
             rope = rope_matrix(self.model.compute_freqs_cis(torch.arange(max_cache_len, device=device, dtype=torch.float).unsqueeze(0), device))
         penalize = penalty_active(repetition_penalty, presence_penalty)
         penalty_mask = None
@@ -1319,22 +1336,22 @@ class BaseGenerate:
                     else:
                         embeds = embed(decode_tokens).to(execution_dtype)
                     current_input_ids = decode_tokens if initial_input_ids is not None else None
-                    position_ids = torch.tensor([[next_pos]], device=device) if next_pos is not None else None
+                    position_ids = torch.tensor([[next_pos]], device=device) if next_pos is not None and rope is None else None
 
                 # DeepStack visual features are injected on the prefill only; gemma4's forward lacks these kwargs.
                 extra = {}
                 if decode_buffers is not None:
                     extra["decode_buffers"] = decode_buffers
                     if rope is not None and step > 0:
-                        past_len = self.model.get_past_len(past_key_values)
-                        extra["freqs_cis"] = rope[:, :, past_len:past_len + 1]
+                        pos = next_pos if next_pos is not None else self.model.get_past_len(past_key_values)
+                        extra["freqs_cis"] = rope[:, :, pos:pos + 1]
                 if step == 0 and deepstack_embeds is not None:
                     extra["deepstack_embeds"] = deepstack_embeds
                     extra["visual_pos_masks"] = visual_pos_masks
                 with comfy.execution_metrics.measure('text_prefill_forward' if step == 0 else 'text_decode_forward'):
                     x, _, past_key_values = self.model.forward(None, embeds=embeds, attention_mask=None, past_key_values=past_key_values, input_ids=current_input_ids, position_ids=position_ids, **extra, embeds_info=(embeds_info if step == 0 else None))
                 logits = self.logits(x)[:, -1]
-                if penalty_mask is None and do_sample and penalize:
+                if penalty_mask is None and penalize:
                     # allocated on the (unbracketed) first step; later steps only index_fill_ it
                     penalty_mask = torch.zeros((logits.shape[-1],), dtype=torch.bool, device=device)
                     if len(initial_tokens) > 0:
@@ -1372,15 +1389,8 @@ class BaseGenerate:
         comfy.execution_metrics.emit('text_generation_completed', generated=len(generated_token_ids))
         return generated_token_ids
 
-    def processed_probs(self, logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, presence_penalty=0.0, penalty_mask=None, allowed_mask=None):
-        # returns (probs, indices); penalty_mask [vocab] bool stands in for token_history
-        if penalty_active(repetition_penalty, presence_penalty):
-            if penalty_mask is not None:
-                logits = torch.where(penalty_mask.unsqueeze(0), apply_penalty(logits, repetition_penalty, presence_penalty), logits)
-            elif len(token_history) > 0:
-                token_ids = torch.tensor(list(set(token_history)), device=logits.device)
-                logits[:, token_ids] = apply_penalty(logits[:, token_ids], repetition_penalty, presence_penalty)
-
+    def processed_probs(self, logits, temperature, top_k, top_p, min_p, allowed_mask=None):
+        # returns (probs, indices)
         if temperature != 1.0:
             logits = logits / temperature
 
@@ -1422,6 +1432,12 @@ class BaseGenerate:
             raise ValueError(f"structured_output.logits: No usable legal logits; no unconstrained fallback. NaN={torch.isnan(logits).sum().item()}, positive_inf={torch.isposinf(logits).sum().item()}, finite={torch.isfinite(logits).sum().item()}.")
 
     def sample_token(self, logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, generator, do_sample=True, presence_penalty=0.0, penalty_mask=None, allowed_mask=None):
+        if penalty_active(repetition_penalty, presence_penalty):
+            if penalty_mask is not None:
+                logits = torch.where(penalty_mask.unsqueeze(0), apply_penalty(logits, repetition_penalty, presence_penalty), logits)
+            elif len(token_history) > 0:
+                token_ids = torch.tensor(list(set(token_history)), device=logits.device)
+                logits[:, token_ids] = apply_penalty(logits[:, token_ids], repetition_penalty, presence_penalty)
 
         if not do_sample or temperature == 0.0:
             if allowed_mask is not None:
@@ -1429,7 +1445,7 @@ class BaseGenerate:
                 self.check_constrained_logits(logits)
             return torch.argmax(logits, dim=-1, keepdim=True)
 
-        probs, top_indices = self.processed_probs(logits, temperature, top_k, top_p, min_p, repetition_penalty, token_history, presence_penalty=presence_penalty, penalty_mask=penalty_mask, allowed_mask=allowed_mask)
+        probs, top_indices = self.processed_probs(logits, temperature, top_k, top_p, min_p, allowed_mask=allowed_mask)
         next_token = torch.multinomial(probs, num_samples=1, generator=generator)
         if top_indices is not None:
             return top_indices.gather(1, next_token)

@@ -71,7 +71,7 @@ def _extract_json(text):
     raise ValueError("The model did not return a JSON value for json_schema." + detail)
 
 
-VIDEO_TOOLTIP = "Video frames as image batch. Assumed to be 24 FPS; subsampled to 1 FPS internally."
+VIDEO_TOOLTIP = "Video frames as image batch. Assumed to be 24 FPS; subsampled to the model's frame rate internally."
 
 class TextGenerateV2(io.ComfyNode):
     @classmethod

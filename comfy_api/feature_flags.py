@@ -130,13 +130,17 @@ _CORE_FEATURE_FLAGS: dict[str, Any] = {
 # Reserved so a CLI flag cannot advertise the excluded outbound cloud deployment path.
 _SERVER_SET_FEATURE_FLAGS = ("deploy_to_cloud",)
 
-# CLI-provided flags cannot overwrite core or server-set flags. Startup code may: main.py sets "assets".
-_cli_flags = {
-    k: v for k, v in _parse_cli_feature_flags().items()
-    if k not in _CORE_FEATURE_FLAGS and k not in _SERVER_SET_FEATURE_FLAGS
-}
+def _server_feature_flags() -> dict[str, Any]:
+    """Registry defaults, then core flags, then CLI flags. CLI flags cannot overwrite core or server-set flags; main.py may still set "assets"."""
+    registry_defaults = {k: info["default"] for k, info in CLI_FEATURE_FLAG_REGISTRY.items()}
+    cli_flags = {
+        k: v for k, v in _parse_cli_feature_flags().items()
+        if k not in _CORE_FEATURE_FLAGS and k not in _SERVER_SET_FEATURE_FLAGS
+    }
+    return {**registry_defaults, **_CORE_FEATURE_FLAGS, **cli_flags}
 
-SERVER_FEATURE_FLAGS: dict[str, Any] = {**_CORE_FEATURE_FLAGS, **_cli_flags}
+
+SERVER_FEATURE_FLAGS: dict[str, Any] = _server_feature_flags()
 
 
 def get_connection_feature(

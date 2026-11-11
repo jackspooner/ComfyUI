@@ -2,9 +2,9 @@
 
 Deploy published non-draft, non-prerelease tags from the actual configured GitHub
 remote, retaining the fork's local memory-recovery patch. Do not deploy a later
-branch tip or downgrade a checkout containing the stable tag. The 4 November 2026
-release is [v0.44.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.44.0),
-release commit `2c75dc1b379a59e0880619d029607af5169a62ef`.
+branch tip or downgrade a checkout containing the stable tag. The 10 November 2026
+release is [v0.45.0](https://github.com/Comfy-Org/ComfyUI/releases/tag/v0.45.0),
+release commit `989d93d0d968e704c589ce0146bb18c77f6b50cc`.
 
 Before changing source or packages, save Git revision/diffs, custom-node revisions,
 package inventory/constraints, service configuration, workflows and baseline
@@ -118,3 +118,24 @@ Run the Gemma template, generation length, conversation, media-budget,
 prefetch cleanup, frontend-manager and video bit-depth suites. New model
 weights, context-window quality, full-size video and partner services require
 their own acceptance; they are not established by the maintenance smoke test.
+
+The v0.45.0 tag pairs frontend 1.58.5, templates 0.11.105 and Kitchen 0.2.41
+with the unchanged allocator 0.6.0 and embedded docs 0.5.16. Kitchen's `memmove`
+is required for combined quantized Qwen projections; test the paired source and
+library in isolation before deployment. Preserve prefetch failure cleanup and
+the existing CLIP enum identities when adding Qwen3-VL 2B and WeVisOne selectors.
+Greedy text decoding now applies repetition/presence penalties before the legal
+JSON-token mask, with the same strict invalid-logit handling as sampling.
+
+Full video extraction uses the upstream native host buffer, falling back to
+bounded chunks when unavailable. Selective stream/frame/resize controls keep
+the fork's bounded frame accumulator, default pixels and decode metrics. Run
+both video frame-buffer and extraction regressions, including native host-buffer
+CPU subprocess checks. Historical extraction benchmarks do not measure this merge.
+
+RelayVSR, WeVisOne-VL, UltraTex and adaptive SeedVR2 paths need their own local
+weights and representative acceptance. RelayVSR Flash decoder files require
+the `upscale_factor` metadata. Discover live node contracts before constructing
+those workflows; existing H3 inference does not certify them. Partner nodes
+remain explicit external operations; local SSO/partner-token defaults remain
+disabled, and cloud deployment remains excluded in this fork.
