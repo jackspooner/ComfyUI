@@ -8,8 +8,8 @@ import comfy.ops as ops
 
 
 def test_failed_prefetch_keeps_all_faulted_modules_reachable(monkeypatch):
-    first = SimpleNamespace(_v='first', _v_signature='resident')
-    second = SimpleNamespace(_v='second', _v_signature='old')
+    first = SimpleNamespace(_v='first', _v_signature='resident', _combined_linear=None)
+    second = SimpleNamespace(_v='second', _v_signature='old', _combined_linear=None)
     root = SimpleNamespace(modules=lambda: iter([first, second]))
     queue = [None, root]
     monkeypatch.setattr(mp, 'PREFETCH_QUEUES', [queue])
@@ -35,7 +35,7 @@ def test_failed_prefetch_keeps_all_faulted_modules_reachable(monkeypatch):
 
 
 def test_successful_resident_prefetch_is_cleaned_once(monkeypatch):
-    child = SimpleNamespace(_v='child', _v_signature='same')
+    child = SimpleNamespace(_v='child', _v_signature='same', _combined_linear=None)
     root = SimpleNamespace(modules=lambda: iter([child]))
     queue = [None, root, None]
     monkeypatch.setattr(mp, 'PREFETCH_QUEUES', [queue])
@@ -59,7 +59,7 @@ def test_successful_resident_prefetch_is_cleaned_once(monkeypatch):
 
 
 def test_direct_cast_failure_does_not_publish_incomplete_prefetch(monkeypatch):
-    child = SimpleNamespace(_v='child', _v_signature='old')
+    child = SimpleNamespace(_v='child', _v_signature='old', _combined_linear=None)
     vbar = ops.comfy_aimdo.model_vbar
     monkeypatch.setattr(vbar, 'vbar_fault', lambda v: 'new')
     monkeypatch.setattr(vbar, 'vbar_signature_compare', lambda a, b: False)

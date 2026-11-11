@@ -158,7 +158,7 @@ def test_padding_and_all_stop_ids(prepared):
 def test_hard_mask_after_filters(top_k, min_p, top_p):
     logits = torch.tensor([[100., 2., -3., 99., 98.]])
     allowed = torch.tensor([[False, True, True, False, False]])
-    probs, indices = BaseGenerate().processed_probs(logits, 0.7, top_k, top_p, min_p, 1., [], allowed_mask=allowed)
+    probs, indices = BaseGenerate().processed_probs(logits, 0.7, top_k, top_p, min_p, allowed_mask=allowed)
     permitted = allowed if indices is None else allowed.gather(1, indices)
     assert (probs[~permitted] == 0).all()
     assert torch.isfinite(probs).all() and probs.sum() == 1
@@ -166,13 +166,15 @@ def test_hard_mask_after_filters(top_k, min_p, top_p):
 
 @pytest.mark.parametrize("do_sample,temp", [(False, 1), (True, 0), (True, 1)])
 def test_greedy_and_sampled_exclusions(do_sample, temp):
-    if do_sample and temp != 0:
-        with pytest.raises(ValueError, match="structured_output.logits"):
-            BaseGenerate().sample_token(torch.tensor([[100., 1., 99.]]), temp, 3, 0, 1, 0., [1], torch.Generator().manual_seed(1), do_sample=do_sample, allowed_mask=torch.tensor([[False, True, False]]))
-        return
-    result = BaseGenerate().sample_token(torch.tensor([[100., 1., 99.]]), temp, 3, 0, 1, 0., [1], torch.Generator().manual_seed(1), do_sample=do_sample, allowed_mask=torch.tensor([[False, True, False]]))
-    # Greedy ignores repetition penalty as before. Sampled zero penalty is
-    # explicitly invalid rather than silently producing an unconstrained token.
+    with pytest.raises(ValueError, match="structured_output.logits"):
+        BaseGenerate().sample_token(torch.tensor([[100., 1., 99.]]), temp, 3, 0, 1, 0., [1], torch.Generator().manual_seed(1), do_sample=do_sample, allowed_mask=torch.tensor([[False, True, False]]))
+    result = BaseGenerate().sample_token(torch.tensor([[100., 1., 99.]]), temp, 3, 0, 1, 1., [1], torch.Generator().manual_seed(1), do_sample=do_sample, allowed_mask=torch.tensor([[False, True, False]]))
+    assert result.item() == 1
+
+
+@pytest.mark.parametrize("temperature", [0., 1.])
+def test_greedy_applies_penalty_before_legal_token_mask(temperature):
+    result = BaseGenerate().sample_token(torch.tensor([[5., 4., 100.]]), temperature, 0, 1., 0., 2., [0], torch.Generator(), do_sample=False, allowed_mask=torch.tensor([[True, True, False]]))
     assert result.item() == 1
 
 

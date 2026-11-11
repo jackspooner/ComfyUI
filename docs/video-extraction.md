@@ -5,6 +5,14 @@ five output sockets, or default colour conversion. PyAV already uses FFmpeg
 libraries and threaded decoding; this change retains that backend. It introduces
 no executable, Python dependency, GPU allocation, download or network request.
 
+The v0.45.0 merge uses the native aimdo host buffer for full extraction when
+available, with the upstream bounded-chunk fallback. Selective extraction keeps
+the fork's frame accumulator and skips unused streams/conversions. Both paths
+preserve default pixels, alpha and decode metrics. The earlier measurements
+below describe the previous accumulator implementation, not a benchmark of the
+new native host-buffer path. Run `video_frame_buffer_test.py` alongside the
+extraction/bit-depth suites; its native host-buffer fixtures use CPU subprocesses.
+
 ## Workflow and controls
 
 Use **Load Video → Trim Video → Get Video Components**. Trimming a file-backed
