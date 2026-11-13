@@ -2554,6 +2554,7 @@ async def init_builtin_extra_nodes():
         "nodes_yue2.py",
         "nodes_yingmusic.py",
         "nodes_locateanything.py",
+        "nodes_viitorvoice.py",
         "nodes_soulx_singer.py",
         "nodes_rvc.py",
         "nodes_drama3.py",

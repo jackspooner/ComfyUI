@@ -22,6 +22,16 @@ Read [the model guide](docs/locateanything.md), run the pinned CPU
 `tests-unit/comfy_test/locateanything_test.py` fixtures and keep all full-model
 inference on the main queue. The converter reuses the existing streaming writer.
 
+## Native ViiTorVoice
+
+Model execution and pure edit math live in `comfy/viitorvoice`, with native
+DualCodec in `comfy/ldm/audio/dualcodec.py` and W2V-BERT in
+`comfy/audio_encoders/wav2vec2_bert.py`. Read [the guide](docs/viitorvoice.md).
+Use normal setup and the focused `viitorvoice_test.py` / `audio_codec_test.py`
+CPU suites. Preserve bidirectional CFG masks, odd-stride decoder trimming,
+MOSS codec identities and exact PCM outside declared edit ranges. Cutlery owns
+compatibility graph composition; full-checkpoint inference uses the main queue.
+
 ## Native component leases
 
 `comfy/component_leases.py` owns bounded references, not GPU residency or prompt

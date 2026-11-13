@@ -8,7 +8,7 @@ class AudioCodecLoader(IO.ComfyNode):
     def define_schema(cls):
         return IO.Schema(
             node_id='AudioCodecLoader', display_name='Load Audio Codec', category='model/loaders',
-            description='Load a pinned converted MOSS v1 or v2 discrete codec from VAE model folders. Both require complete folded FP32 artifacts.',
+            description='Load a pinned converted MOSS v1/v2 or DualCodec discrete codec from VAE folders. Complete folded FP32 artifacts are required; DualCodec also requires its exact semantic companion.',
             inputs=[IO.Combo.Input('codec_name', options=folder_paths.get_filename_list('vae'))],
             outputs=[IO.Custom('AUDIO_CODEC').Output()],
         )
@@ -24,7 +24,7 @@ class AudioCodecEncode(IO.ComfyNode):
     def define_schema(cls):
         return IO.Schema(
             node_id='AudioCodecEncode', display_name='Encode Audio Codes', category='audio/codec',
-            description='Resample and encode integer codes without loudness normalization. MOSS v1 mixes to mono; v2 preserves the first two channels or duplicates mono to stereo. Valid lengths exclude partial final frames.',
+            description='Resample and encode integer codes without loudness normalization. MOSS v1 mixes to mono; v2 preserves two channels. DualCodec uses mono 24 kHz and 12 books; select codebooks=12. Valid lengths exclude partial final frames.',
             inputs=[IO.Audio.Input('audio'), IO.Custom('AUDIO_CODEC').Input('codec'), IO.Int.Input('codebooks', default=32, min=1, max=32)],
             outputs=[IO.Custom('AUDIO_CODES').Output()],
         )

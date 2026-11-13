@@ -66,6 +66,9 @@ loading; see [YingMusic setup and acceptance limits](docs/yingmusic.md).
 LocateAnything now has pinned native MoonViT/projector and modified Qwen2
 components with its original MTP masks, decoding modes and request-private state;
 see [conversion, graph and acceptance limits](docs/locateanything.md).
+ViiTorVoice-NAR also has native masked Qwen3 and DualCodec/W2V-BERT components,
+composed with Qwen alignment and original-PCM splicing. See
+[preparation, edit controls and pending acceptance](docs/viitorvoice.md).
 
 Clone this repository's `main` branch:
 
