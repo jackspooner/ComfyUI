@@ -154,3 +154,36 @@ def test_qwen_language_controls():
     assert qwen.language_name('auto') is None
     with pytest.raises(ValueError):
         qwen.language_name('not-a-language')
+
+
+def test_whisper_word_alignment_uses_n_plus_one_boundaries():
+    cfg, ref, encoder, decoder = whisper_fixture()
+    cfg.eos_token_id = 60
+    class Tokenizer:
+        prefix_tokens = [1, 3, 4]
+        def set_prefix_tokens(self, **kwargs):
+            pass
+    extractor = lambda *args, **kwargs: SimpleNamespace(input_features=torch.randn(1, 8, 32))
+    model = whisper.Model(patcher(encoder, encoder.state_dict(), torch.device('cpu')),
+                          patcher(decoder, decoder.state_dict(), torch.device('cpu')), cfg,
+                          {'alignment_heads': [[0, 0], [1, 1]]}, Tokenizer(), extractor, torch.float32)
+    with (patch('comfy.asr.whisper.mm.load_models_gpu'),
+          patch('transformers.models.whisper.tokenization_whisper._combine_tokens_into_words',
+                return_value=(['one', 'two'], [[6], [7, 8]], [[0], [1, 2]]))):
+        words = whisper.align_words(model, torch.zeros(5120), [6, 7, 8])
+    assert [word['word'] for word in words] == ['one', 'two']
+    assert all(0 <= word['start'] <= word['end'] <= .32 for word in words)
+
+
+def test_whisper_generation_failure_cleans_execution_prefetch():
+    cfg, ref, encoder, decoder = whisper_fixture()
+    extractor = lambda *args, **kwargs: SimpleNamespace(input_features=torch.zeros(1, 8, 32),
+                                                      attention_mask=torch.ones(1, 32))
+    model = whisper.Model(patcher(encoder, encoder.state_dict(), torch.device('cpu')),
+                          patcher(decoder, decoder.state_dict(), torch.device('cpu')), cfg,
+                          ref.generation_config.to_dict(), None, extractor, torch.float32)
+    with (patch.object(whisper.Generation, 'generate', side_effect=RuntimeError('interrupted fixture')),
+          patch('comfy.asr.whisper.prefetch.cleanup_prefetch_queues') as cleanup):
+        with pytest.raises(RuntimeError, match='interrupted fixture'):
+            whisper.transcribe_many(model, [{'waveform': torch.zeros(1, 1, 1600), 'sample_rate': 16000}])
+    cleanup.assert_called_once()
