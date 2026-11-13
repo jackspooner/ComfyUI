@@ -73,7 +73,14 @@ def separate(component, audio):
         raise ValueError('YingMusic separation requires finite audio samples')
     # FP32 baseline preserves native/reference component math. Weights and
     # activations remain under the normal patcher admission and offload owner.
-    model, device, _ = runtime.activate(component, memory=2*1024**3)
+    # Four logical chunks, 60 bands and eight heads at 801 time positions.
+    # Reserve the dense FP32 fallback's scores/softmax, QKV and block workspaces;
+    # do not assume an efficient kernel's memory savings before GPU acceptance.
+    positions, batch, bands, heads, head_dim, dim = 801, 4, 60, 8, 64, 384
+    attention = 2*batch*bands*heads*positions*positions*4
+    qkv = 3*batch*bands*heads*positions*head_dim*4
+    workspaces = 8*batch*positions*bands*dim*4
+    model, device, _ = runtime.activate(component, memory=attention+qkv+workspaces+512*1024**2)
     try:
         with torch.inference_mode():
             vocals = torch.stack([demix(model, item, device, runtime.transformer_options(component)) for item in waveform])

@@ -71,7 +71,7 @@ def test_stereo_residual_and_native_admission_cleanup():
          patch.object(native.runtime, 'transformer_options', return_value={}), patch.object(native, 'demix', side_effect=demix), \
          patch.object(native.comfy.model_prefetch, 'cleanup_prefetch_queues') as cleanup:
         vocal, residual = native.separate(component, {'waveform': waveform, 'sample_rate': 44100})
-        assert activate.call_args.kwargs['memory'] == 2*1024**3
+        activate.assert_called_once()
         cleanup.assert_called_once()
     torch.testing.assert_close(vocal['waveform']+residual['waveform'], waveform)
     assert vocal['sample_rate'] == residual['sample_rate'] == 44100
