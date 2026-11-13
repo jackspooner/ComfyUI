@@ -11,6 +11,63 @@ from safetensors import safe_open
 from safetensors.torch import save_file
 
 IMPLEMENTATION_REVISION = "baa409c2e7e5e775f09b4e92a220808f4827d2cc"
+MODEL_REVISION = '9b3f444f2bccd77fbc03e32eb7c334fc96040b8d'
+SEPARATOR_SHA256 = '87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e'
+SEPARATOR_CONFIG_SHA256 = 'f63f38eb1e6e40a7db0dade714a5ae257555dd8748f4e774eae8679275a81926'
+SEPARATOR_SOURCE_FILES = {
+    'inference_api.py': '60165ec145aa99bff2d079af4327d0dc3244c2c0a805ae2cce3d90a374686583',
+    'utils/model_utils.py': '5dcd1fc07d6fea131205ad0dd60d758b002846d43ae7a58f9583de4c2e3238b3',
+    'models/bs_roformer/mel_band_roformer.py': '922051cbb9c6540c8b2eaeff415286ac46f1df99442234d86a2f4dff7942ac1b',
+    'models/bs_roformer/attend.py': 'c2ccbe9179dcbc6ff4af0fe61141ddb69a4744a4f2114bf5a5c307579c7155e2',
+}
+
+
+def convert_separator(source, source_code, destination):
+    """Reuse the native Roformer geometry and verified writer, not source Python."""
+    import librosa
+    import numpy as np
+    import torch
+    from comfy.cli_args import args
+    args.cpu = True  # Offline header/shape validation must not initialize CUDA.
+    from comfy.soulx_singer.separation import MelBandRoformer
+    from scripts.convert_soulx_singer import sha256, write_component
+
+    relative = 'audio_encoders/yingmusic_separator.safetensors'
+    manifest_path = (destination / relative).with_suffix('.manifest.json')
+    if any(path.exists() for path in (destination / relative, manifest_path, (destination / relative).with_suffix('.partial'))):
+        raise FileExistsError('YingMusic separator destination exists; preserve it and choose a fresh destination.')
+    checkpoint = source / 'ckpts/MelBandRoformer.ckpt'
+    config = source / 'ckpts/config_vocals_mel_band_roformer_kj.yaml'
+    roots = {checkpoint: SEPARATOR_SHA256, config: SEPARATOR_CONFIG_SHA256}
+    source_root = source_code / 'src/third_party/MusicSourceSeparationTraining'
+    roots.update({source_root / name: digest for name, digest in SEPARATOR_SOURCE_FILES.items()})
+    snapshots = {path: (path.stat().st_size, path.stat().st_mtime_ns) for path in roots}
+    for path, expected in roots.items():
+        if sha256(path) != expected:
+            raise ValueError(f'YingMusic separator pinned source mismatch: {path}')
+    bank = librosa.filters.mel(sr=44100, n_fft=2048, n_mels=60)
+    bank[0, 0] = bank[-1, -1] = 1
+    bands = [np.flatnonzero(row > 0).tolist() for row in bank]
+    state = torch.load(checkpoint, map_location='cpu', weights_only=True, mmap=True)
+    with torch.device('meta'):
+        expected = MelBandRoformer(bands, stems=1, dtype=torch.float32, device='meta', operations=torch.nn).state_dict()
+    expected = {key: value for key, value in expected.items() if key not in ('freq_indices', 'num_bands_per_freq')}
+    if (state.keys() != expected.keys() or len(state) != 684 or any(
+            state[key].shape != value.shape or state[key].dtype != torch.float32 for key, value in expected.items())):
+        raise ValueError('YingMusic separator requires the exact complete 684-tensor FP32 checkpoint')
+    metadata = dict(format='yingmusic_roformer', kind='vocals', bands=bands,
+        source_revision=IMPLEMENTATION_REVISION, model_revision=MODEL_REVISION,
+        source_sha256=SEPARATOR_SHA256, config_sha256=SEPARATOR_CONFIG_SHA256,
+        preprocessing='yingmusic_demix_v1', config=config.read_text())
+    manifest = dict(source_revision=IMPLEMENTATION_REVISION, model_revision=MODEL_REVISION,
+        sources={str(path.relative_to(source) if path.is_relative_to(source) else path.relative_to(source_code)): digest for path, digest in roots.items()},
+        tensors={key: dict(shape=list(value.shape), dtype=str(value.dtype)) for key, value in state.items()}, outputs={})
+    if any((path.stat().st_size, path.stat().st_mtime_ns) != snapshot for path, snapshot in snapshots.items()):
+        raise ValueError('YingMusic separator source changed during conversion')
+    write_component(destination, relative, state, metadata, manifest)
+    manifest_path.write_text(json.dumps(manifest, indent=2)+'\n')
+    print(manifest_path)
+    return manifest
 
 
 def convert(source, source_code, destination):
@@ -68,5 +125,9 @@ if __name__ == "__main__":
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--source-code", required=True, type=Path)
     parser.add_argument("--destination", required=True, type=Path)
+    parser.add_argument('--component', choices=('singer', 'separator'), default='singer')
     args = parser.parse_args()
-    convert(args.source, args.source_code, args.destination)
+    if args.component == 'separator':
+        convert_separator(args.source, args.source_code, args.destination)
+    else:
+        convert(args.source, args.source_code, args.destination)

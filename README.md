@@ -60,6 +60,9 @@ Local v1.5 has a separate native Qwen3/NanoGPT2 loader and 48 kHz stereo
 Tokenizer v2 codec, preserving twelve-book references and continuation; see
 [conversion and compatibility](docs/native-audio-grounding.md#local-v15-and-tokenizer-v2).
 Source and CPU comparisons do not establish serving activation or full-model quality.
+YingMusic also has a pinned native vocal separator using the existing Roformer
+components and its exact chunk preparation, plus native compatibility package
+loading; see [YingMusic setup and acceptance limits](docs/yingmusic.md).
 
 Clone this repository's `main` branch:
 

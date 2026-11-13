@@ -100,11 +100,12 @@ class MaskEstimator(nn.Module):
 
 class MelBandRoformer(nn.Module):
     def __init__(self, bands, stems=2, dim=384, depth=6, heads=8, head_dim=64,
-                 dtype=None, device=None, operations=None):
+                 dtype=None, device=None, operations=None, zero_dc=False):
         super().__init__()
         self.dtype = dtype
         self.head_dim = head_dim
         self.bands = len(bands)
+        self.zero_dc = zero_dc
         indexes = [i * 2 + channel for band in bands for i in band for channel in range(2)]
         counts = [sum(i in band for band in bands) for i in range(1025) for channel in range(2)]
         self.register_buffer("freq_indices", torch.tensor(indexes, dtype=torch.long, device=device))
@@ -147,4 +148,7 @@ class MelBandRoformer(nn.Module):
         summed.scatter_add_(2, self.freq_indices[None, None, :, None].expand_as(masks), masks)
         separated = spec[:, None] * summed / self.num_bands_per_freq[None, None, :, None]
         separated = separated.reshape(batch, len(self.mask_estimators), 1025, channels, frames).transpose(2, 3)
+        if self.zero_dc:
+            separated = separated.clone()
+            separated[:, :, :, 0] = 0
         return torch.istft(separated.flatten(0, 2), 2048, 441, window=window, length=length).reshape(batch, len(self.mask_estimators), channels, length)

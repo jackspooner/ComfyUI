@@ -57,7 +57,8 @@ def load_component(path, expected_format, dtype=torch.float32, cpu=False):
     with safe_open(path, framework="pt", device="cpu") as saved:
         metadata = saved.metadata() or {}
     if metadata.get("format") != expected_format:
-        raise ValueError(f"Expected a converted {expected_format} file: {path}. Run scripts/convert_soulx_singer.py offline.")
+        converter = 'convert_yingmusic.py --component separator' if expected_format == 'yingmusic_roformer' else 'convert_soulx_singer.py'
+        raise ValueError(f"Expected a converted {expected_format} file: {path}. Run scripts/{converter} offline.")
     device = torch.device("cpu") if cpu else mm.get_torch_device()
     offload = torch.device("cpu") if cpu else mm.unet_offload_device()
     if expected_format == "soulx_singer":
@@ -73,13 +74,17 @@ def load_component(path, expected_format, dtype=torch.float32, cpu=False):
         model = WhisperContent(torch.float32, offload, comfy.ops.manual_cast)
     elif expected_format == "soulx_rmvpe":
         model = PitchExtractor()
-    elif expected_format == "soulx_roformer":
+    elif expected_format in ("soulx_roformer", "yingmusic_roformer"):
+        if expected_format == 'yingmusic_roformer':
+            from comfy.yingmusic_separator import validate_metadata
+            validate_metadata(metadata)
         model = MelBandRoformer(json.loads(metadata["bands"]), stems=2 if metadata["kind"] == "karaoke" else 1,
-                               dtype=torch.float32, device=offload, operations=comfy.ops.manual_cast)
+                               dtype=torch.float32, device=offload, operations=comfy.ops.manual_cast,
+                               zero_dc=expected_format == 'yingmusic_roformer')
         model.dtype = dtype
     state = comfy.utils.load_torch_file(path, safe_load=True)
     # The separator's gather indices are derived from converter-authenticated band geometry.
-    if expected_format == "soulx_roformer":
+    if expected_format in ("soulx_roformer", "yingmusic_roformer"):
         state.update({"freq_indices": model.freq_indices, "num_bands_per_freq": model.num_bands_per_freq})
     model.load_state_dict(state, strict=True)
     model.eval()

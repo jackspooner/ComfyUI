@@ -499,6 +499,9 @@ owner is unchanged.
 ### Optional native YingMusic
 
 Use `--yingmusic` with the standard worktree setup command to check preinstalled lyric dependencies and espeak-ng. `docs/yingmusic.md` documents local conversion, native loader/node contracts and acceptance status. Run `python -m pytest tests-unit/comfy_test/yingmusic_test.py -q` with the prepared interpreter; real checkpoint comparisons are a separate explicit check.
+Native YingMusic separation also uses `tests-unit/comfy_test/yingmusic_separator_test.py`.
+Its pinned source and optional rotary reference inputs are described in that test;
+these CPU fixtures never load full checkpoint weights or run GPU inference.
 
 ### Optional native SoulX-Singer
 

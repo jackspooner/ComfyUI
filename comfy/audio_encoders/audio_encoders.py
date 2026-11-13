@@ -13,8 +13,8 @@ import torch
 
 
 class AudioEncoderModel():
-    def __init__(self, config, fast_disk=False):
-        self.load_device = comfy.model_management.text_encoder_device()
+    def __init__(self, config, fast_disk=False, device=None):
+        self.load_device = comfy.model_management.text_encoder_device() if device is None else torch.device(device)
         offload_device = comfy.model_management.text_encoder_offload_device()
         self.dtype = comfy.model_management.text_encoder_dtype(self.load_device)
         model_type = config.pop("model_type")
@@ -87,7 +87,7 @@ class YingMusicAudioEncoder(AudioEncoderModel):
         return midi.to(comfy.model_management.intermediate_device())
 
 
-def load_audio_encoder_from_sd(sd, prefix=""):
+def load_audio_encoder_from_sd(sd, prefix="", device=None):
     sd = comfy.utils.state_dict_prefix_replace(sd, {"wav2vec2.": ""})
     if "encoder.layer_norm.bias" in sd: #wav2vec2
         embed_dim = sd["encoder.layer_norm.bias"].shape[0]
@@ -129,7 +129,7 @@ def load_audio_encoder_from_sd(sd, prefix=""):
 
     fast_disk = comfy.storage.state_dict_fast_disk(sd)
     encoder_class = {"sheetsage2": SheetSage2AudioEncoder, "yingmusic": YingMusicAudioEncoder}.get(config["model_type"], AudioEncoderModel)
-    audio_encoder = encoder_class(config, fast_disk=fast_disk)
+    audio_encoder = encoder_class(config, fast_disk=fast_disk, device=device)
     m, u = audio_encoder.load_sd(sd)
     if len(m) > 0:
         logging.warning("missing audio encoder: {}".format(m))
