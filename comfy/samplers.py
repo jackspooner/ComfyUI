@@ -662,6 +662,14 @@ def simple_scheduler(model_sampling, steps):
     sigs += [0.0]
     return torch.FloatTensor(sigs)
 
+def linear_flow_scheduler(model_sampling, steps):
+    if not isinstance(model_sampling, comfy.model_sampling.ModelSamplingDiscreteFlow):
+        raise ValueError("linear_flow requires a discrete flow model")
+    # Sample the continuous flow grid before applying the model-owned shift.
+    # Indexing its 1000-entry table changes non-divisor step counts.
+    timesteps = torch.linspace(model_sampling.multiplier, 0, steps + 1)
+    return model_sampling.sigma(timesteps).cpu()
+
 def ddim_scheduler(model_sampling, steps):
     s = model_sampling
     sigs = []
@@ -1450,6 +1458,7 @@ class SchedulerHandler(NamedTuple):
 
 SCHEDULER_HANDLERS = {
     "simple": SchedulerHandler(simple_scheduler),
+    "linear_flow": SchedulerHandler(linear_flow_scheduler),
     "sgm_uniform": SchedulerHandler(partial(normal_scheduler, sgm=True)),
     "karras": SchedulerHandler(k_diffusion_sampling.get_sigmas_karras, use_ms=False),
     "exponential": SchedulerHandler(k_diffusion_sampling.get_sigmas_exponential, use_ms=False),

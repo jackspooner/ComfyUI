@@ -51,6 +51,9 @@ initial preparation, changed state and preparation after a full unload remain at
 Native MOSS speech packages use offline pinned conversion. The speech converter
 can explicitly admit hash-verified linked archive weights; see
 [native speech preparation](docs/native-audio-grounding.md#offline-voicegenerator-conversion).
+Native SoundEffect v2 supports an exact continuous `linear_flow` scheduler for
+arbitrary step counts and model-owned sigma shifts; see
+[SoundEffect setup and limits](docs/moss-soundeffect.md).
 
 Clone this repository's `main` branch:
 
