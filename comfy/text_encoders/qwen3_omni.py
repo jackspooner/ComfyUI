@@ -185,19 +185,22 @@ class AudioEncoder(nn.Module):
         x = torch.cat([value[:length] for value, length in zip(x.unbind(), lengths)])
         window = max(lengths) * self.window_ratio
         windows = [min(window, x.shape[0] - start) for start in range(0, x.shape[0], window)]
-        # The frontend belongs to the outer allocation scope. Keep its final
-        # tensor alive until the repeated block scope has closed; freeing an
-        # outer allocation from a child scope is rejected by the allocator.
-        frontend_output = x
+        compile_allocations = comfy.model_prefetch.malloc_graph_recording()
         queue = comfy.model_prefetch.make_prefetch_queue(list(self.layers), x.device, {'prefetch_dynamic_vbars': True})
         for layer in self.layers:
             comfy.model_management.throw_exception_if_processing_interrupted()
             def core():
                 nonlocal x
-                x = layer(x, windows)
+                output = layer(x, windows)
+                # Repeated allocation scopes must release their temporaries
+                # before closing. Keep the hidden buffer in the outer scope,
+                # as the native Llama decoder does for compiled blocks.
+                if compile_allocations:
+                    x.copy_(output)
+                else:
+                    x = output
             comfy.model_prefetch.prefetch_queue_pop(queue, x.device, layer, x.dtype, core=core, malloc_scope='block')
         comfy.model_prefetch.prefetch_queue_pop(queue, x.device, None, malloc_scope='block')
-        del frontend_output
         return self.proj2(F.gelu(self.proj1(self.ln_post(x))))
 
 

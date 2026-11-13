@@ -10,8 +10,9 @@ dynamic allocation units and use the existing prefetch queues. Model management
 owns admission, CPU residency, pressure reclamation and reload. Handles expose
 `get_models()` to prompt resource tracking. Audio/text results contain CPU data;
 KV/beam state and selected alignment heads belong to the executing call.
-The reused Qwen audio encoder retains its frontend tensor until the repeated
-allocation scope closes, then releases it before returning. Matching core sources
+The reused Qwen audio encoder copies each compiled block's output into one
+execution-local hidden buffer, releasing block temporaries before their allocation
+scope closes. Matching core sources
 are required; an allocator compilation error must not trigger a legacy fallback
 or disabling dynamic memory management.
 
