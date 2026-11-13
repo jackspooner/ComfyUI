@@ -424,11 +424,39 @@ fixture, not a speech-quality result or live-service deployment. Short GPU
 encode/decode now also passes through the speech graphs above. Long streaming,
 constrained-memory and audible quality acceptance remain open.
 
-## Remaining integrations
+## Original discrete SoundEffect
 
-These are shared prerequisites for the remaining native MOSS SoundEffect v2, LocateAnything, Qwen3-ASR, Qwen3 ForcedAligner and Fish S2-Pro
-integrations. Their remaining loaders/codecs and generation/alignment nodes,
-quality comparisons and live workflows are **not implemented or accepted by this
-change**. Existing worker/runtime paths remain unchanged. Integer speech codes
-use the discrete codec contract above; SoundEffect's continuous diffusion
-path and forced alignment's timestamp classifier remain separate designs.
+The original [MOSS-SoundEffect](https://huggingface.co/OpenMOSS-Team/MOSS-SoundEffect/tree/1cc77ff2357c8aa8f95fd0c6512cf3cf65860d6e)
+uses the 8B Delay architecture with 16 ordered audio books. Prepare its complete
+local bundle with `python -m scripts.convert_moss_speech --variant soundeffect
+--source SOURCE --destination SOURCE.comfyui-native/model.safetensors`. Keep
+originals and the emitted manifest. Its pinned inventory contains 431 BF16
+tensors and exact tokenizer/configuration/processor assets. Conversion neither
+downloads nor executes source Python and refuses existing destinations.
+
+Compose CLIPLoader (`type: moss_tts`) → `MossDiscreteSoundEffect` →
+AudioCodecDecode with the v1 AudioCodecLoader → SaveAudio. TTSD shares the
+8B/16-book detection signature; the effect node explicitly selects its own
+prompt per call, preserving TTSD's default. Text, language, instruction and
+reference serialize as None; Ambient Sound holds the description, Tokens is
+`max(1, int(seconds * 12.5))`, and no Scene field is added. Duration is a hint.
+Text sampling is 1.5/.6/50; audio defaults are 1.5/.6/50/repetition 1.2. The v1
+codec emits mono 24 kHz AUDIO. SoundEffect v2 uses a separate continuous
+MODEL/CLIP/VAE path in [its guide](moss-soundeffect.md).
+
+The existing Qwen attention dispatcher and model patchers own masks, loading,
+offload and cancellation. No separate worker/kernel is introduced. Backend
+selection is provisional until actual RTX 5090 kernel execution, reference
+content and resource comparisons pass. Pinned CPU processor/component checks
+alone do not establish full-model quality or serving activation.
+For offline header fixtures using explicitly staged archive links, set
+`MOSS_ALLOW_LINKED_WEIGHTS=1`; this does not weaken the converter's separate
+pinned size/SHA256 checks or its mandatory `--allow-linked-weights` opt-in.
+
+## Integration boundaries
+
+This document covers shared discrete-code and attention prerequisites. Current
+loader, workflow, quality and activation evidence belongs to each model's guide
+and live discovery. Integer speech codes use the discrete codec contract above;
+SoundEffect v2 continuous diffusion and forced alignment's timestamp classifier
+remain separate designs.

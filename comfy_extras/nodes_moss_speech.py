@@ -117,9 +117,35 @@ class MossVoiceGenerator(IO.ComfyNode):
             audio_repetition_penalty=audio_repetition_penalty))
 
 
+class MossDiscreteSoundEffect(IO.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(node_id='MossDiscreteSoundEffect', display_name='MOSS SoundEffect (Discrete)', category='audio/generation',
+            description='Original 16-book MOSS SoundEffect. Decode AUDIO_CODES with the separate v1 codec; SoundEffect v2 uses a different continuous model.',
+            inputs=[IO.Clip.Input('clip'), IO.String.Input('ambient_sound', multiline=True, default='A dog barking.'),
+                    IO.Float.Input('duration_seconds', default=5., min=.5, max=60., step=.5),
+                    IO.Int.Input('seed', default=0, min=0, max=0xffffffffffffffff, control_after_generate=True),
+                    IO.Int.Input('max_length', default=4096, min=1, max=8192),
+                    IO.Float.Input('audio_temperature', default=1.5, min=0, max=5, step=.01),
+                    IO.Float.Input('audio_top_p', default=.6, min=0, max=1, step=.01),
+                    IO.Int.Input('audio_top_k', default=50, min=1, max=200),
+                    IO.Float.Input('audio_repetition_penalty', default=1.2, min=.5, max=2, step=.01)],
+            outputs=[IO.Custom('AUDIO_CODES').Output()])
+
+    @classmethod
+    def execute(cls, clip, ambient_sound, duration_seconds, seed, max_length,
+                audio_temperature, audio_top_p, audio_top_k, audio_repetition_penalty):
+        tokens = clip.tokenize(None, instruction=None, language=None, ambient_sound=ambient_sound,
+                               tokens=max(1, int(duration_seconds * 12.5)), dialogue=False)
+        return IO.NodeOutput(clip.generate_audio_codes(tokens, max_length=max_length, seed=seed,
+            text_temperature=1.5, text_top_p=.6, text_top_k=50,
+            audio_temperature=audio_temperature, audio_top_p=audio_top_p, audio_top_k=audio_top_k,
+            audio_repetition_penalty=audio_repetition_penalty))
+
+
 class MossSpeechExtension(ComfyExtension):
     async def get_node_list(self):
-        return [MossVoiceGenerator, MossSpeechReference, MossSpeechGenerate, MossVoiceActing, MossDialogueGenerate]
+        return [MossVoiceGenerator, MossSpeechReference, MossSpeechGenerate, MossVoiceActing, MossDialogueGenerate, MossDiscreteSoundEffect]
 
 
 async def comfy_entrypoint():

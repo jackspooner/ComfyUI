@@ -54,6 +54,8 @@ can explicitly admit hash-verified linked archive weights; see
 Native SoundEffect v2 supports an exact continuous `linear_flow` scheduler for
 arbitrary step counts and model-owned sigma shifts; see
 [SoundEffect setup and limits](docs/moss-soundeffect.md).
+The original discrete SoundEffect checkpoint has a separate pinned converter and
+`MossDiscreteSoundEffect` node; see [its codec and prompt contract](docs/native-audio-grounding.md#original-discrete-soundeffect).
 
 Clone this repository's `main` branch:
 

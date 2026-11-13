@@ -58,7 +58,12 @@ class MossSpeechTokenizer:
         self.dialogue = tokenizer_data.get('dialogue', False)
 
     def tokenize_with_weights(self, text, return_word_ids=False, instruction='', language=None, references=None,
-                              tokens=None, quality=None, sound_event=None, ambient_sound=None, normalize_text=False, continuation=None, **kwargs):
+                              tokens=None, quality=None, sound_event=None, ambient_sound=None, normalize_text=False, continuation=None,
+                              dialogue=None, **kwargs):
+        # TTSD and original SoundEffect share the 8B/16-book architecture, but
+        # only TTSD's prompt contains Scene and fixes Tokens to None. Keep an
+        # explicit per-call selection without mutating the shared tokenizer.
+        dialogue = self.dialogue if dialogue is None else dialogue
         if normalize_text:
             text = normalize_tts_text(text)
         codes = []
@@ -66,7 +71,7 @@ class MossSpeechTokenizer:
         speaker = 1
         for reference in references or ():
             if reference is None:
-                if self.dialogue:
+                if dialogue:
                     labels.append(f'[S{speaker}]: None')
                 speaker += 1
                 continue
@@ -76,7 +81,7 @@ class MossSpeechTokenizer:
                 labels.append(f'[S{speaker}]:\n<|audio_start|>{slots}<|audio_end|>')
                 speaker += 1
         prompt = voice_prompt(text, instruction, language, '\n'.join(labels) if references is not None else None,
-                              tokens, quality, sound_event, ambient_sound, self.dialogue)
+                              tokens, quality, sound_event, ambient_sound, dialogue)
         ids = self.tokenizer.encode(prompt, add_special_tokens=False).ids
         starts = [i + 1 for i, token in enumerate(ids) if token == 151652]
         ends = [i for i, token in enumerate(ids) if token == 151653]

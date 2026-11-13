@@ -30,7 +30,8 @@ SPEECH_32 = {key: value for key, value in dict(SPEECH, n_vq=32).items() if key !
 ACTING_LANGUAGE = {key: value for key, value in LANGUAGE_8B.items() if key not in ('rope_theta', 'rope_scaling')}
 ACTING_LANGUAGE['rope_parameters'] = {'rope_theta': 1000000, 'rope_type': 'default'}
 VARIANTS = {'voicegenerator': (LANGUAGE, SPEECH), 'delay': (LANGUAGE_8B, SPEECH_32),
-            'acting': (ACTING_LANGUAGE, SPEECH_32), 'ttsd': (LANGUAGE_8B, dict(SPEECH_32, n_vq=16))}
+            'acting': (ACTING_LANGUAGE, SPEECH_32), 'ttsd': (LANGUAGE_8B, dict(SPEECH_32, n_vq=16)),
+            'soundeffect': (LANGUAGE_8B, dict(SPEECH_32, n_vq=16))}
 
 
 def validate_config(config, variant='voicegenerator'):

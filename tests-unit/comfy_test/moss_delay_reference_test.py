@@ -18,10 +18,10 @@ from comfy.text_encoders.moss_tts_delay import DelayPattern, MossTTSDelay, sampl
 from comfy.text_encoders.moss_speech import MossSpeechTokenizer
 
 
-@pytest.fixture(scope='module', params=['voicegenerator', 'delay', 'acting', 'ttsd'])
+@pytest.fixture(scope='module', params=['voicegenerator', 'delay', 'acting', 'ttsd', 'soundeffect'])
 def reference(request):
     variant = request.param
-    variable = f'MOSS_{variant.upper()}_SOURCE'
+    variable = 'MOSS_SOUNDEFFECT_DISCRETE_SOURCE' if variant == 'soundeffect' else f'MOSS_{variant.upper()}_SOURCE'
     source = os.environ.get(variable)
     if not source:
         pytest.skip(f'Requires pinned {variable} source and isolated Transformers 5 overlay')
@@ -185,12 +185,13 @@ def test_tokenization_matches_worker_dictionary_path(reference, text, instructio
     config = original.MossTTSDelayConfig.from_pretrained(str(source), local_files_only=True)
     options = {'normalize_inputs': True} if 'voicegenerator' in original.__name__ else {}
     processor = original.MossTTSDelayProcessor(tokenizer=tokenizer, model_config=config, **options)
-    message = processor.build_user_message(text=text, instruction=instruction, language=language)
+    message = processor.build_user_message(text=text, instruction=instruction, language=language, tokens=None)
     expected = processor([[message]], mode='generation')['input_ids'][0, :, 0]
     raw = torch.frombuffer(bytearray((source / 'tokenizer.json').read_bytes()), dtype=torch.uint8)
     native = MossSpeechTokenizer(tokenizer_data={'tokenizer_json': raw, 'dialogue': config.n_vq == 16 and config.language_config.hidden_size == 4096})
     tokens = native.tokenize_with_weights(text, instruction=instruction, language=language,
-                                         normalize_text='acting' in original.__name__)['moss_delay'][0]
+                                         normalize_text='acting' in original.__name__,
+                                         dialogue=False if 'soundeffect' in original.__name__ else None)['moss_delay'][0]
     assert [pair[0] for pair in tokens] == expected.tolist()
 
 

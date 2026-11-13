@@ -128,7 +128,7 @@ def test_unknown_attention_config_is_rejected():
         converter.validate_config(config)
 
 
-@pytest.mark.parametrize('variant,count,heads', [('delay', 463, 32), ('acting', 463, 32), ('ttsd', 431, 16)])
+@pytest.mark.parametrize('variant,count,heads', [('delay', 463, 32), ('acting', 463, 32), ('ttsd', 431, 16), ('soundeffect', 431, 16)])
 def test_large_variant_inventory_and_config(variant, count, heads):
     shapes = converter.expected_shapes(variant)
     assert len(shapes) == count
@@ -145,14 +145,15 @@ def test_large_variant_inventory_and_config(variant, count, heads):
         converter.validate_config(config, variant)
 
 
-@pytest.mark.parametrize('variant,variable', [('delay', 'MOSS_DELAY_SOURCE'), ('acting', 'MOSS_ACTING_SOURCE'), ('ttsd', 'MOSS_TTSD_SOURCE')])
+@pytest.mark.parametrize('variant,variable', [('delay', 'MOSS_DELAY_SOURCE'), ('acting', 'MOSS_ACTING_SOURCE'), ('ttsd', 'MOSS_TTSD_SOURCE'), ('soundeffect', 'MOSS_SOUNDEFFECT_DISCRETE_SOURCE')])
 def test_pinned_variant_headers_and_tokenizer(variant, variable):
     source = os.environ.get(variable)
     if not source:
         pytest.skip(f'Requires {variable} pinned bundle')
     source = Path(source)
     converter.validate_config(writer.read_json(source / 'config.json'), variant)
-    records = writer.inspect_shards(source, converter.expected_shapes(variant))
+    records = writer.inspect_shards(source, converter.expected_shapes(variant),
+        allow_linked_weights=os.environ.get('MOSS_ALLOW_LINKED_WEIGHTS') == '1')
     manifest = writer.read_json(Path(converter.__file__).with_name(f'moss_speech_{variant}.json'))
     assert {path.name for path, _, _ in records.values()} == {name for name in manifest['files'] if name.endswith('.safetensors')}
     tokenizer = Tokenizer.from_file(str(source / 'tokenizer.json'))
