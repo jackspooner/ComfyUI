@@ -37,7 +37,8 @@ guides describe their original integration, not the current base version.
 ## Use this fork
 
 Native Qwen3-ASR with forced alignment and Whisper transcription are implemented
-through ComfyUI model patchers, layer offloading and prefetch. See
+through ComfyUI model patchers, layer offloading and prefetch, with execution-local
+encoder buffers retained across their native allocation scopes. See
 [native transcription](docs/native-transcription.md) for offline conversion,
 Cutlery workflow requirements and the outstanding GPU/quality acceptance gates.
 
