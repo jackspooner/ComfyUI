@@ -18,6 +18,7 @@ from transformers.models.qwen3_asr.processing_qwen3_asr import (
 import comfy.model_management as mm
 import comfy.model_prefetch as prefetch
 import comfy.ops
+from comfy.console_progress import advance, phase, report_progress
 from comfy.text_encoders.llama import Llama2_, Qwen3_8BConfig
 from comfy.text_encoders.qwen3_omni import AudioEncoder, audio_output_length
 from .common import waveform, package, patcher, take_component
@@ -138,6 +139,7 @@ def prompt_ids(model, text, length):
 
 
 def embeddings(model, value, text):
+    phase('encoding audio')
     value = torch.nn.functional.pad(value, (0, max(0, 8000 - len(value))))
     inputs = model.extractor(value.numpy(), sampling_rate=16000, padding='longest',
                              truncation=False, return_tensors='pt', return_attention_mask=True)
@@ -156,6 +158,7 @@ def embeddings(model, value, text):
 
 
 def decode(model, ids, encoded, max_new_tokens=1024, classify=False):
+    phase('aligning words' if classify else 'decoding')
     decoder = model.decoder.model
     cfg, device = decoder.config, model.decoder.load_device
     capacity = ids.shape[1] + (0 if classify else max_new_tokens)
@@ -182,6 +185,7 @@ def decode(model, ids, encoded, max_new_tokens=1024, classify=False):
             if value in (151643, 151645):
                 break
             generated.append(value)
+            advance()
             hidden = decoder.embed_tokens(token, out_dtype=torch.bfloat16)
         return model.tokenizer.decode(generated, skip_special_tokens=True)
     finally:
@@ -189,6 +193,7 @@ def decode(model, ids, encoded, max_new_tokens=1024, classify=False):
         prefetch.cleanup_prefetch_queues()
 
 
+@report_progress('Qwen ASR', 'preparing audio', unit='tokens')
 def transcribe(model, audio, language='', context='', max_new_tokens=1024, chunk_seconds=180):
     if model.aligner:
         raise ValueError('Select the Qwen ASR model for transcription')
@@ -209,6 +214,7 @@ def transcribe(model, audio, language='', context='', max_new_tokens=1024, chunk
             'segments': [], 'warnings': [], 'backend': 'comfyui-native-qwen'}
 
 
+@report_progress('Qwen ForcedAligner', 'aligning words', unit='chunks')
 def align(model, audio, transcript):
     if not model.aligner:
         raise ValueError('Select the Qwen ForcedAligner model for alignment')
@@ -245,6 +251,7 @@ def align(model, audio, transcript):
         if len(times) != 2 * len(words):
             raise ValueError('Forced aligner returned an invalid timestamp count')
         times = _fix_timestamps(times)
+        advance()
         duration = (end - start) / 16000
         for index, word in enumerate(words):
             left, right = times[index * 2] / 1000, times[index * 2 + 1] / 1000

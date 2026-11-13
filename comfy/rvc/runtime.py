@@ -17,6 +17,7 @@ except ImportError:
 
 
 import comfy.audio
+from comfy.console_progress import advance, phase, report_progress
 import comfy.model_management as mm
 import comfy.model_patcher
 import comfy.ops
@@ -98,6 +99,7 @@ def change_rms(source, target, rate, mix):
     return target * (a.pow(1 - mix) * b.clamp(min=1e-6).pow(mix - 1)).numpy()
 
 
+@report_progress('RVC', 'preparing audio')
 def convert(voice, content, audio, semitones, speaker, protect, rms_mix, seed, pitch_model=None, index_path=None, index_rate=0.):
     config = json.loads(voice.metadata["config"])
     rate, use_f0, version = config[-1], json.loads(voice.metadata["use_f0"]), voice.metadata["version"]
@@ -126,6 +128,7 @@ def convert(voice, content, audio, semitones, speaker, protect, rms_mix, seed, p
     result = np.zeros(round(len(waveform) * rate / 16000), dtype=np.float32)
     weights = np.zeros_like(result)
     progress = comfy.utils.ProgressBar(len(starts))
+    phase('converting voice', total=len(starts), unit='segments')
     for start in starts:
         mm.throw_exception_if_processing_interrupted()
         end = min(len(waveform), start + 64000)
@@ -162,6 +165,7 @@ def convert(voice, content, audio, semitones, speaker, protect, rms_mix, seed, p
         result[offset:offset + len(core)] += core * window
         weights[offset:offset + len(core)] += window
         progress.update(1)
+        advance()
     result /= np.maximum(weights, 1e-8)
     if rms_mix != 1:
         result = change_rms(waveform, result, rate, rms_mix)

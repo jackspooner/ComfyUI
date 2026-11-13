@@ -8,6 +8,7 @@ from torch import nn
 from tokenizers import Tokenizer
 from safetensors import safe_open
 import comfy.audio
+from comfy.console_progress import advance, phase, report_progress
 import comfy.ops
 import comfy.storage
 import comfy.utils
@@ -42,6 +43,7 @@ class GenerationModel(nn.Module):
     def embed(self, frames):
         return self.tower.embed_backbone(frames, self.backbone.embed_tokens(frames[:, 0]))
 
+    @report_progress('Drama 3', 'prefilling', unit='frames')
     def generate(self, prompt, max_frames, settings, generator):
         capacity = len(prompt) + max_frames
         if not 0 < max_frames or capacity > self.config.text.max_position_embeddings:
@@ -66,6 +68,7 @@ class GenerationModel(nn.Module):
         previous, main_history, produced = frames[-1:].clone(), frames[:, 0], []
         finish_reason = 'length'
         for index in range(max_frames):
+            phase('generating audio')
             mm.throw_exception_if_processing_interrupted()
             position = len(frames) - 1 + index
             with prefetch.malloc_graph_scope(self.device):
@@ -82,6 +85,7 @@ class GenerationModel(nn.Module):
                 finish_reason = 'eos'
                 break
             produced.append(previous[0, 1:].to('cpu', copy=True))
+            advance()
             main_history = torch.cat((main_history[-15:], previous[:, 0]))
         if not produced:
             raise ValueError('Drama 3 ended without producing audio frames')

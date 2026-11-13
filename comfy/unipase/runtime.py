@@ -5,6 +5,7 @@ from torch.nn import functional as F
 from safetensors import safe_open
 
 import comfy.audio
+from comfy.console_progress import advance, phase, report_progress
 import comfy.model_management as mm
 import comfy.model_patcher
 import comfy.ops
@@ -83,6 +84,7 @@ def segments(length, rate):
     return result
 
 
+@report_progress('UniPASE', 'preparing audio')
 def enhance(bundle, audio, output_sample_rate=0, enable_plc=True):
     waveform, rate = audio["waveform"], audio["sample_rate"]
     output_rate = output_sample_rate or rate
@@ -92,6 +94,7 @@ def enhance(bundle, audio, output_sample_rate=0, enable_plc=True):
     parts = segments(source.shape[-1], rate)
     result = torch.empty(*source.shape[:-1], source.shape[-1] * output_rate // rate, dtype=torch.float32)
     progress = comfy.utils.ProgressBar(source.shape[0] * source.shape[1] * len(parts))
+    phase('restoring speech', total=source.shape[0] * source.shape[1] * len(parts), unit='segments')
     for batch in range(source.shape[0]):
         for channel in range(source.shape[1]):
             track = source[batch, channel]
@@ -104,6 +107,7 @@ def enhance(bundle, audio, output_sample_rate=0, enable_plc=True):
                 offset = begin - start * output_rate // rate
                 target[begin:finish] = restored[offset:offset + finish - begin]
                 progress.update(1)
+                advance()
             # Upstream file inference preserves the recording's peak after stitching.
             target.mul_(track.abs().amax() / (target.abs().amax() + 1e-8))
     return {"waveform": result, "sample_rate": output_rate}

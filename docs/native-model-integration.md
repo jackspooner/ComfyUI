@@ -24,6 +24,12 @@ and full-package acceptance remain separate claims.
 
 ## 1. Establish the inference target
 
+Inference without an existing console indicator must use truthful, throttled,
+single-line progress with reliable success/error/cancellation cleanup. Read
+[console reporter usage and coverage](custom-inference-progress.md) for scopes,
+unknown totals, worker forwarding and avoiding duplicate indicators. Preserve
+existing node hooks and model math; progress events never extend worker deadlines.
+
 Inspect upstream code, model files and configuration before deciding what to
 build. A Hugging Face repository can contain application releases, training
 pretrains, several architectures or supporting assets rather than one usable

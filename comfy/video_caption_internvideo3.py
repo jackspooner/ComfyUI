@@ -4,6 +4,7 @@
 import json
 
 import torch
+from comfy.console_progress import advance, phase, report_progress
 from torch import nn
 from torch.nn import functional as F
 from tokenizers import Tokenizer
@@ -170,6 +171,7 @@ class InternVideoCaptioner:
         self.patcher = comfy.model_patcher.CoreModelPatcher(self.network, load_device=self.load_device, offload_device=offload,
             fast_disk=comfy.storage.state_dict_fast_disk(state_dict))
 
+    @report_progress('InternVideo3', 'preparing media', unit='iterations')
     def caption(self, images, source_fps, audio, prompt, fps, max_pixels, max_tokens, max_events, response_format='text', json_schema=''):
         if audio is not None:
             raise ValueError('InternVideo3 has no audio encoder; use visual frames only')
@@ -196,8 +198,10 @@ class InternVideoCaptioner:
         cache, output = None, []
         attempt = None if prepared is None else prepared.new_attempt()
         for _ in range(max_tokens):
+            phase('decoding')
             comfy.model_management.throw_exception_if_processing_interrupted()
             hidden, cache = self.network.model.step(hidden, positions, cache)
+            advance()
             token = select_token(self.network.model.lm_head(hidden[:, -1:])[:, -1], attempt)
             complete = attempt.commit(token) if attempt is not None else False
             if token in self.eos_tokens:

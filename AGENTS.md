@@ -23,6 +23,15 @@ Keep lifecycle/async-context binding in the execution caller and native loading
 in ModelPatcher/model_management. The shared authoritative `comfyui` skill owns
 operating guidance.
 
+## Custom inference progress
+
+Custom inference without an existing console indicator must provide truthful,
+throttled single-line progress with cleanup on completion, cancellation and error.
+Use the scoped [console reporter](docs/custom-inference-progress.md), real totals
+only, unknown-length counters or phase/elapsed reporting, and existing IPC for
+worker forwarding. Preserve UI progress hooks, inference and absolute deadlines;
+do not duplicate a working sampler/token bar or add per-step INFO logs.
+
 ## Engineering Style
 
 - Keep changes small and direct. Most fixes should touch the narrowest code path

@@ -22,6 +22,7 @@ import comfy.model_prefetch
 import comfy.ops
 import comfy.storage
 import comfy.utils
+from comfy.console_progress import advance, phase, report_progress
 from comfy.ldm.paddleocr import Detector, Recognizer
 
 
@@ -221,6 +222,7 @@ class PaddleOCRModel:
             output = patcher.model(pixels.to(patcher.load_device))
         return output.detach().cpu()
 
+    @report_progress('PaddleOCR', 'preparing images')
     def recognize(self, images, operation='detect_and_recognize', preprocessing='no_enlargement', threshold=0.3, box_threshold=0.6, unclip_ratio=1.5,
                   detector_batch_size=1, recognition_batch_size=1):
         if operation not in OPERATIONS or preprocessing not in PREPROCESSING:
@@ -229,6 +231,7 @@ class PaddleOCRModel:
             raise ValueError('PaddleOCR batch sizes must be positive integers.')
         results = []
         progress = comfy.utils.ProgressBar(len(images))
+        phase('recognizing text', total=len(images), unit='images')
         source = iter(enumerate(images))
         frame_window_size = detector_batch_size if operation == 'detect_and_recognize' else recognition_batch_size
         while window := list(islice(source, frame_window_size)):
@@ -252,6 +255,7 @@ class PaddleOCRModel:
                 del crop_window
             results.extend(record for _, _, record in frames)
             progress.update(len(frames))
+            advance(len(frames))
         mm.throw_exception_if_processing_interrupted()
         return {'version': 1, 'operation': operation, 'preprocessing': preprocessing, 'models': self.identity, 'images': results}
 

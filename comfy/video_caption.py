@@ -1,5 +1,6 @@
 """Patcher-managed native audio-visual captioners with request-local KV/grounding state."""
 import json
+from comfy.console_progress import advance, phase, report_progress
 import math
 from types import SimpleNamespace
 
@@ -184,6 +185,7 @@ class VideoCaptioner:
         self.patcher = comfy.model_patcher.CoreModelPatcher(self.network, load_device=self.load_device, offload_device=offload,
             fast_disk=comfy.storage.state_dict_fast_disk(state_dict))
 
+    @report_progress('Video captioner', 'preparing media', unit='iterations')
     def caption(self, images, source_fps, audio, prompt, fps, max_pixels, max_tokens, max_events, response_format='text', json_schema=''):
         config = self.network.model.config
         prepared = prepare_json(self.tokenizer, self.family, config.vocab_size, {self.network.config.eos_token_id}, response_format, json_schema)
@@ -218,11 +220,13 @@ class VideoCaptioner:
         return self._pad(ids, hidden, grid, min(fps, source_fps), max_tokens, max_events, audio_count, prepared)
 
     def _salmonn(self, ids, hidden, positions, delta, deepstack, visual_mask, max_tokens, attempt=None):
+        phase('decoding SALMONN')
         network = self.network
         cache = None
         output = []
         for step in range(max_tokens):
             hidden, cache, _ = network.model.step(hidden, positions, cache, deepstack=deepstack, visual_mask=visual_mask)
+            advance()
             token = select_token(network.logits(hidden[:, -1:])[:, -1], attempt)
             complete = attempt.commit(token) if attempt is not None else False
             if token == network.config.eos_token_id:
@@ -236,6 +240,7 @@ class VideoCaptioner:
         return output
 
     def _pad(self, ids, hidden, grid, fps, max_tokens, max_events, audio_count, prepared=None):
+        phase('planning events')
         network = self.network
         time, height, width = grid[0].tolist()
         per_frame = height * width // 4
@@ -284,9 +289,11 @@ class VideoCaptioner:
         attempts = [None if prepared is None else prepared.new_attempt() for _ in planned]
         finished = [False] * branches
         for step in range(max_tokens):
+            phase('decoding event captions')
             positions = torch.full((3, 1, branches), prefix + step + int(delta[0]), device=ids.device, dtype=torch.long)
             mask = session._branch_visibility_mask(branches, cache[0][2] + branches, prefix, hidden.dtype, ids.device)
             output, cache, _ = network.model.step(embedding, positions, cache, mask=mask)
+            advance()
             logits = network.logits(output[0])
             banned = [network.config.evi_token_id, network.config.evi_end_token_id, network.config.shift_token_id,
                 network.config.audio_token_id, network.config.video_token_id, network.config.image_token_id,

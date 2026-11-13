@@ -6,6 +6,7 @@ import torch
 
 import comfy.model_management
 import comfy.utils
+from comfy.console_progress import advance, report_progress
 from .llama import BaseLlama, Llama2_, Qwen3_8BConfig
 
 
@@ -139,6 +140,7 @@ class MossTTSDelay(BaseLlama, torch.nn.Module):
         hidden, _, cache = self.model(None, embeds=self.combined_embeddings(input_ids), attention_mask=attention_mask, past_key_values=cache)
         return [head(hidden[:, -1]) for head in self.lm_heads], cache
 
+    @report_progress('MOSS Delay', 'generating audio', unit='iterations')
     def generate_delay(self, input_ids, attention_mask, max_new_tokens, seed, **sampling):
         batch, length, channels = input_ids.shape
         capacity = length + max_new_tokens
@@ -159,7 +161,8 @@ class MossTTSDelay(BaseLlama, torch.nn.Module):
             history[:, used:used + 1] = current
             mask[:, used] = torch.tensor([not stopped for stopped in pattern.stopped], device=mask.device, dtype=mask.dtype)
             used += 1
-            progress.update(step + 1)
+            progress.update_absolute(step + 1)
+            advance()
             if all(pattern.stopped):
                 break
         return [(length - start, history[i, start:used].to(device='cpu', copy=True)) for i, start in enumerate(pattern.assistant_offsets)]
