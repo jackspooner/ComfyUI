@@ -25,6 +25,7 @@ class AudioCodecIdentity:
 
 MOSS_V1 = AudioCodecIdentity('moss_audio_tokenizer', '3cd226ba2947efa357ef453bcad111b6eafba782', 24000, 1920, (1024,) * 32)
 MOSS_V2 = AudioCodecIdentity('moss_audio_tokenizer_v2', 'f6e20e543b33d2c252a7ef71bdf8aa71e5ff9169', 48000, 3840, (1024,) * 32)
+DUALCODEC_V1 = AudioCodecIdentity('dualcodec_25hz_v1', 'c225ea3e999c5bb0092c41f01e1ab0f2576fcf3e', 24000, 960, (16384,)+(1024,)*11)
 
 
 @dataclass(frozen=True)
@@ -169,6 +170,13 @@ class AudioCodec:
 
 def load_audio_codec(path, device=None, disable_dynamic=False):
     state_dict, metadata = comfy.utils.load_torch_file(path, safe_load=True, return_metadata=True)
+    if metadata and metadata.get('architecture') == DUALCODEC_V1.family:
+        from comfy.viitorvoice.codec import DualCodec
+        del state_dict
+        selected = model_management.get_torch_device() if device is None else torch.device(device)
+        if selected.type != 'cpu' and selected != model_management.get_torch_device():
+            raise ValueError('DualCodec must use CPU or the selected native ComfyUI device')
+        return DualCodec(path, cpu=selected.type == 'cpu', disable_dynamic=disable_dynamic)
     codec = AudioCodec(state_dict, metadata, device=device, disable_dynamic=disable_dynamic)
     codec.patcher.cached_patcher_init = (load_audio_codec_patcher, (path, device))
     return codec
