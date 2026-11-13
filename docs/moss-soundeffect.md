@@ -66,6 +66,11 @@ the candidate nodes and converted model filenames; source support does not make
 those nodes available on an older running server. Reload the saved workflow before
 editing it. The 100-step simple schedule matches the reference grid; other step
 counts use ComfyUI's discretized schedule and are not guaranteed to match upstream.
+For exact arbitrary step counts, select `linear_flow` instead of `simple` and
+apply `ModelSamplingSD3` with the requested `sigma_shift`. This scheduler evaluates
+the model-owned shift on the continuous 1-to-0 grid, retaining the reference's
+extra final Euler step. It requires a discrete flow model; existing scheduler
+choices keep their behavior.
 
 ## Verification and limits
 
