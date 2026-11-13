@@ -2156,6 +2156,7 @@ class TEModel(Enum):
     WEVISONE_2B = 48
     WEVISONE_4B = 49
     QWEN3VL_2B = 50
+    MOSS_LOCAL_V15 = 51
 
 
 def detect_te_model(sd):
@@ -2243,6 +2244,12 @@ def detect_te_model(sd):
                       "model.layers.0.self_attn.q_norm.weight": 128, "model.norm.weight": 4096}
     if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in moss_signature.items()):
         return TEModel.MOSS_AUDIO
+    local_v15_signature = {'local_text_lm_head.weight': 2, 'local_transformer.h.0.attn.c_attn.weight': 7680,
+                           'local_transformer.ln_f.weight': 2560, 'audio_embeddings.11.weight': 1024,
+                           'audio_lm_heads.11.weight': 1024, 'model.norm.weight': 2560,
+                           'model.layers.35.self_attn.q_norm.weight': 128, 'model.embed_tokens.weight': 151936}
+    if all(key in sd and sd[key].ndim > 0 and sd[key].shape[0] == size for key, size in local_v15_signature.items()):
+        return TEModel.MOSS_LOCAL_V15
     local_signature = {'local_transformer.norm.weight': 1536, 'speech_embedding_to_local_mlp.down_proj.weight': 1536,
                        'model.norm.weight': 2048, 'model.layers.27.self_attn.q_norm.weight': 128,
                        'local_transformer.layers.3.self_attn.q_norm.weight': 128, 'lm_heads.32.weight': 1025,
@@ -2497,15 +2504,17 @@ def load_text_encoder_state_dicts(state_dicts=[], embedding_directory=None, clip
             clip_target.clip = comfy.text_encoders.moss_audio.te(**llama_detect(clip_data))
             clip_target.tokenizer = comfy.text_encoders.moss_audio.MossAudioTokenizer
             tokenizer_data["tokenizer_json"] = clip_data[0].pop("tokenizer_json", None)
-        elif te_model in (TEModel.MOSS_VOICEGENERATOR, TEModel.MOSS_DELAY_8B, TEModel.MOSS_TTSD, TEModel.MOSS_LOCAL):
+        elif te_model in (TEModel.MOSS_VOICEGENERATOR, TEModel.MOSS_DELAY_8B, TEModel.MOSS_TTSD, TEModel.MOSS_LOCAL, TEModel.MOSS_LOCAL_V15):
             speech_config = {}
             if te_model in (TEModel.MOSS_DELAY_8B, TEModel.MOSS_TTSD):
                 speech_config = {'language': dict(hidden_size=4096, intermediate_size=12288, num_hidden_layers=36, num_attention_heads=32),
                                  'codebooks': 32 if te_model == TEModel.MOSS_DELAY_8B else 16}
-            clip_target.clip = comfy.text_encoders.moss_speech.te(**llama_detect(clip_data), speech_config=speech_config, local=te_model == TEModel.MOSS_LOCAL)
-            clip_target.tokenizer = comfy.text_encoders.moss_speech.MossLocalTokenizer if te_model == TEModel.MOSS_LOCAL else comfy.text_encoders.moss_speech.MossSpeechTokenizer
+            clip_target.clip = comfy.text_encoders.moss_speech.te(**llama_detect(clip_data), speech_config=speech_config,
+                local=te_model == TEModel.MOSS_LOCAL, local_v15=te_model == TEModel.MOSS_LOCAL_V15)
+            clip_target.tokenizer = (comfy.text_encoders.moss_speech.MossLocalV15Tokenizer if te_model == TEModel.MOSS_LOCAL_V15 else
+                comfy.text_encoders.moss_speech.MossLocalTokenizer if te_model == TEModel.MOSS_LOCAL else comfy.text_encoders.moss_speech.MossSpeechTokenizer)
             tokenizer_data['tokenizer_json'] = clip_data[0].pop('tokenizer_json', None)
-            tokenizer_data['codebooks'] = 32 if te_model == TEModel.MOSS_LOCAL else speech_config.get('codebooks', 16)
+            tokenizer_data['codebooks'] = 12 if te_model == TEModel.MOSS_LOCAL_V15 else 32 if te_model == TEModel.MOSS_LOCAL else speech_config.get('codebooks', 16)
             tokenizer_data['dialogue'] = te_model == TEModel.MOSS_TTSD
         elif te_model == TEModel.GLM_OCR:
             clip_target.clip = comfy.text_encoders.glm_ocr.te(dtype_llama=clip_data[0]['model.norm.weight'].dtype)

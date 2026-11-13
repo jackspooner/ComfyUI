@@ -11,6 +11,7 @@ import comfy.ops
 import comfy.storage
 import comfy.utils
 from comfy.ldm.audio.moss_audio_tokenizer import MossAudioTokenizer
+from comfy.ldm.audio.moss_audio_tokenizer_v2 import MossAudioTokenizerV2
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,7 @@ class AudioCodecIdentity:
 
 
 MOSS_V1 = AudioCodecIdentity('moss_audio_tokenizer', '3cd226ba2947efa357ef453bcad111b6eafba782', 24000, 1920, (1024,) * 32)
+MOSS_V2 = AudioCodecIdentity('moss_audio_tokenizer_v2', 'f6e20e543b33d2c252a7ef71bdf8aa71e5ff9169', 48000, 3840, (1024,) * 32)
 
 
 @dataclass(frozen=True)
@@ -63,18 +65,23 @@ class AudioCodes:
 
 class AudioCodec:
     def __init__(self, state_dict, metadata, device=None, disable_dynamic=False):
-        if not metadata or metadata.get('architecture') != MOSS_V1.family or metadata.get('model_revision') != MOSS_V1.revision or metadata.get('conversion_version') != '1':
-            raise ValueError('Unsupported audio codec; prepare the pinned MOSS v1 artifact with scripts/convert_moss_codec.py')
+        identity = next((value for value in (MOSS_V1, MOSS_V2) if metadata and
+            metadata.get('architecture') == value.family and metadata.get('model_revision') == value.revision), None)
+        if identity is None or metadata.get('conversion_version') != '1':
+            raise ValueError('Unsupported audio codec; prepare the pinned MOSS v1/v2 artifact with scripts/convert_moss_codec.py')
+        model_class = MossAudioTokenizerV2 if identity == MOSS_V2 else MossAudioTokenizer
         # Lazy native operations do not all check checkpoint shapes. Validate the
         # complete architecture before assigning any file-backed parameters.
-        expected = MossAudioTokenizer(device='meta', dtype=torch.float32, operations=torch.nn).state_dict()
+        expected = model_class(device='meta', dtype=torch.float32, operations=torch.nn).state_dict()
         if state_dict.keys() != expected.keys() or any(state_dict[k].shape != v.shape or state_dict[k].dtype != torch.float32 for k, v in expected.items()):
-            raise ValueError('MOSS v1 audio codec requires the complete folded FP32 checkpoint')
-        self.identity = MOSS_V1
+            raise ValueError('MOSS audio codec requires the complete folded FP32 checkpoint')
+        self.identity = identity
         self.device = model_management.vae_device() if device is None else device
         offload_device = model_management.vae_offload_device()
         operations = comfy.ops.pick_operations(torch.float32, torch.float32, self.device, disable_fast_fp8=True)
-        self.model = MossAudioTokenizer(device=offload_device, dtype=torch.float32, operations=operations).eval()
+        if identity == MOSS_V2 and self.device.type not in ('cpu', 'cuda'):
+            raise ValueError('MOSS Tokenizer v2 currently requires CPU or CUDA BF16 compute support')
+        self.model = model_class(device=offload_device, dtype=torch.float32, operations=operations).eval()
         model_management.archive_model_dtypes(self.model)
         patcher_type = comfy.model_patcher.ModelPatcher if disable_dynamic else comfy.model_patcher.CoreModelPatcher
         self.patcher = patcher_type(self.model, load_device=self.device, offload_device=offload_device, fast_disk=comfy.storage.state_dict_fast_disk(state_dict))
@@ -82,6 +89,13 @@ class AudioCodec:
         self.model.load_state_dict(state_dict, strict=True, assign=self.patcher.is_dynamic())
 
     def memory_required(self, frames, encode=False):
+        if self.identity == MOSS_V2:
+            tokens = frames * 32 if encode else min(frames, 100) * 32
+            queries = min(tokens, 1500)
+            keys = min(tokens, 1900) if encode else queries+400
+            attention = queries * keys * (20 * 4 * 2 + 16)
+            blocks = tokens * 1280 * 4 * 16
+            return attention + blocks + 256 * 1024**2 + frames * 3840 * 2 * 4 * 2
         # One stream at a time. Reserve dense attention, block workspaces and
         # both chunk outputs and their concatenation; weights are patcher-owned.
         tokens = frames * 8 if encode else min(frames, 100) * 8
@@ -97,11 +111,15 @@ class AudioCodec:
 
     def encode(self, audio, codebooks=32):
         if not 1 <= codebooks <= len(self.identity.codebook_sizes):
-            raise ValueError('MOSS v1 supports 1 to 32 codebooks')
+            raise ValueError('MOSS codecs support 1 to 32 ordered codebooks')
         waveform = audio['waveform']
         if waveform.ndim != 3 or waveform.shape[1] == 0 or not waveform.is_floating_point():
             raise ValueError('Audio codec input must be floating-point [batch, channel, sample] audio')
-        waveform = waveform.to(device='cpu', dtype=torch.float32).mean(dim=1, keepdim=True)
+        waveform = waveform.to(device='cpu', dtype=torch.float32)
+        if self.identity == MOSS_V2:
+            waveform = waveform.repeat(1, 2, 1) if waveform.shape[1] == 1 else waveform[:, :2]
+        else:
+            waveform = waveform.mean(dim=1, keepdim=True)
         rate = audio['sample_rate']
         if rate <= 0 or int(rate) != rate:
             raise ValueError('Audio codec input sample rate must be a positive integer')
@@ -138,7 +156,7 @@ class AudioCodec:
                             valid = segment.codes[i:i + 1, :, :length].to(device=self.device, dtype=torch.int64)
                             waveform = self.model.decode(valid).to(device='cpu', copy=True)
                         else:
-                            waveform = torch.empty((1, 1, 0), dtype=torch.float32)
+                            waveform = torch.empty((1, 2 if self.identity == MOSS_V2 else 1, 0), dtype=torch.float32)
                         skip = segment.decode_skip_frames[i] if segment.decode_skip_frames is not None else 0
                         if skip:
                             if skip >= length:

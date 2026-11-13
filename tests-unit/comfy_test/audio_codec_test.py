@@ -133,6 +133,43 @@ def test_empty_encode(codec):
     loader.assert_not_called()
 
 
+def test_v2_preserves_stereo_and_rejects_v1_codes(codec):
+    owner, loader = codec
+    owner.identity = ac.MOSS_V2
+    class StereoMath(CodecMath):
+        def encode(self, waveform, lengths, count):
+            self.inputs.append(waveform.clone())
+            return torch.zeros(1, count, 2, dtype=torch.int64), [n // 3840 for n in lengths]
+        def decode(self, codes):
+            self.inputs.append(codes.clone())
+            return torch.stack((torch.arange(codes.shape[-1]*3840), -torch.arange(codes.shape[-1]*3840)), 0).float()[None]
+    owner.model = StereoMath()
+    wave = torch.stack((torch.ones(7690), -torch.ones(7690)), 0)[None]
+    codes = owner.encode({'waveform': wave, 'sample_rate': 48000}, 12)
+    assert torch.equal(owner.model.inputs[0], wave)
+    assert codes.codec == ac.MOSS_V2 and codes.version == 1
+    assert codes.segments[0].lengths == (2,)
+    assert codes.segments[0].source_sample_lengths == (7690,)
+    output = owner.decode(replace(codes, segments=(replace(codes.segments[0], decode_skip_frames=(1,)),)))
+    assert output[0]['waveform'].shape == (1, 2, 3840)
+    assert output[0]['sample_rate'] == 48000
+    assert torch.equal(output[0]['waveform'][0, 0], torch.arange(3840, 7680).float())
+    assert torch.equal(output[0]['waveform'][0, 1], -torch.arange(3840, 7680).float())
+    with pytest.raises(ValueError, match='identity'):
+        owner.decode(payload())
+
+
+def test_v2_mono_reference_and_empty_audio_keep_two_channels(codec):
+    owner, loader = codec
+    owner.identity = ac.MOSS_V2
+    owner.encode({'waveform': torch.ones(1, 1, 3840), 'sample_rate': 48000}, 12)
+    assert owner.model.inputs[0].shape == (1, 2, 3840)
+    empty = ac.AudioCodes(ac.MOSS_V2, (ac.AudioCodeSegment(torch.empty(1, 12, 0, dtype=torch.int64), (0,)),))
+    loader.reset_mock()
+    assert owner.decode(empty)[0]['waveform'].shape == (1, 2, 0)
+    loader.assert_not_called()
+
+
 def test_cancel_does_not_return_partial_batch(codec, monkeypatch):
     codec, _ = codec
     interrupted = Mock(side_effect=[None, ac.model_management.InterruptProcessingException()])

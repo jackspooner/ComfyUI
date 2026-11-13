@@ -1,0 +1,75 @@
+{
+  "model_id": "OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5",
+  "revision": "be7766a6735b98bd793f7c79fb720b4d0f5d13b8",
+  "license": "Apache-2.0",
+  "files": {
+    "README.md": {
+      "bytes": 16359,
+      "sha256": "ef63734dae2e6ac149a5c4fd75a916848abc1c8ef98fabc7dcb247d8ff4a3a04"
+    },
+    "__init__.py": {
+      "bytes": 254,
+      "sha256": "fa22d925207c64e6701f9c5f97c3e14a9bad4db5c37060c6e5f1362c02bc8040"
+    },
+    "added_tokens.json": {
+      "bytes": 790,
+      "sha256": "39bb49db6acfb8e7510b1640f575bdc183f511d85c94ce3ee967f2a6195c4a8a"
+    },
+    "chat_template.jinja": {
+      "bytes": 4168,
+      "sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+    },
+    "config.json": {
+      "bytes": 10045,
+      "sha256": "826f81f163b1b557ad13f83c4f35008f4fee5a6cb6311b4316ff3dbb25149411"
+    },
+    "configuration_moss_tts.py": {
+      "bytes": 7160,
+      "sha256": "ab6debcb92032cb9dc91ae80aed77dbadd2e59848208baef2b062bd6def3f3be"
+    },
+    "gpt2_decoder.py": {
+      "bytes": 30896,
+      "sha256": "f2e877104669f1e6c7cd34680f0da1a8a159e032123ee56b660b63929b6c8989"
+    },
+    "merges.txt": {
+      "bytes": 1671853,
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+    },
+    "model.safetensors": {
+      "bytes": 9100859544,
+      "sha256": "608f1ff64bc6caa9be836060fc7c78a15c4658c4a07b8d73c78d6f70d1b39c23"
+    },
+    "modeling_moss_tts.py": {
+      "bytes": 26379,
+      "sha256": "b0a66211943ae580b087f3e71495fea2f455701a4f6c29b6d3562218f7668c5f"
+    },
+    "processing_moss_tts.py": {
+      "bytes": 37496,
+      "sha256": "3fc5616b1ec3408162b7d859a7696725a40525313b20f9b31a06ee55c93bd7ad"
+    },
+    "processor_config.json": {
+      "bytes": 210,
+      "sha256": "db574bfebad009e05193196a63a4eeecd353eeca177ccfff28b9379d595d88b7"
+    },
+    "qwen3_decoder.py": {
+      "bytes": 25473,
+      "sha256": "100163bd7ecf31a59bafacc0b032ace9339edc992a3eb4cc80662502e04e46f0"
+    },
+    "special_tokens_map.json": {
+      "bytes": 394,
+      "sha256": "02a153514db64e5378c53ef164c960409882649de6f4aac8f81f66218e7f8797"
+    },
+    "tokenizer.json": {
+      "bytes": 11423220,
+      "sha256": "06902d1fb775216338802205886a24bc715ccc606bd872a892e3d3c83ca1b9e2"
+    },
+    "tokenizer_config.json": {
+      "bytes": 5727,
+      "sha256": "ec2869dd4c9c7155b3460c291a6fb2b955e5068013ba7efbcaafd1c61e02abce"
+    },
+    "vocab.json": {
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    }
+  }
+}

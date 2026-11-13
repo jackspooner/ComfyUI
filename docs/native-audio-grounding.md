@@ -453,6 +453,53 @@ For offline header fixtures using explicitly staged archive links, set
 `MOSS_ALLOW_LINKED_WEIGHTS=1`; this does not weaken the converter's separate
 pinned size/SHA256 checks or its mandatory `--allow-linked-weights` opt-in.
 
+## Local v1.5 and Tokenizer v2
+
+Original Local 1.7B remains distinct. Local v1.5 uses the pinned Qwen3 4B time
+model and one-layer NanoGPT2 decoder with twelve tied audio embedding/head pairs.
+Load its converted package with `CLIPLoader` type `moss_tts`; the exact signature
+selects `MossLocalV15ClipModel`. Use existing speech/reference/codec nodes.
+
+```sh
+python -m scripts.convert_moss_local --variant v1.5 --source /absolute/Local-v1.5 --destination /absolute/Local-v1.5.comfyui-native/model.safetensors
+python -m scripts.convert_moss_codec --variant v2 --source /absolute/Tokenizer-v2 --destination /absolute/Tokenizer-v2.comfyui-native/codec.safetensors
+```
+
+The model revision `be7766a6735b98bd793f7c79fb720b4d0f5d13b8` has 438 tensors
+(9.10 GB); codec revision `f6e20e543b33d2c252a7ef71bdf8aa71e5ff9169` has 2028
+folded FP32 tensors (8.49 GB). Complete pinned source inventories, tokenizer assets,
+tied-weight identities and emitted tensors are verified. Originals are preserved;
+existing outputs are refused. Conversion never executes checkpoint Python or downloads.
+
+The v2 codec identity is separate from v1 while the `AUDIO_CODES` payload version
+stays 1. Its 48 kHz stereo PCM uses a 3840-sample hop and 32 available books;
+Local v1.5 consumes exactly the first twelve. Mono references duplicate channels;
+stereo references preserve both channels and share the pinned RMS normalization
+gain limited to ±3 dB. Continuation is decoded with full prefix context before
+decoded-prefix trimming. Wrong codec identities fail before inference.
+
+Keep literal text, punctuation and `[pause X.Ys]` markers; text normalization is
+unsupported for v1.5. Prompt controls strip surrounding whitespace; no speaker
+labels are inserted into single-voice references. Text sampling is 1/1/50, audio
+defaults 1.7/.8/25/repetition 1. Positive temperature is required. Repetition
+history includes generated frames only. Seeds, global KV and local book caches
+are call-private, with interruption between frames and books. Native operations,
+attention, patchers and prefetch own loading and residency. The codec uses BF16
+encoder/decoder compute and FP32 quantizer/learned norm math, with bounded masked
+attention chunks and no persistent autocast weight cache.
+
+Pinned small CPU comparisons cover prompts, stereo ordering, causal/window masks,
+FP32/BF16 cached global/local logits, quantization, all tensor shapes, generation
+protocol, continuation, private RNG and cancellation/retry:
+
+```sh
+MOSS_LOCAL_V15_REFERENCE=/absolute/Local-v1.5 MOSS_CODEC_V2_REFERENCE=/absolute/Tokenizer-v2 PYTHONPATH=/absolute/pinned/transformers5 HF_HUB_OFFLINE=1 python -m pytest tests-unit/comfy_test/moss_local_v15_reference_test.py tests-unit/comfy_test/moss_codec_v2_reference_test.py tests-unit/comfy_test/audio_codec_test.py -q
+```
+
+These checks do not establish full-model quality, GPU memory-pressure behavior or
+serving activation. Run full-checkpoint comparisons through the main queue and
+retain per-model acceptance evidence before cutover.
+
 ## Integration boundaries
 
 This document covers shared discrete-code and attention prerequisites. Current

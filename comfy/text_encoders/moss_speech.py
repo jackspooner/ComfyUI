@@ -4,14 +4,15 @@ from tokenizers import Tokenizer
 
 import comfy.audio
 from comfy import sd1_clip
-from comfy.audio_codec import AudioCodes, AudioCodeSegment, MOSS_V1
+from comfy.audio_codec import AudioCodes, AudioCodeSegment, MOSS_V1, MOSS_V2
 from .moss_tts_delay import MossTTSDelay, AUDIO_PAD
 from .moss_tts_local import MossTTSLocal
+from .moss_tts_local_v15 import MossTTSLocalV15
 from .moss_text_normalization import normalize_tts_text
 
 
-def reference_codes(reference, codebooks):
-    reference.validate(MOSS_V1)
+def reference_codes(reference, codebooks, codec=MOSS_V1):
+    reference.validate(codec)
     codes = []
     for segment in reference.segments:
         if segment.codes.shape[1] < codebooks:
@@ -38,6 +39,14 @@ def voice_prompt(text, instruction, language, reference=None, tokens=None, quali
 
 
 def encode_speech_reference(codec, audio):
+    if getattr(codec, 'identity', MOSS_V1) == MOSS_V2:
+        waveform = audio['waveform'].to(device='cpu', dtype=torch.float32)
+        waveform = waveform.repeat(1, 2, 1) if waveform.shape[1] == 1 else waveform[:, :2]
+        if waveform.shape[-1]:
+            waveform = comfy.audio.resample(waveform, audio['sample_rate'], MOSS_V2.sample_rate)
+            gain = (-20-10*torch.log10(waveform.square().mean(dim=(-2, -1), keepdim=True)+1e-9)).clamp(-3, 3)
+            waveform = waveform * 10**(gain/20)
+        return codec.encode({'waveform': waveform, 'sample_rate': MOSS_V2.sample_rate}, 12)
     waveform = audio['waveform'].to(device='cpu', dtype=torch.float32).mean(dim=1, keepdim=True)
     if waveform.shape[-1]:
         waveform = comfy.audio.resample(waveform, audio['sample_rate'], MOSS_V1.sample_rate)
@@ -132,9 +141,56 @@ class MossLocalTokenizer(MossSpeechTokenizer):
     delayed = False
 
 
+class MossLocalV15Tokenizer(MossSpeechTokenizer):
+    delayed = False
+
+    def tokenize_with_weights(self, text, return_word_ids=False, instruction=None, language=None, references=None,
+                              tokens=None, quality=None, sound_event=None, ambient_sound=None, continuation=None,
+                              normalize_text=False, **kwargs):
+        if normalize_text:
+            raise ValueError('MOSS Local v1.5 preserves literal text and pause markers; text normalization is unsupported')
+        encode = lambda value: self.tokenizer.encode(value, add_special_tokens=False).ids
+        ids = [151644] + encode('user\n') + encode('<user_inst>\n- Reference(s):\n')
+        prepared = []
+        if continuation is None:
+            for reference in references or ():
+                if reference is not None:
+                    prepared.extend(reference_codes(reference, 12, MOSS_V2))
+        bindings = []
+        if prepared:
+            for codes in prepared:
+                ids.append(151669)
+                bindings.append((len(ids), codes))
+                ids.extend([151654]*len(codes))
+                ids.append(151670)
+        else:
+            ids.extend(encode('None'))
+        def value(raw):
+            return 'None' if raw is None else str(raw).strip() or 'None'
+        controls = ''.join('\n- '+name+':\n'+value(raw) for name, raw in (
+            ('Instruction', instruction), ('Tokens', tokens), ('Quality', quality),
+            ('Sound Event', sound_event), ('Ambient Sound', ambient_sound), ('Language', language)))
+        ids.extend(encode(controls+'\n- Text:\n'))
+        ids.extend(encode('' if text is None else str(text)))
+        ids.extend(encode('\n</user_inst>'))
+        ids.extend([151645, *encode('\n'), 151644, *encode('assistant\n'), 151669])
+        if continuation is not None:
+            prefix = reference_codes(continuation, 12, MOSS_V2)
+            if len(prefix) > 1:
+                raise ValueError('MOSS Local v1.5 continuation requires exactly one prompt audio item')
+            if prefix:
+                bindings.append((len(ids), prefix[0]))
+                ids.extend([151656]*len(prefix[0]))
+        result = {'moss_delay': [[(token, 1., i+1) if return_word_ids else (token, 1.) for i, token in enumerate(ids)]]}
+        if bindings:
+            result['moss_references'] = bindings
+        return result
+
+
 class MossSpeechClipModel(sd1_clip.SDClipModel):
     model_class = MossTTSDelay
     delayed = True
+    codec_identity = MOSS_V1
 
     def __init__(self, device='cpu', dtype=None, model_options={}, speech_config=None):
         super().__init__(device=device, dtype=dtype, textmodel_json_config=speech_config or {}, model_class=self.model_class,
@@ -187,7 +243,7 @@ class MossSpeechClipModel(sd1_clip.SDClipModel):
                 first = decoded[0]
                 decoded[0] = AudioCodeSegment(first.codes, first.lengths, decode_skip_frames=(prefix_length,))
             segments.extend(decoded)
-        return AudioCodes(MOSS_V1, tuple(segments))
+        return AudioCodes(self.codec_identity, tuple(segments))
 
 
 class MossLocalClipModel(MossSpeechClipModel):
@@ -225,15 +281,29 @@ class MossLocalClipModel(MossSpeechClipModel):
                     segments.append(AudioCodeSegment(segment, (i - start,), decode_skip_frames=(min(prefix_length, i - start),) if first else None))
                     start = None
                     first = False
-        return AudioCodes(MOSS_V1, tuple(segments))
+        return AudioCodes(self.codec_identity, tuple(segments))
 
 
-def te(dtype_llama=None, llama_quantization_metadata=None, speech_config=None, local=False):
+class MossLocalV15ClipModel(MossLocalClipModel):
+    model_class = MossTTSLocalV15
+    codec_identity = MOSS_V2
+
+    def load_sd(self, sd):
+        return MossSpeechClipModel.load_sd(self, sd)
+
+    def audio_generation_memory(self, tokens, max_length):
+        batch = len(tokens['moss_delay'])
+        size = self.transformer.dtype.itemsize
+        local = self.transformer.model.config.hidden_size
+        return MossSpeechClipModel.audio_generation_memory(self, tokens, max_length) + batch*13*local*size*4 + batch*local*48*size
+
+
+def te(dtype_llama=None, llama_quantization_metadata=None, speech_config=None, local=False, local_v15=False):
     class MossSpeechTEModel(sd1_clip.SD1ClipModel):
         def __init__(self, device='cpu', dtype=None, model_options={}):
             if llama_quantization_metadata is not None:
                 model_options = {**model_options, 'quantization_metadata': llama_quantization_metadata}
-            super().__init__(device=device, dtype=dtype_llama or dtype, name='moss_delay', clip_model=MossLocalClipModel if local else MossSpeechClipModel,
+            super().__init__(device=device, dtype=dtype_llama or dtype, name='moss_delay', clip_model=MossLocalV15ClipModel if local_v15 else MossLocalClipModel if local else MossSpeechClipModel,
                              model_options=model_options, speech_config=speech_config)
 
         def audio_generation_memory(self, tokens, max_length):

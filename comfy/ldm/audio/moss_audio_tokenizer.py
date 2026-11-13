@@ -45,6 +45,10 @@ class LayerScale(nn.Module):
         self.scale = nn.Parameter(torch.empty(channels, device=device, dtype=dtype))
 
     def forward(self, x):
+        if getattr(self, 'preserve_weight_dtype', False):
+            # Tokenizer v2 computes projections in BF16 while its FP32 scale
+            # deliberately promotes the residual, matching the pinned codec.
+            return x * comfy.ops.cast_to(self.scale, self.scale.dtype, x.device)
         return x * comfy.ops.cast_to_input(self.scale, x)
 
 
@@ -87,9 +91,9 @@ class CodecAttention(nn.Module):
 
 
 class CodecTransformerLayer(nn.Module):
-    def __init__(self, dim, heads, intermediate, context, device=None, dtype=None, operations=None):
+    def __init__(self, dim, heads, intermediate, context, device=None, dtype=None, operations=None, attention_class=CodecAttention):
         super().__init__()
-        self.self_attn = CodecAttention(dim, heads, context, device=device, dtype=dtype, operations=operations)
+        self.self_attn = attention_class(dim, heads, context, device=device, dtype=dtype, operations=operations)
         self.norm1 = operations.LayerNorm(dim, eps=1e-5, device=device, dtype=dtype)
         self.norm2 = operations.LayerNorm(dim, eps=1e-5, device=device, dtype=dtype)
         self.linear1 = operations.Linear(dim, intermediate, bias=False, device=device, dtype=dtype)
@@ -98,15 +102,20 @@ class CodecTransformerLayer(nn.Module):
         self.layer_scale_2 = LayerScale(dim, device=device, dtype=dtype)
 
     def forward(self, x, rotary, offset=0, cache=None):
-        x = x + self.layer_scale_1(self.self_attn(self.norm1(x), rotary, offset, cache))
-        return x + self.layer_scale_2(self.linear2(F.gelu(self.linear1(self.norm2(x)))))
+        # V2 retains FP32 learned normalization weights under BF16 autocast.
+        # Cast the result, rather than rounding those weights to the input dtype.
+        preserve = getattr(self, 'preserve_norm_weight_dtype', False)
+        normed = self.norm1(x.float()).to(x.dtype) if preserve else self.norm1(x)
+        x = x + self.layer_scale_1(self.self_attn(normed, rotary, offset, cache))
+        normed = self.norm2(x.float()).to(x.dtype) if preserve else self.norm2(x)
+        return x + self.layer_scale_2(self.linear2(F.gelu(self.linear1(normed))))
 
 
 class CodecTransformer(nn.Module):
-    def __init__(self, dim, heads, intermediate, depth, context, device=None, dtype=None, operations=None):
+    def __init__(self, dim, heads, intermediate, depth, context, device=None, dtype=None, operations=None, attention_class=CodecAttention):
         super().__init__()
         self.head_dim = dim // heads
-        self.layers = nn.ModuleList([CodecTransformerLayer(dim, heads, intermediate, context, device=device, dtype=dtype, operations=operations) for _ in range(depth)])
+        self.layers = nn.ModuleList([CodecTransformerLayer(dim, heads, intermediate, context, device=device, dtype=dtype, operations=operations, attention_class=attention_class) for _ in range(depth)])
 
     def forward(self, x, state=None):
         offset = state['offset'] if state is not None else 0
@@ -126,11 +135,12 @@ class CodecTransformer(nn.Module):
 
 
 class ProjectedTransformer(nn.Module):
-    def __init__(self, input_dim, output_dim, dim, heads, intermediate, depth, context, device=None, dtype=None, operations=None):
+    def __init__(self, input_dim, output_dim, dim, heads, intermediate, depth, context, device=None, dtype=None, operations=None,
+                 attention_class=CodecAttention, force_projection=False):
         super().__init__()
-        self.input_proj = operations.Linear(input_dim, dim, bias=False, device=device, dtype=dtype) if input_dim != dim else nn.Identity()
-        self.transformer = CodecTransformer(dim, heads, intermediate, depth, context, device=device, dtype=dtype, operations=operations)
-        self.output_proj = operations.Linear(dim, output_dim, bias=False, device=device, dtype=dtype) if output_dim != dim else nn.Identity()
+        self.input_proj = operations.Linear(input_dim, dim, bias=False, device=device, dtype=dtype) if force_projection or input_dim != dim else nn.Identity()
+        self.transformer = CodecTransformer(dim, heads, intermediate, depth, context, device=device, dtype=dtype, operations=operations, attention_class=attention_class)
+        self.output_proj = operations.Linear(dim, output_dim, bias=False, device=device, dtype=dtype) if force_projection or output_dim != dim else nn.Identity()
 
     def forward(self, x, state=None):
         return self.output_proj(self.transformer(self.input_proj(x.transpose(1, 2)), state)).transpose(1, 2)

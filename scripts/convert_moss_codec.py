@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert the pinned MOSS v1 FP32 codec offline, folding weight normalization."""
+"""Convert pinned MOSS v1/v2 FP32 codecs offline, folding weight normalization."""
 import argparse
 import hashlib
 import json
@@ -37,12 +37,22 @@ def fold_convolutions(records):
     return converted, transforms
 
 
-def convert(source, destination):
+def mapped_name(key, variant):
+    if variant == 'v2':
+        key = key.replace('.self_attn.in_proj.', '.self_attn.in_projs.0.')
+        key = key.replace('.self_attn.out_proj.', '.self_attn.out_projs.0.')
+        key = key.replace('.ffn.0.', '.linear1.').replace('.ffn.2.', '.linear2.')
+    return key
+
+
+def convert(source, destination, variant='v1'):
+    if variant not in ('v1', 'v2'):
+        raise ValueError('Unsupported MOSS codec variant; select v1 or v2')
     source = Path(source).resolve()
     destination = Path(destination)
     if destination.exists() or destination.with_suffix('.manifest.json').exists():
         raise FileExistsError(f'Destination or manifest already exists: {destination}')
-    provenance = read_json(Path(__file__).with_name('moss_codec_v1.json'))
+    provenance = read_json(Path(__file__).with_name(f'moss_codec_{variant}.json'))
     snapshots = verify_sources(source, provenance)
     records = inspect_shards(source)
     for key, (_, _, entry) in records.items():
@@ -60,21 +70,24 @@ def convert(source, destination):
         if remaining.keys() & folded_records.keys():
             raise ValueError('Folded codec weight collides with an original tensor')
         snapshots[folded_path] = file_identity(folded_path)
-        metadata = dict(format='pt', architecture='moss_audio_tokenizer', conversion_version='1',
+        metadata = dict(format='pt', architecture='moss_audio_tokenizer' if variant == 'v1' else 'moss_audio_tokenizer_v2', conversion_version='1',
                         model_id=provenance['model_id'], model_revision=provenance['revision'],
                         source_manifest=json.dumps(provenance, separators=(',', ':')),
                         source_config=(source / 'config.json').read_text(encoding='utf-8'),
                         source_tensor_count=str(len(records)),
                         weight_norm_transforms=json.dumps(transforms, separators=(',', ':')))
-        return stream_checkpoint(remaining | folded_records, None, destination, metadata, source_stats=snapshots)
+        combined = remaining | folded_records
+        return stream_checkpoint(combined, None, destination, metadata, source_stats=snapshots,
+                                 name_mapping={key: mapped_name(key, variant) for key in combined})
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--destination', type=Path, required=True)
+    parser.add_argument('--variant', choices=('v1', 'v2'), default='v1')
     args = parser.parse_args()
-    result = convert(args.source, args.destination)
+    result = convert(args.source, args.destination, args.variant)
     print(f"Verified {result['source_tensors']} inference tensors ({result['source_bytes']} bytes): {args.destination}")
 
 
