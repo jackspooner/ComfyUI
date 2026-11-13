@@ -14,6 +14,14 @@ Constrained caption JSON reuses `comfy/text_json.py` and the native sampler;
 check optional pins with `setup_worktree.py --text-json` and run
 `video_caption_json_test.py` with the shared `text_json_native_test.py` regression.
 
+## Native LocateAnything
+
+Native LocateAnything model math, preprocessing and sampling are in
+`comfy/locateanything/`; graph components are in `comfy_extras/nodes_locateanything.py`.
+Read [the model guide](docs/locateanything.md), run the pinned CPU
+`tests-unit/comfy_test/locateanything_test.py` fixtures and keep all full-model
+inference on the main queue. The converter reuses the existing streaming writer.
+
 ## Native component leases
 
 `comfy/component_leases.py` owns bounded references, not GPU residency or prompt

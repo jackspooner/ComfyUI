@@ -63,6 +63,9 @@ Source and CPU comparisons do not establish serving activation or full-model qua
 YingMusic also has a pinned native vocal separator using the existing Roformer
 components and its exact chunk preparation, plus native compatibility package
 loading; see [YingMusic setup and acceptance limits](docs/yingmusic.md).
+LocateAnything now has pinned native MoonViT/projector and modified Qwen2
+components with its original MTP masks, decoding modes and request-private state;
+see [conversion, graph and acceptance limits](docs/locateanything.md).
 
 Clone this repository's `main` branch:
 
