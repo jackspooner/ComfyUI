@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import threading
+from comfy.console_progress import observe_progress, write_log
 
 import comfy.internal_logging
 
@@ -58,16 +59,21 @@ class LogInterceptor(io.TextIOWrapper):
         self._logs_since_flush = []
 
     def write(self, data):
+        if not data:
+            return 0
+        observe_progress(data)
         entry = {"t": datetime.now().isoformat(), "m": data}
         with self._lock:
             self._logs_since_flush.append(entry)
 
             # Simple handling for cr to overwrite the last output if it isnt a full line
             # else logs just get full of progress messages
-            if isinstance(data, str) and data.startswith("\r") and not logs[-1]["m"].endswith("\n"):
+            # A bare CR moves the cursor; it must not discard tqdm's preceding
+            # space-filled clear before a warning is written on the same row.
+            if logs and isinstance(data, str) and len(data) > 1 and data.startswith("\r") and not logs[-1]["m"].endswith("\n"):
                 logs.pop()
             logs.append(entry)
-        super().write(data)
+        return super().write(data)
 
     def flush(self):
         super().flush()
@@ -94,6 +100,14 @@ def get_log_level(level):
     return comfy.internal_logging.DETAIL if level == "DETAIL" else logging.getLevelName(level)
 
 
+class ProgressStreamHandler(logging.StreamHandler):
+    def emit(self, record):
+        try:
+            write_log(self.format(record), self.stream)
+        except Exception:
+            self.handleError(record)
+
+
 def setup_logger(log_level: str = 'INFO', file_outputs=None, capacity: int = 300, use_stdout: bool = False):
     global logs
     if logs:
@@ -117,7 +131,7 @@ def setup_logger(log_level: str = 'INFO', file_outputs=None, capacity: int = 300
 
     formatter = ColoredFormatter("%(message)s")
 
-    stream_handler = logging.StreamHandler()
+    stream_handler = ProgressStreamHandler()
     stream_handler.setFormatter(formatter)
     stream_handler.setLevel(console_level)
 
@@ -126,7 +140,7 @@ def setup_logger(log_level: str = 'INFO', file_outputs=None, capacity: int = 300
         stream_handler.addFilter(lambda record: not record.levelno < logging.ERROR)
 
         # Lesser to stdout
-        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler = ProgressStreamHandler(sys.stdout)
         stdout_handler.setFormatter(formatter)
         stdout_handler.setLevel(console_level)
         stdout_handler.addFilter(lambda record: record.levelno < logging.ERROR)

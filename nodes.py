@@ -28,6 +28,7 @@ import comfy.utils
 import comfy.latent_formats
 import comfy.controlnet
 import comfy.execution_metrics
+from comfy_execution.console_progress import instrument_custom_node
 from comfy.comfy_types import IO, ComfyNodeABC, InputTypeDict, FileLocator
 from comfy_api.internal import register_versions, ComfyAPIWithVersion
 from comfy_api.version_list import supported_versions
@@ -2316,6 +2317,12 @@ def get_module_name(module_path: str) -> str:
 
 async def load_custom_node(module_path: str, ignore=set(), module_parent="custom_nodes") -> bool:
     module_name = get_module_name(module_path)
+    phase_progress = module_parent == "custom_nodes" or (
+        module_parent == "comfy_extras" and module_name in {
+            "nodes_sam3", "nodes_sam3d_body", "nodes_depth_anything_3",
+            "nodes_hunyuan3d", "nodes_stable3d", "nodes_yingmusic",
+        }
+    )
     if os.path.isfile(module_path):
         sp = os.path.splitext(module_path)
         module_name = sp[0]
@@ -2367,6 +2374,8 @@ async def load_custom_node(module_path: str, ignore=set(), module_parent="custom
         if hasattr(module, "NODE_CLASS_MAPPINGS") and getattr(module, "NODE_CLASS_MAPPINGS") is not None:
             for name, node_cls in module.NODE_CLASS_MAPPINGS.items():
                 if name not in ignore:
+                    if phase_progress:
+                        instrument_custom_node(node_cls, name)
                     NODE_CLASS_MAPPINGS[name] = node_cls
                     node_cls.RELATIVE_PYTHON_MODULE = "{}.{}".format(module_parent, get_module_name(module_path))
             if hasattr(module, "NODE_DISPLAY_NAME_MAPPINGS") and getattr(module, "NODE_DISPLAY_NAME_MAPPINGS") is not None:
@@ -2397,6 +2406,8 @@ async def load_custom_node(module_path: str, ignore=set(), module_parent="custom
                     node_cls: io.ComfyNode
                     schema = node_cls.GET_SCHEMA()
                     if schema.node_id not in ignore:
+                        if phase_progress:
+                            instrument_custom_node(node_cls, schema.display_name or schema.node_id, function_name="execute")
                         NODE_CLASS_MAPPINGS[schema.node_id] = node_cls
                         node_cls.RELATIVE_PYTHON_MODULE = "{}.{}".format(module_parent, get_module_name(module_path))
                         if schema.display_name is not None:

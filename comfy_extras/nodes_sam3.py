@@ -10,6 +10,7 @@ import torch
 import torch.nn.functional as F
 import comfy.model_management
 import comfy.utils
+from comfy.console_progress import advance, phase
 import folder_paths
 from comfy_api.latest import ComfyExtension, io, ui
 import av
@@ -172,6 +173,7 @@ class SAM3_Detect(io.ComfyNode):
         all_bbox_dicts = []
         all_masks = []
         pbar = comfy.utils.ProgressBar(B)
+        phase('detecting objects', total=B, unit='images')
 
         for b in range(B):
             frame = image_in[b:b+1].to(device=device, dtype=dtype)
@@ -248,6 +250,7 @@ class SAM3_Detect(io.ComfyNode):
                 else:
                     all_masks.append(torch.zeros(H, W, device=comfy.model_management.intermediate_device()))
             pbar.update(1)
+            advance()
 
         idev = comfy.model_management.intermediate_device()
         all_masks = [m.to(idev) for m in all_masks]

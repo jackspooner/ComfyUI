@@ -180,7 +180,15 @@ def test_generation_budget_stopping_and_cancel(budget):
     ids = torch.full((2, 3, 3), 1024, dtype=torch.int64)
     ids[:, :, 0] = torch.tensor([151644, AUDIO_START, AUDIO_GEN])
     ids[:, -1, 1:] = 7
-    out = MossTTSLocal.generate_local(Scripted(), ids, torch.ones(2, 3), budget, 9, text_temperature=0, audio_temperature=0)
+    import comfy.utils
+    completed = []
+    class RecordingProgress(comfy.utils.ProgressBar):
+        def update_absolute(self, value, *args, **kwargs):
+            super().update_absolute(value, *args, **kwargs)
+            completed.append(self.current)
+    with patch.object(comfy.utils, 'ProgressBar', RecordingProgress):
+        out = MossTTSLocal.generate_local(Scripted(), ids, torch.ones(2, 3), budget, 9, text_temperature=0, audio_temperature=0)
+    assert completed == list(range(1, min(budget, 3) + 1))
     assert [n for n, _ in out] == [1, 1]
     assert out[0][1].shape[0] == 2 + min(budget, 3)
     if budget > 1:

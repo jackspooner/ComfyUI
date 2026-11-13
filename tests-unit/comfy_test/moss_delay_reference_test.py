@@ -82,6 +82,23 @@ class ScriptedLogits:
         return [x[:, -1] for x in self(input_ids).logits], None
 
 
+def test_delay_progress_counts_completed_iterations(monkeypatch):
+    import comfy.utils
+    completed = []
+    class RecordingProgress(comfy.utils.ProgressBar):
+        def update_absolute(self, value, *args, **kwargs):
+            super().update_absolute(value, *args, **kwargs)
+            completed.append(self.current)
+    monkeypatch.setattr(comfy.utils, 'ProgressBar', RecordingProgress)
+    config = types.SimpleNamespace(n_vq=4, language_config=types.SimpleNamespace(vocab_size=155648))
+    prompt = torch.full((1, 3, 5), 1024, dtype=torch.int64)
+    prompt[0, :, 0] = torch.tensor([151644, 77091, 198])
+    output = MossTTSDelay.generate_delay(ScriptedLogits(config), prompt, torch.ones(1, 3), 12, 9,
+                                        text_temperature=0, audio_temperature=0)
+    assert len(completed) > 2
+    assert completed == list(range(1, output[0][1].shape[0] + 1))
+
+
 @pytest.mark.parametrize('budget', [0, 2, 4, 12])
 @pytest.mark.parametrize('continuation', [False, True])
 def test_delay_warmup_flush_stop_and_budget(reference, budget, continuation):

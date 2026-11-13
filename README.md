@@ -33,6 +33,10 @@ guides describe their original integration, not the current base version.
   bounded live updates for consumers such as MediaTools. Forecasts belong to
   the consumer; these observations do not establish complete GPU timings or
   authorize maintenance.
+  Custom inference also has [single-line console progress](docs/custom-inference-progress.md)
+  with truthful counters or phase/elapsed reporting in the log panel. Existing
+  sampler indicators are preserved; matching worker extensions need activation
+  alongside core before their IPC phases are available.
 
 ## Use this fork
 

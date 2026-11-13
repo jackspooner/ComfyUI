@@ -20,6 +20,7 @@ from transformers.models.whisper.modeling_whisper import WhisperForConditionalGe
 import comfy.model_management as mm
 import comfy.model_prefetch as prefetch
 import comfy.ops
+from comfy.console_progress import advance, phase, report_progress
 from comfy.audio_encoders.whisper import AudioEncoder
 from comfy.ldm.modules.attention import AttentionTensorContainer, ComfyAttention, optimized_attention_masked
 from .common import package, patcher, take_component, waveform
@@ -219,6 +220,7 @@ class AdmittedEncoder(nn.Module):
         return self.component.model.conv2
 
     def forward(self, input_features, **kwargs):
+        phase('encoding audio')
         mm.load_models_gpu([self.component], memory_required=max(256 * 1024**2, input_features.shape[0] * self.config.d_model * self.config.max_source_positions * 64))
         return BaseModelOutput(last_hidden_state=self.component.model(input_features.to(device=self.component.load_device, dtype=self.dtype)))
 
@@ -229,10 +231,13 @@ class AdmittedDecoder(nn.Module):
         self.component, self.dtype, self.config = model.decoder, model.dtype, model.config
 
     def forward(self, input_ids=None, **kwargs):
+        phase('decoding')
         batch = input_ids.shape[0] if input_ids is not None else kwargs['inputs_embeds'].shape[0]
         required = batch * self.config.decoder_layers * self.config.d_model * (self.config.max_target_positions + self.config.max_source_positions) * 4
         mm.load_models_gpu([self.component], memory_required=max(256 * 1024**2, required + batch * self.config.vocab_size * self.config.max_target_positions * 4))
-        return self.component.model(input_ids=input_ids, **kwargs)
+        output = self.component.model(input_ids=input_ids, **kwargs)
+        advance()
+        return output
 
 
 class EncoderDecoder(nn.Module):
@@ -283,6 +288,7 @@ class Generation(WhisperForConditionalGeneration):
         return super()._postprocess_outputs(seek_outputs, *args, **kwargs)
 
 
+@report_progress('Whisper', 'aligning words')
 def align_words(model, audio, tokens, language=None, task='transcribe'):
     """Bounded OpenAI-style teacher-forced alignment using selected heads."""
     from transformers.models.whisper.generation_whisper import _dynamic_time_warping, _median_filter
@@ -324,6 +330,7 @@ def align_words(model, audio, tokens, language=None, task='transcribe'):
     return result
 
 
+@report_progress('Whisper', 'preparing audio', unit='decoder iterations')
 def transcribe_many(model, audios, language='en', beam_size=5, batch_size=1, condition_on_previous_text=False,
                     task='transcribe', chunk_length_s=0, vad_filter=False, initial_prompt=''):
     if task not in ('transcribe', 'translate') or not 1 <= beam_size <= 10 or not 1 <= batch_size <= 64:

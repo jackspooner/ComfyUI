@@ -6,6 +6,7 @@ import torch
 import comfy.model_management
 import comfy.model_prefetch
 import comfy.utils
+from comfy.console_progress import advance, report_progress
 from comfy.ldm.modules.attention import optimized_attention_for_device
 from .llama import BaseLlama, Llama2_, Qwen3_8BConfig, RMSNorm, TransformerBlock
 from .moss_tts_delay import AUDIO_END, AUDIO_PAD, AUDIO_START
@@ -103,6 +104,7 @@ class MossTTSLocal(BaseLlama, torch.nn.Module):
         hidden = self.local_to_speech_embedding_mlps[channel](hidden)
         return self.lm_heads[channel](self.layer_norm_before_lm_heads[channel](hidden)), cache
 
+    @report_progress('MOSS Local', 'generating audio', unit='frames')
     def generate_local(self, input_ids, attention_mask, max_new_tokens, seed, text_temperature=1.5, text_top_p=1.0,
                        text_top_k=50, audio_temperature=1.0, audio_top_p=0.95, audio_top_k=50, audio_repetition_penalty=1.1):
         batch, length, channels = input_ids.shape
@@ -139,7 +141,8 @@ class MossTTSLocal(BaseLlama, torch.nn.Module):
             history[:, used:used + 1] = current
             stopped |= current[:, 0, 0] == AUDIO_END
             used += 1
-            progress.update(step + 1)
+            progress.update_absolute(step + 1)
+            advance()
             if stopped.all():
                 break
         outputs = []
