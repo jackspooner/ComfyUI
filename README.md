@@ -41,6 +41,8 @@ through ComfyUI model patchers, layer offloading and prefetch, with execution-lo
 encoder buffers retained across their native allocation scopes. See
 [native transcription](docs/native-transcription.md) for offline conversion,
 Cutlery workflow requirements and the outstanding GPU/quality acceptance gates.
+Repeated dynamic-VRAM preparations with unchanged state are logged at DEBUG;
+initial preparation, changed state and preparation after a full unload remain at INFO.
 
 Clone this repository's `main` branch:
 
