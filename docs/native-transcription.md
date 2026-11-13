@@ -51,7 +51,9 @@ Original files and existing destinations are preserved. Reserve original plus
 output disk space (approximately 4.4 GiB Qwen ASR, 1.7 GiB aligner, 2.9 GiB Whisper
 large-v3 and 1.5 GiB turbo for the inspected checkpoints). Interrupted temporary
 files are not valid packages; retry into a fresh destination after inspection.
-The normal archive model-cache owner can manage artifacts; no second cache is added.
+ASR packages must be local in the selected model root; this change does not expand
+the archive cache's supported categories. Loading reuses native tensor storage and
+fast-disk support, and adds no separate residency or disk cache.
 
 ## Behaviour
 
@@ -67,7 +69,8 @@ Transformers' token/long-form algorithms with native tensor networks. Word timin
 uses a separate bounded teacher-forced pass, selected cross-attention heads and
 DTW; decode beams never accumulate all-head attention outputs. Multiple inputs
 use bounded batches with private state and original slot ordering. A zero chunk
-length uses native long-form decoding; explicit lengths partition the input while
+length uses native long-form decoding at batch 1 or with previous-text conditioning;
+larger independent batches use model-sized windows. Explicit lengths partition the input while
 retaining offsets. Translation quality depends on the selected checkpoint.
 
 ## Verification and rollout

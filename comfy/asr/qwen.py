@@ -24,6 +24,13 @@ from .common import waveform, package, patcher, take_component
 
 
 class Encoder(AudioEncoder):
+    def __init__(self, config, device, dtype, operations):
+        super().__init__(config, device, dtype, operations)
+        self.compute_dtype = dtype
+
+    def get_dtype(self):
+        return self.compute_dtype
+
     def get_dynamic_vram__units(self):
         return list(self.layers), [(self.conv2d1, self.conv2d2, self.conv2d3, self.conv_out,
                                    self.ln_post, self.proj1, self.proj2)]
@@ -41,11 +48,20 @@ class Decoder(Llama2_):
         cfg.graph_dynamic_vbar_blocks = True
         cfg.prefetch_dynamic_vbars = True
         super().__init__(cfg, device=device, dtype=dtype, ops=comfy.ops.manual_cast)
+        self.compute_dtype = dtype
         if classes != config['vocab_size']:
             self.lm_head = comfy.ops.manual_cast.Linear(cfg.hidden_size, classes, bias=False, device=device, dtype=dtype)
 
     def get_dynamic_vram__units(self):
         return list(self.layers), [(self.embed_tokens, self.norm, self.lm_head)]
+
+    def get_dtype(self):
+        return self.compute_dtype
+
+    def compute_freqs_cis(self, position_ids, device):
+        # Qwen rounds rotary sin/cos to the hidden dtype before applying RoPE.
+        return tuple(value.to(self.norm.weight.dtype).float()
+                     for value in super().compute_freqs_cis(position_ids, device))
 
 
 @dataclass(frozen=True)
