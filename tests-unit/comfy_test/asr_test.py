@@ -1,6 +1,7 @@
 """Small CPU reference comparisons; no serving state, weights or GPU inference."""
 from unittest.mock import patch
 from types import SimpleNamespace
+import weakref
 
 import pytest
 import torch
@@ -139,7 +140,13 @@ def test_qwen_audio_encoder(length):
     padded = torch.nn.functional.pad(features, (0, -length % 100))[None]
     mask = torch.arange(padded.shape[-1])[None] < length
     expected = projector(ref(padded, input_features_mask=mask).last_hidden_state)
+    frontend = []
+    native.layers[0].register_forward_pre_hook(lambda module, inputs: frontend.append(weakref.ref(inputs[0])))
+    def check_frontend_lifetime(module, inputs):
+        assert frontend[0]() is not None, 'outer-scope frontend freed inside a repeated encoder block'
+    native.layers[1].register_forward_pre_hook(check_frontend_lifetime)
     torch.testing.assert_close(native(features), expected, atol=1e-5, rtol=1e-4)
+    assert frontend[0]() is None, 'frontend execution buffer retained after encoding'
 
 
 def test_chunking_has_no_gaps_and_finds_low_amplitude_sample():
