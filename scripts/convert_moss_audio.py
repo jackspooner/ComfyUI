@@ -78,7 +78,7 @@ def expected_shapes():
     return shapes
 
 
-def inspect_shards(source, expected=None):
+def inspect_shards(source, expected=None, *, allow_linked_weights=False):
     index_path = source / 'model.safetensors.index.json'
     index = read_json(index_path) if index_path.exists() else None
     weight_map = index['weight_map'] if index is not None else None
@@ -88,7 +88,7 @@ def inspect_shards(source, expected=None):
     filenames = sorted(set(weight_map.values())) if weight_map is not None else ['model.safetensors']
     for filename in filenames:
         path = source / filename
-        if path.resolve().parent != source.resolve():
+        if Path(filename).name != filename or (path.resolve().parent != source.resolve() and not allow_linked_weights):
             raise ValueError(f"Shard must be directly inside the source directory: {filename}")
         if not path.is_file():
             raise ValueError(f"Missing shard: {path}")

@@ -42,6 +42,10 @@ encoder buffers retained across their native allocation scopes. See
 [native transcription](docs/native-transcription.md) for offline conversion,
 Cutlery workflow requirements and the outstanding GPU/quality acceptance gates.
 
+Native MOSS speech packages use offline pinned conversion. The speech converter
+can explicitly admit hash-verified linked archive weights; see
+[native speech preparation](docs/native-audio-grounding.md#offline-voicegenerator-conversion).
+
 Clone this repository's `main` branch:
 
 ```bash
