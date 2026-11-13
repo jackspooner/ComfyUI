@@ -44,6 +44,10 @@ Cutlery workflow requirements and the outstanding GPU/quality acceptance gates.
 Repeated dynamic-VRAM preparations with unchanged state are logged at DEBUG;
 initial preparation, changed state and preparation after a full unload remain at INFO.
 
+Native MOSS speech packages use offline pinned conversion. The speech converter
+can explicitly admit hash-verified linked archive weights; see
+[native speech preparation](docs/native-audio-grounding.md#offline-voicegenerator-conversion).
+
 Clone this repository's `main` branch:
 
 ```bash

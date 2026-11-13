@@ -69,10 +69,11 @@ def expected_shapes(variant='voicegenerator'):
     return shapes
 
 
-def verify_sources(source, manifest):
+def verify_sources(source, manifest, *, allow_linked_weights=False):
     paths = {source / name: entry for name, entry in manifest['files'].items()}
     for path in paths:
-        if path.resolve().parent != source.resolve():
+        if path.name not in manifest['files'] or (path.resolve().parent != source.resolve() and
+                not (allow_linked_weights and path.suffix == '.safetensors')):
             raise ValueError(f'Source must be directly inside the bundle: {path.name}')
     snapshots = {path: file_identity(path) for path in paths}
     for path, entry in paths.items():
@@ -87,16 +88,16 @@ def verify_sources(source, manifest):
     return snapshots
 
 
-def convert(source, destination, variant='voicegenerator'):
+def convert(source, destination, variant='voicegenerator', *, allow_linked_weights=False):
     source = Path(source).resolve()
     destination = Path(destination)
     if destination.exists() or destination.with_suffix('.manifest.json').exists():
         raise FileExistsError(f'Destination or manifest already exists: {destination}')
     provenance = read_json(Path(__file__).with_name(f'moss_speech_{variant}.json'))
-    snapshots = verify_sources(source, provenance)
+    snapshots = verify_sources(source, provenance, allow_linked_weights=allow_linked_weights)
     config = read_json(source / 'config.json')
     validate_config(config, variant)
-    records = inspect_shards(source, expected_shapes(variant))
+    records = inspect_shards(source, expected_shapes(variant), allow_linked_weights=allow_linked_weights)
     if {path for path, _, _ in records.values()} != {source / name for name in provenance['files'] if name.endswith('.safetensors')}:
         raise ValueError(f'Weight files differ from the pinned MOSS {variant} inventory')
     tokenizer_json = (source / 'tokenizer.json').read_bytes()
@@ -120,8 +121,10 @@ def main():
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--destination', type=Path, required=True)
     parser.add_argument('--variant', choices=VARIANTS, default='voicegenerator')
+    parser.add_argument('--allow-linked-weights', action='store_true',
+                        help='Allow operator-staged safetensors symlinks; every target must match the pinned size and SHA256.')
     args = parser.parse_args()
-    result = convert(args.source, args.destination, args.variant)
+    result = convert(args.source, args.destination, args.variant, allow_linked_weights=args.allow_linked_weights)
     print(f"Verified {result['source_tensors']} tensors ({result['source_bytes']} bytes): {args.destination}")
 
 

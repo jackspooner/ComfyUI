@@ -47,6 +47,11 @@ python -m scripts.convert_moss_speech --source /absolute/MOSS-VoiceGenerator --d
 python -m pytest tests-unit/comfy_test/moss_speech_conversion_test.py tests-unit/comfy_test/moss_audio_test.py -q
 ```
 
+For operator-staged safetensors symlinks, add `--allow-linked-weights`. This permits
+linked weight payloads only after checking their pinned SHA256 and size; metadata
+files remain directly inside the source bundle. Source identity is rechecked before
+publication. Without this explicit option, links escaping the bundle remain refused.
+
 The output contains all 343 BF16 tensors, with `language_model.*` renamed to
 `model.*`, independent `lm_heads.*` and `emb_ext.*` weights, and the original
 tokenizer JSON bytes in a U8 tensor. Metadata retains config, tokenizer settings,

@@ -75,6 +75,25 @@ def test_pinned_source_mismatch_and_path_escape(tmp_path):
         converter.verify_sources(tmp_path, manifest)
 
 
+def test_linked_weights_require_explicit_opt_in_and_pinned_bytes(tmp_path):
+    source = tmp_path / 'bundle'
+    source.mkdir()
+    target = tmp_path / 'weights.safetensors'
+    save_file({'w': torch.ones(2, 3, dtype=torch.bfloat16)}, target)
+    (source / 'model.safetensors').symlink_to(target)
+    data = target.read_bytes()
+    manifest = {'revision': 'fixture', 'files': {'model.safetensors': {
+        'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}}}
+    with pytest.raises(ValueError, match='directly inside'):
+        converter.verify_sources(source, manifest)
+    snapshots = converter.verify_sources(source, manifest, allow_linked_weights=True)
+    assert snapshots[source / 'model.safetensors'] == writer.file_identity(target)
+    assert set(writer.inspect_shards(source, {'w': [2, 3]}, allow_linked_weights=True)) == {'w'}
+    save_file({'w': torch.zeros(2, 3, dtype=torch.bfloat16)}, target)
+    with pytest.raises(ValueError, match='does not match pinned'):
+        converter.verify_sources(source, manifest, allow_linked_weights=True)
+
+
 @pytest.mark.parametrize('when', ['before', 'during'])
 def test_changing_source_never_publishes_output(tmp_path, monkeypatch, when):
     path = tmp_path / 'model.safetensors'
