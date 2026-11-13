@@ -12,6 +12,8 @@ check = "import sys, torch, einops, safetensors, sqlite3, yaml; assert sys.versi
 subprocess.run([runtime, "-c", check], check=True)
 if "--text-json" in sys.argv:
     subprocess.run([runtime, "-c", "import llguidance, importlib.metadata; assert llguidance.__version__ == '1.9.1'; assert importlib.metadata.version('jsonschema') == '4.26.0'; print('Optional text JSON prerequisites ready: llguidance 1.9.1, jsonschema 4.26.0')"], check=True)
+if "--asr" in sys.argv:
+    subprocess.run([runtime, "-c", "import importlib.metadata, numpy, tokenizers; assert importlib.metadata.version('transformers') == '5.22.2', 'Native ASR requires verified Transformers 5.22.2'; from transformers.models.qwen3_asr.processing_qwen3_asr import Qwen3ASRProcessor; print('Native ASR offline processor/generation prerequisites ready')"], check=True)
 if "--moss-soundeffect" in sys.argv:
     subprocess.run([runtime, "-c", "import ftfy, wcwidth; print('MOSS SoundEffect prompt prerequisites ready:', ftfy.__version__)"], check=True)
 if "--applio" in sys.argv:

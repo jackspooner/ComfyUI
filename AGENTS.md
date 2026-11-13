@@ -1,5 +1,10 @@
 ## Native video captioners
 
+For native ASR, read [transcription](docs/native-transcription.md). Prepare with
+`scripts/setup_worktree.py --asr` and run the focused CPU `asr_test.py` suite.
+Model code stays in `comfy/asr`; Cutlery owns graph interfaces and formatting.
+Use the main queue for full-checkpoint GPU acceptance, never standalone inference.
+
 Native video-captioner preparation and acceptance are documented in
 [video captioners](docs/video-captioners.md). InternVideo3 M²LA stays in its model
 module; reuse the optional caption extension and offline converter. Run the
