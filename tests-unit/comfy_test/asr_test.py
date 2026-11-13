@@ -100,24 +100,26 @@ def test_whisper_timestamp_and_longform_generation(frames):
     assert len(actual['segments']) == len(expected['segments'])
 
 
-def test_qwen_logits_and_cached_decode():
+@pytest.mark.parametrize('dtype', [torch.float32, torch.bfloat16])
+def test_qwen_logits_and_cached_decode(dtype):
     cfg = Qwen3Config(hidden_size=32, intermediate_size=64, num_hidden_layers=2, num_attention_heads=4,
                       num_key_value_heads=2, head_dim=8, vocab_size=128, max_position_embeddings=128,
                       rope_theta=1000000)
     cfg._attn_implementation = 'sdpa'
     torch.manual_seed(5)
-    ref = Qwen3ForCausalLM(cfg).float().eval()
-    native = qwen.Decoder(cfg.to_dict(), 128, torch.float32, 'cpu')
+    ref = Qwen3ForCausalLM(cfg).to(dtype).eval()
+    native = qwen.Decoder(cfg.to_dict(), 128, dtype, 'cpu')
     state = ref.model.state_dict()
     state['lm_head.weight'] = ref.lm_head.weight
     native.load_state_dict(state, strict=True)
-    cache = native.init_kv_cache(1, 16, torch.device('cpu'), torch.float32)
+    cache = native.init_kv_cache(1, 16, torch.device('cpu'), dtype)
     previous = None
     for ids in (torch.tensor([[1, 2, 3]]), torch.tensor([[4]]), torch.tensor([[7]])):
         hidden, _, cache = native(ids, past_key_values=cache)
         expected = ref(ids, past_key_values=previous, use_cache=True)
         previous = expected.past_key_values
-        torch.testing.assert_close(native.lm_head(hidden), expected.logits, atol=1e-6, rtol=1e-5)
+        tolerance = (1e-6, 1e-5) if dtype == torch.float32 else (2e-3, 1e-2)
+        torch.testing.assert_close(native.lm_head(hidden), expected.logits, atol=tolerance[0], rtol=tolerance[1])
 
 
 @pytest.mark.parametrize('length', [100, 231, 800, 901])
@@ -187,3 +189,19 @@ def test_whisper_generation_failure_cleans_execution_prefetch():
         with pytest.raises(RuntimeError, match='interrupted fixture'):
             whisper.transcribe_many(model, [{'waveform': torch.zeros(1, 1, 1600), 'sample_rate': 16000}])
     cleanup.assert_called_once()
+
+
+def test_whisper_batches_independent_windows_of_one_recording():
+    cfg, ref, encoder, decoder = whisper_fixture()
+    extractor = lambda clips, **kwargs: SimpleNamespace(input_features=torch.zeros(len(clips), 8, 32),
+                                                       attention_mask=torch.ones(len(clips), 32))
+    model = whisper.Model(patcher(encoder, encoder.state_dict(), torch.device('cpu')),
+                          patcher(decoder, decoder.state_dict(), torch.device('cpu')), cfg,
+                          ref.generation_config.to_dict(), None, extractor, torch.float32)
+    def generated(features, **kwargs):
+        return {'segments': [[] for _ in features]}
+    with (patch.object(whisper.Generation, 'generate', side_effect=generated) as generate,
+          patch('comfy.asr.whisper.mm.load_models_gpu')):
+        result = whisper.transcribe_many(model, [{'waveform': torch.zeros(1, 1, 15000), 'sample_rate': 16000}], batch_size=2)
+    assert len(result) == 1
+    assert [call.args[0].shape[0] for call in generate.call_args_list] == [2, 1]

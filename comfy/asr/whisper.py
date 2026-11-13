@@ -26,6 +26,14 @@ from .common import package, patcher, take_component, waveform
 
 
 class Encoder(AudioEncoder):
+    def __init__(self, n_mels=128, n_ctx=1500, n_state=1280, n_head=20, n_layer=32,
+                 dtype=None, device=None, operations=None):
+        super().__init__(n_mels, n_ctx, n_state, n_head, n_layer, dtype, device, operations)
+        self.compute_dtype = dtype
+
+    def get_dtype(self):
+        return self.compute_dtype
+
     def get_dynamic_vram__units(self):
         return list(self.layers), [(self.conv1, self.conv2, self.embed_positions, self.layer_norm)]
 
@@ -109,6 +117,9 @@ class Decoder(nn.Module):
 
     def get_dynamic_vram__units(self):
         return list(self.layers), [(self.embed_tokens, self.embed_positions, self.layer_norm, self.proj_out)]
+
+    def get_dtype(self):
+        return self.compute_dtype
 
     def forward(self, input_ids=None, attention_mask=None, encoder_hidden_states=None, past_key_values=None,
                 inputs_embeds=None, position_ids=None, use_cache=True, alignment_heads=(), **kwargs):
@@ -275,7 +286,7 @@ class Generation(WhisperForConditionalGeneration):
 def align_words(model, audio, tokens, language=None, task='transcribe'):
     """Bounded OpenAI-style teacher-forced alignment using selected heads."""
     from transformers.models.whisper.generation_whisper import _dynamic_time_warping, _median_filter
-    from transformers.models.whisper.tokenization_whisper import _combine_tokens_into_words
+    from transformers.models.whisper.tokenization_whisper import LANGUAGES, _combine_tokens_into_words
     text_tokens = [int(token) for token in tokens if int(token) < model.config.eos_token_id]
     if not text_tokens:
         return []
@@ -303,7 +314,8 @@ def align_words(model, audio, tokens, language=None, task='transcribe'):
     text_indices, time_indices = _dynamic_time_warping(-matrix)
     jumps = np.pad(np.diff(text_indices), (1, 0), constant_values=1).astype(bool)
     boundaries = time_indices[jumps] * 0.02
-    words, word_tokens, indices = _combine_tokens_into_words(tokenizer, text_tokens, language)
+    word_language = 'english' if task == 'translate' else LANGUAGES.get(language, language)
+    words, word_tokens, indices = _combine_tokens_into_words(tokenizer, text_tokens, word_language)
     result = []
     for word, group in zip(words, indices):
         if group:
@@ -329,7 +341,12 @@ def transcribe_many(model, audios, language='en', beam_size=5, batch_size=1, con
             spans = [(0, len(value))]
         jobs = []
         for start, end in spans:
-            step = round(chunk_length_s * 16000) if chunk_length_s else end - start
+            if chunk_length_s:
+                step = round(chunk_length_s * 16000)
+            elif batch_size > 1 and not condition_on_previous_text:
+                step = model.config.max_source_positions * 320
+            else:
+                step = end - start
             for left in range(start, end, max(1, step)):
                 jobs.append((left, min(end, left + step)))
         queues.append(jobs)
@@ -366,6 +383,11 @@ def transcribe_many(model, audios, language='en', beam_size=5, batch_size=1, con
                           attention_mask=inputs.attention_mask.to(model.decoder.load_device))
             if prompts[0]:
                 kwargs['prompt_ids'] = model.tokenizer.get_prompt_ids(prompts[0], return_tensors='pt').to(model.decoder.load_device)
+            # Long recordings keep their mel input across upstream window seeks.
+            # Admit that allocation before copying it onto a pressured GPU.
+            input_bytes = inputs.input_features.numel() * torch.empty((), dtype=model.dtype).element_size()
+            encoder_workspace = len(work) * model.config.d_model * model.config.max_source_positions * 64
+            mm.load_models_gpu([model.encoder], memory_required=max(256 * 1024**2, input_bytes + encoder_workspace))
             generated = generation.generate(inputs.input_features.to(device=model.decoder.load_device, dtype=model.dtype), **kwargs)
             for (index, offset, end), segments in zip(work, generated['segments']):
                 for segment in segments:
