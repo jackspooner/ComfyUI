@@ -181,11 +181,13 @@ class Model:
     def get_models(self):
         return [self.encoder, self.decoder]
 
+    def _comfy_cache_tensors(self):
+        return self.get_models()
+
 
 def load(path, dtype=torch.float16):
     meta, state = package(path, 'whisper')
     config = WhisperConfig(**json.loads(meta['config']))
-    encoder, decoder = networks(config, dtype)
     from tokenizers import Tokenizer
     # Construct entirely from embedded assets; tokenizer special-token helpers
     # remain Whisper's implementation, with no from_pretrained/network lookup.
@@ -193,14 +195,29 @@ def load(path, dtype=torch.float16):
     token_config = {key: saved_config[key] for key in ('language', 'task', 'predict_timestamps', 'errors', 'model_max_length') if key in saved_config}
     # All added tokens and their properties already live in tokenizer_json.
     # Replaying HF's serialized AddedToken dictionaries would add them twice.
-    tokenizer = WhisperTokenizerFast(tokenizer_object=Tokenizer.from_str(bytes(state.pop('tokenizer_json').tolist()).decode()),
-                                     **token_config)
+    embedded = Tokenizer.from_str(bytes(state.pop('tokenizer_json').tolist()).decode())
+    generation_config = json.loads(meta['generation_config'])
+    required_ids = [('<|startoftranscript|>', config.decoder_start_token_id), ('<|endoftext|>', config.eos_token_id)]
+    for field, token in (('decoder_start_token_id', '<|startoftranscript|>'), ('eos_token_id', '<|endoftext|>'),
+                         ('no_timestamps_token_id', '<|notimestamps|>'), ('prev_sot_token_id', '<|startofprev|>')):
+        if field in generation_config:
+            required_ids.append((token, generation_config[field]))
+    required_ids.extend(generation_config.get('lang_to_id', {}).items())
+    required_ids.extend((f'<|{task}|>', token) for task, token in generation_config.get('task_to_id', {}).items())
+    if 'no_timestamps_token_id' in generation_config:
+        required_ids.extend([('<|nospeech|>', generation_config['no_timestamps_token_id'] - 1),
+                             ('<|0.00|>', generation_config['no_timestamps_token_id'] + 1)])
+    for token, token_id in required_ids:
+        if type(token_id) is not int or not 0 <= token_id < config.vocab_size or embedded.token_to_id(token) != token_id:
+            raise ValueError(f'Unexpected native Whisper tokenizer ID: {token}')
+    tokenizer = WhisperTokenizerFast(tokenizer_object=embedded, **token_config)
+    encoder, decoder = networks(config, dtype)
     encoder_state, decoder_state = take_component(state, 'encoder.'), take_component(state, 'decoder.')
     if state:
         raise ValueError(f'Unexpected native Whisper tensors: {sorted(state)}')
     device = mm.get_torch_device()
     return Model(patcher(encoder, encoder_state, device), patcher(decoder, decoder_state, device), config,
-                 json.loads(meta['generation_config']), tokenizer,
+                 generation_config, tokenizer,
                  WhisperFeatureExtractor(**json.loads(meta['preprocessor_config'])), dtype)
 
 
@@ -230,11 +247,46 @@ class AdmittedDecoder(nn.Module):
         super().__init__()
         self.component, self.dtype, self.config = model.decoder, model.dtype, model.config
 
+    def memory_required(self, batch, length, source_length, dtype, cache=None, use_cache=True, alignment_heads=()):
+        size = dtype.itemsize
+        dim = self.config.d_model
+        past = cache.get_seq_length() if cache is not None else 0
+        cache_bytes = resident = largest = 0
+        if use_cache:
+            for cross, context in ((False, self.config.max_target_positions), (True, source_length)):
+                owner = (cache.cross_attention_cache if cross else cache.self_attention_cache) if cache is not None else None
+                for index in range(self.config.decoder_layers):
+                    layer = owner.layers[index] if owner is not None and index < len(owner.layers) else None
+                    tensors = (layer.keys, layer.values) if layer is not None and layer.is_initialized else (None, None)
+                    for tensor in tensors:
+                        cache_dtype = dtype
+                        if tensor is not None:
+                            resident += tensor.numel() * tensor.element_size()
+                            cache_dtype = tensor.dtype if cross else torch.promote_types(dtype, tensor.dtype)
+                        allocation = batch * context * dim * cache_dtype.itemsize
+                        cache_bytes += allocation
+                        largest = max(largest, allocation)
+        # Dynamic concatenation and beam index_select retain one old K/V tensor
+        # while allocating its replacement. Existing cache bytes are already live.
+        required = max(0, cache_bytes - resident) + largest
+        required += batch * dim * (length + source_length) * size * 8
+        required += batch * length * (past + length) * size
+        # Generation keeps native logits while computing float32 token scores.
+        required += batch * length * self.config.vocab_size * (size + 4)
+        if alignment_heads:
+            required += batch * len(alignment_heads) * length * source_length * 4 * 2
+            required += batch * dim * (length + source_length) * 4
+        return required
+
     def forward(self, input_ids=None, **kwargs):
         phase('decoding')
-        batch = input_ids.shape[0] if input_ids is not None else kwargs['inputs_embeds'].shape[0]
-        required = batch * self.config.decoder_layers * self.config.d_model * (self.config.max_target_positions + self.config.max_source_positions) * 4
-        mm.load_models_gpu([self.component], memory_required=max(256 * 1024**2, required + batch * self.config.vocab_size * self.config.max_target_positions * 4))
+        embeds = kwargs.get('inputs_embeds')
+        batch, length = input_ids.shape if embeds is None else embeds.shape[:2]
+        encoded = kwargs.get('encoder_hidden_states')
+        source_length = encoded.shape[1] if encoded is not None else self.config.max_source_positions
+        required = self.memory_required(batch, length, source_length, self.dtype if embeds is None else embeds.dtype,
+                                        kwargs.get('past_key_values'), kwargs.get('use_cache', True), kwargs.get('alignment_heads', ()))
+        mm.load_models_gpu([self.component], memory_required=max(256 * 1024**2, required))
         output = self.component.model(input_ids=input_ids, **kwargs)
         advance()
         return output
@@ -280,6 +332,17 @@ class Generation(WhisperForConditionalGeneration):
     @property
     def device(self):
         return self.execution_device
+
+    def _expand_inputs_for_generation(self, expand_size=1, is_encoder_decoder=False, input_ids=None, **model_kwargs):
+        if expand_size > 1 and is_encoder_decoder:
+            encoded = model_kwargs['encoder_outputs'].last_hidden_state
+            decoder = self.model.decoder
+            batch = encoded.shape[0] * expand_size
+            required = decoder.memory_required(batch, input_ids.shape[1], encoded.shape[1], decoder.dtype,
+                                                model_kwargs.get('past_key_values'), model_kwargs.get('use_cache', True))
+            required += encoded.numel() * encoded.element_size() * expand_size
+            mm.load_models_gpu([decoder.component], memory_required=max(256 * 1024**2, required))
+        return super()._expand_inputs_for_generation(expand_size, is_encoder_decoder, input_ids, **model_kwargs)
 
     def _postprocess_outputs(self, seek_outputs, *args, **kwargs):
         # Neither long nor short segments need to retain completed KV caches.

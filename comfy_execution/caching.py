@@ -560,12 +560,26 @@ RAM_CACHE_LARGE_INTERMEDIATE = 512 * 1024 ** 2
 def all_outputs_dynamic(outputs):
     if outputs is None:
         return False
+    if isinstance(outputs, Mapping):
+        outputs = outputs.values()
+    elif not isinstance(outputs, (list, tuple)):
+        outputs = (outputs,)
 
     for output in outputs:
-        if isinstance(output, (list, tuple)):
+        if isinstance(output, (list, tuple, Mapping)):
             if not all_outputs_dynamic(output):
                 return False
-        elif not hasattr(output, "is_dynamic") or not output.is_dynamic():
+        elif hasattr(output, "is_dynamic"):
+            if not output.is_dynamic():
+                return False
+        elif hasattr(output, "_comfy_cache_tensors"):
+            try:
+                if not all_outputs_dynamic(output._comfy_cache_tensors()):
+                    return False
+            except Exception:
+                # The sizing pass reports broken hooks and prioritizes eviction.
+                return False
+        else:
             return False
 
     return True

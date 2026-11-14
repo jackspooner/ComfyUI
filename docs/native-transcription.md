@@ -8,7 +8,11 @@ by these native paths. Existing explicit legacy nodes remain separate.
 Each encoder and decoder has a native CoreModelPatcher. Transformer blocks expose
 dynamic allocation units and use the existing prefetch queues. Model management
 owns admission, CPU residency, pressure reclamation and reload. Handles expose
-`get_models()` to prompt resource tracking. Audio/text results contain CPU data;
+`get_models()` to prompt resource tracking and `_comfy_cache_tensors()` to the
+existing RAM-pressure cache, so both components receive normal model eviction
+priority when their cached output is no longer active. Discovery also preserves
+the cache's active dynamic-model protection through mappings and component hooks.
+It does not add a residency policy or measure physical RAM. Audio/text results contain CPU data;
 KV/beam state and selected alignment heads belong to the executing call.
 The reused Qwen audio encoder copies each compiled block's output into one
 execution-local hidden buffer, releasing block temporaries before their allocation
@@ -60,6 +64,15 @@ ASR packages must be local in the selected model root; this change does not expa
 the archive cache's supported categories. Loading reuses native tensor storage and
 fast-disk support, and adds no separate residency or disk cache.
 
+Loading validates the manifest's unique tensor destinations, shapes and supported
+BF16/F16/F32 storage types against the package, then checks the native architecture
+before assigning weights, including lazy native operations. Embedded tokenizer
+bytes must be a valid U8 JSON payload with the recorded hash and required token
+IDs. Storage precision need not equal compute precision. Model payloads are not
+rehash-verified on every load; retain the converter's provenance and verification
+receipt. A rejected package needs an intact matching package/manifest or a fresh
+offline conversion, not a change to its manifest to suppress the error.
+
 ## Behaviour
 
 Qwen accepts one nonempty AUDIO clip, converts to mono 16 kHz and keeps contiguous
@@ -67,6 +80,11 @@ low-amplitude chunk boundaries and offsets. Default 180-second chunks support
 alignment; text-only graphs may choose up to 1200 seconds subject to token context.
 Transcription and alignment are independent graph components. Unsupported languages
 and invalid word times retain usable text and explicit quality warnings.
+Chunk text joining preserves word boundaries and scripts that do not use word
+spaces. Tolerated final timestamp bins and chunk ranges beyond the supplied audio
+are clamped to ordered, in-range endpoints with an incomplete-timing warning;
+empty slices retain text without alignment. Qwen rotary rounding follows compute precision
+independently of stored normalization-weight precision.
 
 Whisper retains language/auto detection, transcribe/translate, beam size, initial
 prompt, previous-text conditioning, VAD and chunk/batch controls. Generation uses
@@ -77,11 +95,17 @@ use bounded batches with private state and original slot ordering. A zero chunk
 length uses native long-form decoding at batch 1 or with previous-text conditioning;
 larger independent batches use model-sized windows. Explicit lengths partition the input while
 retaining offsets. Translation quality depends on the selected checkpoint.
+Whisper decoder admission accounts for the selected cache dtype, beam expansion,
+remaining cache allocation and transient work; already allocated caches are not
+counted again as future allocations. These estimates do not replace measured GPU
+pressure acceptance. Matching Cutlery nodes validate each native AUDIO input
+before result-cache lookup; formatting-only reuse retains the single-clip contract.
 
 ## Verification and rollout
 
 Run the prepared interpreter with
-`-m pytest tests-unit/comfy_test/asr_test.py -q` for tiny CPU reference comparisons,
+`-m pytest tests-unit/comfy_test/asr_test.py tests-unit/comfy_test/asr_package_test.py tests-unit/comfy_test/asr_qwen_regression_test.py tests-unit/comfy_test/asr_memory_test.py tests-unit/comfy_test/qwen3_omni_test.py -q`
+for tiny CPU reference comparisons, malformed-package/input checks,
 cached/beam decoding, long-form controls and chunk invariants. These tests do not
 establish full-checkpoint GPU offload, speed or transcript quality.
 
