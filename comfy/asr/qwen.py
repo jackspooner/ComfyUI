@@ -12,7 +12,7 @@ import torch
 from tokenizers import Tokenizer
 from transformers import WhisperFeatureExtractor
 from transformers.models.qwen3_asr.processing_qwen3_asr import (
-    LANGUAGE_CODE_TO_NAME, _parse_single_output, _fix_timestamps, _clean_tokens, Qwen3ASRProcessor,
+    LANGUAGE_CODE_TO_NAME, _parse_single_output, _fix_timestamps, _clean_tokens, _is_cjk_char, Qwen3ASRProcessor,
 )
 
 import comfy.model_management as mm
@@ -60,7 +60,7 @@ class Decoder(Llama2_):
 
     def compute_freqs_cis(self, position_ids, device):
         # Qwen rounds rotary sin/cos to the hidden dtype before applying RoPE.
-        return tuple(value.to(self.norm.weight.dtype).float()
+        return tuple(value.to(self.compute_dtype).float()
                      for value in super().compute_freqs_cis(position_ids, device))
 
 
@@ -77,6 +77,9 @@ class Model:
     def get_models(self):
         return [self.encoder, self.decoder]
 
+    def _comfy_cache_tensors(self):
+        return self.get_models()
+
 
 def networks(config, dtype=torch.bfloat16, device='cpu'):
     thinker = config['thinker_config']
@@ -88,8 +91,17 @@ def networks(config, dtype=torch.bfloat16, device='cpu'):
 def load(path):
     meta, state = package(path, 'qwen3_asr')
     config = json.loads(meta['config'])
-    encoder, decoder = networks(config)
     tokenizer = Tokenizer.from_str(bytes(state.pop('tokenizer_json').tolist()).decode())
+    thinker = config['thinker_config']
+    required = {'<|audio_pad|>': thinker['audio_token_id'], '<|audio_start|>': thinker['audio_start_token_id'],
+                '<|audio_end|>': thinker['audio_end_token_id'], '<|im_start|>': 151644,
+                '<|im_end|>': 151645, '<|endoftext|>': 151643}
+    if 'classify_num' in thinker:
+        required['<timestamp>'] = config['timestamp_token_id']
+    for text, token in required.items():
+        if not isinstance(token, int) or not 0 <= token < thinker['text_config']['vocab_size'] or tokenizer.encode(text, add_special_tokens=False).ids != [token]:
+            raise ValueError(f'Unexpected native Qwen tokenizer ID: {text}')
+    encoder, decoder = networks(config)
     encoder_state, decoder_state = take_component(state, 'encoder.'), take_component(state, 'decoder.')
     if state:
         raise ValueError(f'Unexpected native Qwen tensors: {sorted(state)}')
@@ -189,6 +201,24 @@ def decode(model, ids, encoded, max_new_tokens=1024, classify=False):
         prefetch.cleanup_prefetch_queues()
 
 
+def join_chunks(chunks):
+    text = ''
+    for chunk in chunks:
+        current = chunk['text']
+        if not current:
+            continue
+        if text and not text[-1].isspace() and not current[0].isspace():
+            left, right = text[-1], current[0]
+            # Han, kana and Thai run without word spaces; Korean retains them.
+            unspaced = any(_is_cjk_char(char) or '\u3040' <= char <= '\u30ff' or '\uff66' <= char <= '\uff9f' or '\u0e00' <= char <= '\u0e7f'
+                           for char in (left, right))
+            if (not unspaced and right not in '.,!?;:%)]}…。，！？；：、）」』】》〉”’'
+                    and left not in '([{（「『【《〈“‘\'-/。，！？；：、'):
+                text += ' '
+        text += current
+    return text
+
+
 def transcribe(model, audio, language='', context='', max_new_tokens=1024, chunk_seconds=180):
     if model.aligner:
         raise ValueError('Select the Qwen ASR model for transcription')
@@ -205,7 +235,7 @@ def transcribe(model, audio, language='', context='', max_new_tokens=1024, chunk
         parsed = _parse_single_output(decode(model, ids, encoded, max_new_tokens))
         chunks.append({'start': start / 16000, 'end': end / 16000,
                        'language': forced or parsed['language'], 'text': parsed['transcription']})
-    return {'text': ''.join(chunk['text'] for chunk in chunks), 'chunks': chunks,
+    return {'text': join_chunks(chunks), 'chunks': chunks,
             'segments': [], 'warnings': [], 'backend': 'comfyui-native-qwen'}
 
 
@@ -240,6 +270,12 @@ def align(model, audio, transcript):
             continue
         text = '<|audio_start|><|audio_pad|><|audio_end|>' + '<timestamp><timestamp>'.join(words) + '<timestamp><timestamp>'
         start, end = round(chunk['start'] * 16000), round(chunk['end'] * 16000)
+        if not 0 <= start < end <= len(value):
+            start, end = max(0, min(start, len(value))), max(0, min(end, len(value)))
+            result['warnings'].append({'code': 'transcription_timestamps_incomplete',
+                                       'message': 'Forced alignment chunk is outside the supplied audio'})
+        if start >= end:
+            continue
         ids, encoded = embeddings(model, value[start:end], text)
         times = decode(model, ids, encoded, classify=True).numpy() * model.config['timestamp_segment_time']
         if len(times) != 2 * len(words):
@@ -252,6 +288,12 @@ def align(model, audio, transcript):
                 result['warnings'].append({'code': 'transcription_timestamps_incomplete',
                                            'message': 'Forced aligner returned an out-of-range word timestamp'})
                 continue
-            result['segments'].append({'text': word, 'start': round(chunk['start'] + left, 3),
-                                       'end': round(chunk['start'] + min(right, duration), 3)})
+            if right > duration:
+                result['warnings'].append({'code': 'transcription_timestamps_incomplete',
+                                           'message': 'Forced aligner word timestamp was clamped to the audio boundary'})
+            # Clamp after rounding too, so millisecond output cannot exceed a
+            # sample-accurate chunk boundary.
+            lower, upper = start / 16000, end / 16000
+            result['segments'].append({'text': word, 'start': min(upper, max(lower, round(lower + min(left, duration), 3))),
+                                       'end': min(upper, max(lower, round(lower + min(right, duration), 3)))})
     return result
