@@ -84,6 +84,30 @@ def test_cancelled_preparation_does_not_publish_partial_audio():
             native.demix(FakeSeparator(), torch.zeros(2, 81), torch.device('cpu'), {}, chunk=80)
 
 
+def test_cpu_roformer_does_not_dispatch_the_global_cuda_attention_backend():
+    from comfy import ops
+    from comfy.soulx_singer import separation
+    from comfy.ldm.modules import attention
+    with torch.random.fork_rng(devices=[]), torch.inference_mode():
+        torch.manual_seed(7410)
+        model = separation.Attention(16, 2, 8, torch.float32, 'cpu', ops.manual_cast)
+        for parameter in model.parameters():
+            torch.nn.init.normal_(parameter, std=.05)
+        x = torch.randn(2, 11, 16)
+        position = torch.arange(11, dtype=torch.float32)
+        normalized = model.norm(x)
+        q, k, v = model.to_qkv(normalized).reshape(2, 11, 3, 2, 8).permute(2, 0, 3, 1, 4).unbind(0)
+        phase = torch.outer(position, model.rotary_embed.freqs)
+        matrix = torch.stack((phase.cos(), -phase.sin(), phase.sin(), phase.cos()), -1).unflatten(-1, (2, 2))[None, None]
+        q, k = separation.apply_rope(q, k, matrix)
+        attended = F.scaled_dot_product_attention(q, k, v).transpose(1, 2).reshape(2, 11, 16)
+        expected = model.to_out(attended*model.to_gates(normalized).sigmoid().repeat_interleave(8, -1))
+        with patch.object(attention, 'optimized_attention', side_effect=AssertionError('CUDA-only global backend')), \
+             patch.object(separation, 'optimized_attention', side_effect=AssertionError('CUDA-only imported backend'), create=True):
+            actual = model(x, position)
+        torch.testing.assert_close(actual, expected, rtol=2e-5, atol=2e-6)
+
+
 def test_small_complete_roformer_matches_pinned_source_including_dc_filter(reference):
     import einops
     import librosa
