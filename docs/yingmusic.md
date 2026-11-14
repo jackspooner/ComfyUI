@@ -1,5 +1,12 @@
 # Native YingMusic Singer Plus
 
+The shared MelBandRoformer selects attention through the core's device-aware
+selector. An explicit CPU separator uses the existing CPU implementation even
+when the server's default attention is CUDA-only. GPU execution and explicit
+compatible per-model attention remain under native selection. Test full CPU
+separation through the main queue as well as the normal GPU path; tiny fixtures
+alone do not establish full-checkpoint readiness.
+
 This fork adapts [ASLP-lab YingMusic Singer Plus](https://github.com/ASLP-lab/YingMusic-Singer-Plus), source revision `baa409c2e7e5e775f09b4e92a220808f4827d2cc`.
 The DiT, melody Conformer and existing AudioOobleck VAE run inside ComfyUI.
 Native loaders, ModelPatcher, attention selection, prefetch, queue progress and cancellation own execution.

@@ -8,7 +8,7 @@ import comfy.model_management
 import comfy.model_prefetch
 import comfy.ops
 from comfy.ldm.flux.math import apply_rope
-from comfy.ldm.modules.attention import AttentionTensorContainer, ComfyAttention, optimized_attention
+from comfy.ldm.modules.attention import AttentionTensorContainer, ComfyAttention, optimized_attention_for_device
 
 
 class RMSNorm(nn.Module):
@@ -54,7 +54,8 @@ class Attention(nn.Module):
         cos, sin = phase.cos(), phase.sin()
         rotation = torch.stack((cos, -sin, sin, cos), dim=-1).unflatten(-1, (2, 2))[None, None]
         q, k = apply_rope(q, k, rotation)
-        out = optimized_attention(AttentionTensorContainer(q), AttentionTensorContainer(k), AttentionTensorContainer(v),
+        attention = optimized_attention_for_device(x.device)
+        out = attention(AttentionTensorContainer(q), AttentionTensorContainer(k), AttentionTensorContainer(v),
                                   self.heads, skip_reshape=True, preferred_attention=self.comfy_attention)
         gates = self.to_gates(x).sigmoid().repeat_interleave(self.head_dim, dim=-1)
         return self.to_out(out * gates)

@@ -1,5 +1,9 @@
 # ComfyUI fork
 
+Native YingMusic/MelBandRoformer separation selects attention for its actual
+execution device. Explicit CPU separation works with a CUDA attention default;
+GPU separation retains the configured native backend. See [YingMusic](docs/yingmusic.md).
+
 This fork extends [Comfy-Org/ComfyUI](https://github.com/Comfy-Org/ComfyUI) with
 additional native model integrations, editable workflows and local execution
 controls. It is intended for people building local image, video, audio, text
