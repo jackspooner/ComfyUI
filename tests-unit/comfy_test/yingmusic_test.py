@@ -1,13 +1,20 @@
+from functools import partial
+import json
+from unittest.mock import Mock
+
 import pytest
 import torch
+from safetensors.torch import save_file
 from torch.nn import functional as F
 
 from comfy.cli_args import args
 args.cpu = True
-from comfy import model_detection, ops
+from comfy import model_detection, ops, sd
+from comfy.audio_encoders import audio_encoders
 from comfy.audio_encoders.yingmusic import prepare_melody
 from comfy.ldm.yingmusic.model import Attention, GRN, YingMusic
-from comfy_extras.nodes_yingmusic import prepare_audio
+from comfy_extras.nodes_multigpu import SelectVAEDeviceNode
+from comfy_extras.nodes_yingmusic import YingMusicPackageLoader, prepare_audio
 
 
 def initialize(model):
@@ -94,3 +101,72 @@ def test_reference_channel_and_silence_preparation():
     assert torch.all(result[..., :4410] == 1)
     assert torch.count_nonzero(result[..., 4410:]) == 0
     assert source["waveform"].shape == (1, 1, 4410)
+
+
+@pytest.fixture
+def singer_package(tmp_path, monkeypatch):
+    tiny_vae = partial(sd.AudioOobleckVAE, channels=2, c_mults=[1], strides=[2])
+    monkeypatch.setattr(sd, 'AudioOobleckVAE', tiny_vae)
+    state = initialize(tiny_vae()).state_dict()
+    identity = {
+        'source_sha256': 'b32dc225a6cfff37f2252b7d3b60cbf536f656de349eba6d5b773aa5f5b780e4',
+        'implementation_revision': 'baa409c2e7e5e775f09b4e92a220808f4827d2cc',
+    }
+    manifest = {**identity, 'files': {}}
+    for kind in ('diffusion_models', 'vae', 'audio_encoders'):
+        path = tmp_path/kind/'yingmusic_singer_plus.safetensors'
+        path.parent.mkdir()
+        tensors = state if kind == 'vae' else {'weight': torch.ones(1)}
+        save_file(tensors, str(path), metadata={**identity, 'source': 'ASLP-lab/YingMusic-Singer-Plus'})
+        manifest['files'][str(path.relative_to(tmp_path))] = {'tensors': len(tensors)}
+    (tmp_path/'yingmusic_singer_plus.manifest.json').write_text(json.dumps(manifest))
+    monkeypatch.setattr(sd, 'load_diffusion_model', Mock(return_value=object()))
+    monkeypatch.setattr(audio_encoders, 'load_audio_encoder_from_sd', Mock(return_value=object()))
+    monkeypatch.setattr(sd.model_management, 'get_torch_device', lambda: torch.device('cuda:0'))
+    monkeypatch.setattr(sd.model_management, 'vae_device', lambda: torch.device('cpu'))
+    monkeypatch.setattr(sd.model_management, 'vae_dtype', lambda *args: torch.float32)
+    monkeypatch.setattr(sd.model_management, 'unload_model_and_clones', Mock())
+    return tmp_path, state
+
+
+@pytest.mark.parametrize('device', ['auto', 'cpu', 'cuda:0'])
+def test_package_vae_device_selection_reconstructs_pristine_weights(singer_package, monkeypatch, device):
+    root, state = singer_package
+    model, vae, encoder, lyrics = YingMusicPackageLoader().load(str(root), device)
+    assert model is sd.load_diffusion_model.return_value
+    assert encoder is audio_encoders.load_audio_encoder_from_sd.return_value
+    assert lyrics == str(root/'text_encoders/yingmusic_singer_plus')
+    selected = None if device == 'auto' else torch.device(device)
+    original_device = selected or torch.device('cpu')
+    assert vae.device == vae.patcher.load_device == original_device
+    assert not vae.crop_input  # Converted YingMusic metadata disables generic VAE cropping.
+    assert all(value.device.type == 'cpu' for value in vae.first_stage_model.parameters())
+    original = vae.first_stage_model
+    key = next(iter(state))
+    original.state_dict()[key].add_(7)
+    target = torch.device('cuda:1' if device == 'cuda:0' else 'cuda:0')
+    monkeypatch.setattr(sd.model_management, 'resolve_gpu_device_option', lambda value: target if value == 'gpu:fixture' else None)
+    retargeted = SelectVAEDeviceNode.execute(vae, 'gpu:fixture').result[0]
+    assert retargeted.device == retargeted.patcher.load_device == target
+    assert retargeted.first_stage_model is retargeted.patcher.model
+    assert retargeted.first_stage_model is not original
+    for name, value in retargeted.first_stage_model.state_dict().items():
+        torch.testing.assert_close(value, state[name], rtol=0, atol=0)
+        assert value.device.type == 'cpu'
+    restored = SelectVAEDeviceNode.execute(retargeted, 'default').result[0]
+    assert restored.device == restored.patcher.load_device == original_device
+    assert restored.first_stage_model is not retargeted.first_stage_model
+    assert restored.first_stage_model is restored.patcher.model
+    assert vae.device == original_device
+    assert not restored.crop_input
+    assert sd.model_management.unload_model_and_clones.call_count == 2
+
+
+def test_package_loader_rejects_invalid_vae_before_encoder(singer_package):
+    root, state = singer_package
+    path = root/'vae/yingmusic_singer_plus.safetensors'
+    save_file({f'unknown.{index}': value for index, value in enumerate(state.values())}, str(path),
+              metadata={'source_sha256': 'b32dc225a6cfff37f2252b7d3b60cbf536f656de349eba6d5b773aa5f5b780e4'})
+    with pytest.raises(RuntimeError, match='VAE is invalid'):
+        YingMusicPackageLoader().load(str(root), 'cpu')
+    audio_encoders.load_audio_encoder_from_sd.assert_not_called()

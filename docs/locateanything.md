@@ -45,6 +45,13 @@ compatibility graphs preserve their existing eight task choices and prompt text.
 Missing/mismatched packages fail with preparation instructions and never start a
 worker or substitute another model. Native CPU execution uses FP32; CUDA uses BF16.
 
+The custom `LOCATE_VISION` and `LOCATE_LANGUAGE` components support the loader's
+device choice and normal patcher-managed loading/offloading. They do not expose
+the generic MODEL/CLIP/VAE device selectors. Their patchers currently have no
+disk-backed reconstruction factory, so forced deep copies/delegate reconstruction
+are unsupported. This limitation does not establish an ordinary generation or
+normal unload/reload failure; full lifecycle acceptance remains outstanding.
+
 Image preparation preserves bicubic resizing, the pinned 25,600-patch allowance,
 14-pixel patches, normalization and 2×2 merge order. It processes the first input
 IMAGE item. Coordinates remain normalized integer tokens until the Cutlery result
