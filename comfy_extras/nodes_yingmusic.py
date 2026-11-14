@@ -122,7 +122,11 @@ class YingMusicPackageLoader:
             raise ValueError('YingMusic package device must match the selected native GPU or CPU')
         options = {} if selected is None else {'load_device': selected, 'offload_device': torch.device('cpu')}
         model = comfy.sd.load_diffusion_model(str(paths['diffusion_models']), model_options=options)
-        vae = comfy.sd.VAE(sd=comfy.utils.load_torch_file(str(paths['vae']), safe_load=True), device=selected)
+        vae_path = str(paths['vae'])
+        vae_sd, metadata = comfy.utils.load_torch_file(vae_path, safe_load=True, return_metadata=True)
+        vae = comfy.sd.VAE(sd=vae_sd, metadata=metadata, device=selected)
+        vae.throw_exception_if_invalid()
+        vae.patcher.cached_patcher_init = (comfy.sd.load_vae_patcher, (vae_path, metadata, selected))
         encoder = comfy.audio_encoders.audio_encoders.load_audio_encoder_from_sd(
             comfy.utils.load_torch_file(str(paths['audio_encoders']), safe_load=True), device=selected)
         return model, vae, encoder, str(root/'text_encoders/yingmusic_singer_plus')

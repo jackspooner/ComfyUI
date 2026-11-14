@@ -60,6 +60,10 @@ For existing Cutlery generation/segmentation IDs, also run the ordinary singer
 converter with the same sibling destination. `YingMusicPackageLoader` composes
 the existing native diffusion, VAE and audio-encoder loading with explicit
 auto/CPU/native-GPU placement and returns their exact lyric-asset path. The
+package VAE retains its conversion metadata and uses the standard file-backed
+VAE reconstruction factory, including `SelectVAEDevice` retargeting. The selected
+loader device is retained when reconstructing weights; the device selector owns
+the clone's target device. Invalid VAE weights fail during package loading. The
 generation node's optional `lyric_assets` input selects that converted asset set;
 omitting it preserves configured text-encoder discovery. Existing standard-loader
 graphs remain valid. Cutlery compatibility macros expand to inspectable component
@@ -68,6 +72,12 @@ New RouterAudio v8 stages bind the exact separator file and manifest; accepted
 adapters through v7 retain worker separation and their original checkpoints.
 
 ## Verification status
+
+Tiny CPU package fixtures cover the loader's auto/CPU/native-GPU settings,
+metadata, invalid VAE rejection and real patcher reconstruction through
+`SelectVAEDevice`, including restoration of the original device. GPU resolution
+is mocked and all tensors remain on CPU; these checks do not establish hardware
+placement, full-checkpoint retargeting or multi-GPU acceptance.
 
 The new separator's ten pinned CPU preparation fixtures match exactly across
 short, boundary and multi-batch lengths. Native singing/SoulX regression checks
