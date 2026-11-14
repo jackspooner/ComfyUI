@@ -29,6 +29,8 @@ guides describe their original integration, not the current base version.
 - **Memory and media handling:** pinned-memory registration and partial-prefetch
   recovery, an opt-in archive-to-NVMe model cache, selective video extraction,
   external image references, and geometry interchange/texturing helpers.
+  Native package selector matching can inspect archive paths without staging
+  unrelated weights; see the [model cache guide](docs/model-cache.md).
 - **Diagnostics:** prompt-free local timing observations, stage coverage and
   bounded live updates for consumers such as MediaTools. Forecasts belong to
   the consumer; these observations do not establish complete GPU timings or
