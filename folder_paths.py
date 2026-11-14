@@ -451,9 +451,9 @@ def filter_files_extensions(files: Collection[str], extensions: Collection[str])
 
 
 
-def get_full_path(folder_name: str, filename: str) -> str | None:
+def get_full_path(folder_name: str, filename: str, *, resolve_cache: bool = True) -> str | None:
     """
-    Get the full path of a file in a folder, has to be a file
+    Get a model path. Metadata lookups can resolve archive sources without staging.
     """
     global folder_names_and_paths
     folder_name = map_legacy(folder_name)
@@ -461,7 +461,8 @@ def get_full_path(folder_name: str, filename: str) -> str | None:
         return None
     folders = folder_names_and_paths[folder_name]
     if comfy.model_cache.manager is not None and filename.startswith("archive/"):
-        return comfy.model_cache.resolve(source_path(comfy.model_cache.manager.config, folder_name, filename[len("archive/"):]))
+        selected = source_path(comfy.model_cache.manager.config, folder_name, filename[len("archive/"):])
+        return comfy.model_cache.resolve(selected) if resolve_cache else str(selected)
     filename = os.path.relpath(os.path.join("/", filename), "/")
     for x in folders[0]:
         full_path = os.path.join(x, filename)

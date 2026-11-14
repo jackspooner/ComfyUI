@@ -44,6 +44,12 @@ selector entries. Refreshing model lists discovers new archive files without
 copying weights or refreshing inactivity. Unavailable archives produce explicit
 errors rather than being treated as empty source libraries.
 
+For package identity or selector matching, use
+`folder_paths.get_full_path(category, name, resolve_cache=False)`. It returns the
+archive source path without copying weights, touching inactivity or consuming
+cache capacity, even inside a running node. Normal loader calls retain cache
+staging. Metadata selection is not an inference fallback or a reservation.
+
 ## Normal use
 
 Select `archive/your-model.safetensors` in an existing loader and queue normally.
